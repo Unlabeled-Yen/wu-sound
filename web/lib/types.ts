@@ -105,3 +105,69 @@ export function formatEquipmentLocation(status: EquipmentStatus, site_name?: str
   if (status === 'on_site') return site_name ? `案場中 · ${site_name}` : '案場中';
   return EQUIPMENT_STATUS_LABEL[status];
 }
+
+// Phase 4: 內帳
+export type LedgerDirection = 'income' | 'expense';
+export type LedgerKind =
+  | 'project' | 'loan' | 'other_income'
+  | 'salary' | 'bonus' | 'reimbursement' | 'goods' | 'vehicle'
+  | 'rent' | 'utility' | 'credit_card' | 'tax' | 'investment' | 'health' | 'other_expense';
+export type InvoiceStatus = 'none' | 'to_issue' | 'issued';
+export type LedgerStatus = 'active' | 'voided';
+
+export interface LedgerEntry {
+  id: string;
+  occurred_on: string;
+  direction: LedgerDirection;
+  kind: LedgerKind;
+  amount_twd: number;
+  party: string | null;
+  memo: string | null;
+  is_external: boolean;
+  invoice_status: InvoiceStatus;
+  invoice_no: string | null;
+  invoice_date: string | null;
+  tax_amount_twd: number;
+  status: LedgerStatus;
+  voided_reason: string | null;
+  source_batch_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const LEDGER_KIND_LABEL: Record<LedgerKind, string> = {
+  project: '案件收款',
+  loan: '借款/資本',
+  other_income: '其他收入',
+  salary: '薪資',
+  bonus: '獎金',
+  reimbursement: '代墊/零用金',
+  goods: '貨款/採購',
+  vehicle: '車輛',
+  rent: '租金',
+  utility: '水電',
+  credit_card: '信用卡',
+  tax: '稅金',
+  investment: '投資',
+  health: '健檢',
+  other_expense: '其他支出',
+};
+
+export const INCOME_KINDS: LedgerKind[] = ['project', 'loan', 'other_income'];
+export const EXPENSE_KINDS: LedgerKind[] = [
+  'salary', 'bonus', 'reimbursement', 'goods', 'vehicle',
+  'rent', 'utility', 'credit_card', 'tax', 'investment', 'health', 'other_expense',
+];
+
+export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+  none: '不列外帳',
+  to_issue: '待開立',
+  issued: '已開立',
+};
+
+// 5% 營業稅:含稅金額 / 21 = 稅額
+export function suggestTax(amountTwd: number): number {
+  if (!Number.isFinite(amountTwd) || amountTwd <= 0) return 0;
+  return Math.round(amountTwd / 21);
+}
