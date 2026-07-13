@@ -12,6 +12,7 @@ export default async function BossLayout({ children }: { children: React.ReactNo
   const links: { href: string; label: string }[] = [
     { href: '/boss/expenses', label: '零用金審核' },
     { href: '/boss/close', label: '月結' },
+    { href: '/boss/equipment', label: '設備' },
     { href: '/boss/worklogs', label: '工作記錄' },
     { href: '/boss/clockins', label: '打卡' },
     { href: '/boss/users', label: '使用者管理' },

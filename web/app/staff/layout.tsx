@@ -22,13 +22,14 @@ export default async function StaffLayout({ children }: { children: React.ReactN
     { href: '/staff/capture', label: '相機' },
     { href: '/staff/queue', label: '待確認', badge: draftCount },
     { href: '/staff/worklogs', label: '工作記錄' },
+    { href: '/staff/equipment', label: '設備' },
     { href: '/staff/clockins', label: '打卡' },
   ];
 
   return (
     <div className="flex-1 flex flex-col min-h-full">
       <main className="flex-1 pb-20">{children}</main>
-      <nav className="fixed bottom-0 inset-x-0 z-40 bg-white dark:bg-neutral-950 border-t border-neutral-200 dark:border-neutral-800 grid grid-cols-5 text-xs">
+      <nav className="fixed bottom-0 inset-x-0 z-40 bg-white dark:bg-neutral-950 border-t border-neutral-200 dark:border-neutral-800 grid grid-cols-6 text-xs">
         {tabs.map((t) => (
           <Link
             key={t.href}
