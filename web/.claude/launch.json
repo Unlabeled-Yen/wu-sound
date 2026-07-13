@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "env": {
+        "SESSION_SECRET": "devsecret_at_least_16_chars_long",
+        "NEXT_PUBLIC_SUPABASE_URL": "https://placeholder.supabase.co",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY": "placeholder",
+        "SUPABASE_SERVICE_ROLE_KEY": "placeholder",
+        "ANTHROPIC_API_KEY": "placeholder"
+      }
+    }
+  ]
+}
