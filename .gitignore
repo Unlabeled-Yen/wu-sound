@@ -1,3 +1,7 @@
 intake/
 .env*
 .DS_Store
+# 語音轉錄可能含敏感財務/客戶對話,一律隔離
+docs/voice-notes/
+語音轉錄/
+voice-notes/
