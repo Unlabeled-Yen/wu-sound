@@ -15,6 +15,7 @@ export default async function BossLayout({ children }: { children: React.ReactNo
     { href: '/boss/equipment', label: '設備' },
     { href: '/boss/worklogs', label: '工作記錄' },
     { href: '/boss/clockins', label: '打卡' },
+    { href: '/boss/sites', label: '案場管理' },
     { href: '/boss/users', label: '使用者管理' },
   ];
 
