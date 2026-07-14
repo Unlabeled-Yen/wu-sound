@@ -15,12 +15,23 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "聲生工作系統",
   description: "聲生 SSA 工作系統",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "聲生",
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  themeColor: "#0A0A0A",
 };
 
 export default function RootLayout({
