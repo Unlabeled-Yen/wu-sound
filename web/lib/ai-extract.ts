@@ -4,7 +4,7 @@ import type { ExpenseAiDraft, ExpenseCategory } from './types';
 
 const ANTHROPIC_PRIMARY = 'claude-sonnet-4-5';
 const ANTHROPIC_FALLBACK = 'claude-sonnet-5';
-const KIMI_DEFAULT_MODEL = 'kimi-latest';
+const KIMI_DEFAULT_MODEL = 'moonshot-v1-8k-vision-preview';
 const KIMI_DEFAULT_BASE = 'https://api.moonshot.ai/v1';
 
 const PROMPT = `你是收據辨識助手。只回傳 JSON,不要任何說明文字。JSON 結構:
