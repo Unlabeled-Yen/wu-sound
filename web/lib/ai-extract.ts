@@ -2,8 +2,10 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import type { ExpenseAiDraft, ExpenseCategory } from './types';
 
-const MODEL_PRIMARY = 'claude-sonnet-4-5';
-const MODEL_FALLBACK = 'claude-sonnet-5';
+const ANTHROPIC_PRIMARY = 'claude-sonnet-4-5';
+const ANTHROPIC_FALLBACK = 'claude-sonnet-5';
+const KIMI_DEFAULT_MODEL = 'kimi-latest';
+const KIMI_DEFAULT_BASE = 'https://api.moonshot.ai/v1';
 
 const PROMPT = `你是收據辨識助手。只回傳 JSON,不要任何說明文字。JSON 結構:
 {
@@ -46,21 +48,14 @@ function safeParse(text: string): ExpenseAiDraft {
   }
 }
 
-export async function extractReceipt(
-  imageBytes: Uint8Array,
-  mediaType: string,
-): Promise<ExpenseAiDraft> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return { confidence: 'low', raw: 'ANTHROPIC_API_KEY 未設定' };
-  }
-  const client = new Anthropic({ apiKey });
-  const b64 = Buffer.from(imageBytes).toString('base64');
-  const supportedType =
-    mediaType === 'image/jpeg' || mediaType === 'image/png' || mediaType === 'image/gif' || mediaType === 'image/webp'
-      ? mediaType
-      : 'image/jpeg';
+function normalizeMediaType(mediaType: string): string {
+  return mediaType === 'image/jpeg' || mediaType === 'image/png' || mediaType === 'image/gif' || mediaType === 'image/webp'
+    ? mediaType
+    : 'image/jpeg';
+}
 
+async function extractViaAnthropic(b64: string, mediaType: string): Promise<ExpenseAiDraft> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
   async function callModel(model: string): Promise<string> {
     const resp = await client.messages.create({
       model,
@@ -69,10 +64,7 @@ export async function extractReceipt(
         {
           role: 'user',
           content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: supportedType, data: b64 },
-            },
+            { type: 'image', source: { type: 'base64', media_type: mediaType as 'image/jpeg', data: b64 } },
             { type: 'text', text: PROMPT },
           ],
         },
@@ -81,19 +73,66 @@ export async function extractReceipt(
     const first = resp.content.find((c) => c.type === 'text');
     return first && first.type === 'text' ? first.text : '';
   }
-
   let text: string;
   try {
-    text = await callModel(MODEL_PRIMARY);
-  } catch (e1) {
-    try {
-      text = await callModel(MODEL_FALLBACK);
-    } catch (e2) {
-      const msg = e2 instanceof Error ? e2.message : String(e2);
-      return { confidence: 'low', raw: `AI 呼叫失敗: ${msg}` };
-    }
+    text = await callModel(ANTHROPIC_PRIMARY);
+  } catch {
+    text = await callModel(ANTHROPIC_FALLBACK);
   }
-
   if (!text) return { confidence: 'low', raw: 'AI 無輸出' };
   return safeParse(text);
+}
+
+async function extractViaKimi(b64: string, mediaType: string): Promise<ExpenseAiDraft> {
+  const baseURL = (process.env.KIMI_BASE_URL ?? KIMI_DEFAULT_BASE).replace(/\/$/, '');
+  const model = process.env.AI_VISION_MODEL ?? KIMI_DEFAULT_MODEL;
+  const resp = await fetch(`${baseURL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${process.env.KIMI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 512,
+      temperature: 0.1,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:${mediaType};base64,${b64}` } },
+            { type: 'text', text: PROMPT },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    return { confidence: 'low', raw: `Kimi 呼叫失敗 (${resp.status}): ${body.slice(0, 300)}` };
+  }
+  const data = (await resp.json()) as { choices?: { message?: { content?: string } }[] };
+  const text = data.choices?.[0]?.message?.content ?? '';
+  if (!text) return { confidence: 'low', raw: 'AI 無輸出' };
+  return safeParse(text);
+}
+
+export async function extractReceipt(
+  imageBytes: Uint8Array,
+  mediaType: string,
+): Promise<ExpenseAiDraft> {
+  const b64 = Buffer.from(imageBytes).toString('base64');
+  const type = normalizeMediaType(mediaType);
+  try {
+    if (process.env.ANTHROPIC_API_KEY) {
+      return await extractViaAnthropic(b64, type);
+    }
+    if (process.env.KIMI_API_KEY) {
+      return await extractViaKimi(b64, type);
+    }
+    return { confidence: 'low', raw: '未設定任何 AI 金鑰 (ANTHROPIC_API_KEY 或 KIMI_API_KEY)' };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { confidence: 'low', raw: `AI 呼叫失敗: ${msg}` };
+  }
 }
