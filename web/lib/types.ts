@@ -171,3 +171,10 @@ export function suggestTax(amountTwd: number): number {
   if (!Number.isFinite(amountTwd) || amountTwd <= 0) return 0;
   return Math.round(amountTwd / 21);
 }
+
+// Phase 3: 品項庫 + 報價單
+export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost';
+export interface CatalogItem { id:string; brand:string|null; name:string; item_type:string|null; unit:string; cost_price_twd:number|null; sell_price_twd:number|null; category:string|null; note:string|null; active:boolean; created_at:string; updated_at:string; }
+export interface Quote { id:string; client_name:string; project_name:string|null; status:QuoteStatus; need_text:string|null; ai_rationale:string|null; note:string|null; created_by:string; created_at:string; updated_at:string; }
+export interface QuoteLine { id:string; quote_id:string; catalog_item_id:string|null; name:string; spec:string|null; qty:number; unit:string|null; unit_price_twd:number|null; is_ai_suggested:boolean; sort_order:number; created_at:string; }
+export const QUOTE_STATUS_LABEL: Record<QuoteStatus,string> = { draft:'草稿', sent:'已送出', won:'成交', lost:'未成交' };

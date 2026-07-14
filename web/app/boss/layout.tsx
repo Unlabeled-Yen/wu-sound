@@ -13,6 +13,8 @@ export default async function BossLayout({ children }: { children: React.ReactNo
     { href: '/boss/expenses', label: '零用金審核' },
     { href: '/boss/close', label: '月結' },
     { href: '/boss/ledger', label: '內帳' },
+    { href: '/boss/quotes', label: '報價' },
+    { href: '/boss/catalog', label: '品項庫' },
     { href: '/boss/equipment', label: '設備' },
     { href: '/boss/worklogs', label: '工作記錄' },
     { href: '/boss/clockins', label: '打卡' },

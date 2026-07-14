@@ -1,0 +1,189 @@
+-- ============================================================
+-- Phase 3 套用:品項庫 + 報價單 + 114 品項種子
+-- 對現有 wu-sound-fde Supabase 專案,SQL Editor 全部貼上、Run 一次。
+-- ============================================================
+
+-- Phase 3 migration:品項庫 + 報價單
+-- 對現有 DB 執行這份。全新專案跑 schema.sql 已含。
+
+create type quote_status as enum ('draft', 'sent', 'won', 'lost');
+
+create table catalog_items (
+  id uuid primary key default gen_random_uuid(),
+  brand text,
+  name text not null,
+  item_type text,
+  unit text not null default '式',
+  cost_price_twd integer check (cost_price_twd is null or cost_price_twd >= 0),
+  sell_price_twd integer check (sell_price_twd is null or sell_price_twd >= 0),
+  category text,
+  note text,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index catalog_active_idx on catalog_items (active);
+create index catalog_category_idx on catalog_items (category);
+create index catalog_search_idx on catalog_items using gin (to_tsvector('simple', coalesce(name,'') || ' ' || coalesce(brand,'') || ' ' || coalesce(item_type,'')));
+
+create trigger catalog_bump_updated
+before update on catalog_items for each row execute function bump_updated_at();
+
+create table quotes (
+  id uuid primary key default gen_random_uuid(),
+  client_name text not null,
+  project_name text,
+  status quote_status not null default 'draft',
+  need_text text,
+  ai_rationale text,
+  note text,
+  created_by uuid not null references users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index quotes_client_idx on quotes (client_name);
+create index quotes_status_idx on quotes (status, created_at desc);
+
+create trigger quotes_bump_updated
+before update on quotes for each row execute function bump_updated_at();
+
+create table quote_lines (
+  id uuid primary key default gen_random_uuid(),
+  quote_id uuid not null references quotes(id) on delete cascade,
+  catalog_item_id uuid references catalog_items(id),
+  name text not null,
+  spec text,
+  qty integer not null default 1 check (qty > 0),
+  unit text,
+  unit_price_twd integer check (unit_price_twd is null or unit_price_twd >= 0),
+  is_ai_suggested boolean not null default false,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index quote_lines_quote_idx on quote_lines (quote_id, sort_order);
+
+alter table catalog_items enable row level security;
+alter table quotes enable row level security;
+alter table quote_lines enable row level security;
+
+-- ===== 品項庫種子 =====
+-- Phase 3 seed:品項庫(來源 價目進價表.xlsx,114 項;進價/售價多為空,老闆邊用邊補)
+insert into catalog_items (brand, name, item_type, unit, cost_price_twd, sell_price_twd, category, note) values
+  ('CODA', 'HOPS8i', '喇叭', '顆', null, null, '音響系統', null),
+  ('CODA', 'G15-SUB', '超低音', '顆', null, null, '音響系統', null),
+  ('CODA', 'U12i-Sub', '超低音', '顆', null, null, '音響系統', null),
+  ('CODA', 'D5-Cube', '喇叭', '顆', null, null, '音響系統', null),
+  ('CODA', 'G308i', '喇叭', '顆', null, null, '音響系統', null),
+  ('CODA', 'Linus6.4i', '擴大機', '台', null, null, '音響系統', null),
+  ('YAMAHA', 'DHR12', '喇叭', '顆', null, null, '音響系統', null),
+  ('ANP', '19寸 32U機櫃', '機櫃', '座', null, null, '音響系統', null),
+  ('ANP', '19寸 22U機櫃', '機櫃', '座', null, null, '音響系統', null),
+  ('YAMAHA', 'PX3', '擴大機', '台', null, null, '音響系統', null),
+  ('YAMAHA', 'HS5', '喇叭', '顆', null, null, '音響系統', null),
+  ('CODA', 'U15-SUB', '超低音', '顆', null, null, '音響系統', null),
+  ('CODA', 'G512', '喇叭', '顆', null, null, '音響系統', null),
+  ('YAMAHA', 'CHR12M', '喇叭', '顆', null, null, '音響系統', null),
+  ('YAMAHA', 'CBR12', '喇叭', '顆', null, null, '音響系統', null),
+  ('Fuman', 'CN3600 SE', '電源時序', '台', null, null, '電源系統', null),
+  ('KINGSTAGE', 'SC160', '電源時序', '台', null, null, '電源系統', null),
+  ('KINGSTAGE', 'SC-080PRO', '電源時序', '台', null, null, '電源系統', null),
+  ('KINGSTAGE', 'Kingstage喇叭架', '各種架子', '支', null, null, '五金配件/架子', null),
+  ('CODA', 'CODA喇叭架', '各種架子', '支', null, null, '五金配件/架子', null),
+  ('YAMAHA', 'Yamaha喇叭架', '各種架子', '支', null, null, '五金配件/架子', null),
+  ('CANARE', '2S11F', '喇叭線', '卷or米', null, null, '線材/接頭/配件', null),
+  ('CANARE', '2S9', '喇叭線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', '4S8', '喇叭線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', '4S6', '喇叭線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'L-2T2S', '訊號線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', '2AT', '訊號線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', '4AT', '訊號線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', '8AT', '訊號線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'L-5D2V', '無線麥克風天線線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'L-2.5CHD', 'SDI線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'L-4.5CHD', 'SDI線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'L-5.5CUHD', 'SDI線', '式', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'BCP-B25HD', 'SDI頭', '顆', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'BCP-B53', 'SDI頭', '顆', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'BCP-D55UHD', 'SDI頭', '顆', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'BCJ-JRUDK', 'SDI座', '顆', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'BP-C5', '天線接頭', '顆', null, null, '線材/接頭/配件', null),
+  ('CANARE', 'MS202 耳機延長訊號線', '訊號線', '式', null, null, '線材/接頭/配件', null),
+  ('嘉榮', '2平方米3C電源線', '電源線', '式', null, null, '電源系統, 線材/接頭/配件', null),
+  ('LINKOMM', 'Cat.6a網路線', '網路線', '式', null, null, '線材/接頭/配件', null),
+  ('LINKOMM', 'Cat.6網路線', '網路線', '式', null, null, '線材/接頭/配件', null),
+  ('LINKOMM', 'Cat.6a穿透式水晶頭23-24AWG遮蔽式', '網路接頭', '顆', 26, null, '線材/接頭/配件', null),
+  ('LINKOMM', '水晶頭護套遮蔽式', '網路接頭', '顆', 4, null, '線材/接頭/配件', null),
+  ('LINKOMM', 'Cat.6穿透式水晶頭23-26AWG非遮蔽', '網路接頭', '顆', 7, null, '線材/接頭/配件', null),
+  ('LINKOMM', '水晶頭護套非遮蔽', '網路接頭', '顆', 2, null, '線材/接頭/配件', null),
+  ('LINKOMM', 'Cat.6a資訊插座', '網路母座', '顆', 108, null, '線材/接頭/配件', null),
+  ('LINKOMM', 'Cat.6資訊插座', '網路母座', '顆', 68, null, '線材/接頭/配件', null),
+  ('SUNRISE', 'Cat5e 超軟佈線型', '網路線', '式', null, null, '線材/接頭/配件', null),
+  ('SUNRISE', 'S-098', '訊號線', '式', null, null, '線材/接頭/配件', null),
+  ('SUNRISE', '8pair multi', '訊號線', '式', null, null, '線材/接頭/配件', null),
+  ('KINGSTAGE', '機櫃電源排插（有線）', '排插', '組', null, null, '電源系統', null),
+  ('Mipro', '747-四手握', '無線麥克風', '組', null, null, '樂器', null),
+  ('Nord', 'Grand2', '電鋼琴', '台', null, null, '樂器', null),
+  ('Behringer', 'Wing Compact', '音控台', '台', null, null, '音響系統', null),
+  ('Behringer', 'S16', 'stage box', '台', null, null, '音響系統', null),
+  ('SHURE', 'QLXD2/4', '無線麥克風', '組', null, null, '樂器', null),
+  ('SHURE', 'UA844+', '無線麥克風分配器', '台', null, null, '樂器', null),
+  ('SHURE', 'UA8', '無線麥克風天線', '支', null, null, '樂器', null),
+  ('Superlux', 'RS908', '機櫃', '座', null, null, '音響系統', null),
+  ('EFNOTE', 'EFNOTE 7', '電子鼓', '組', null, null, '樂器', null),
+  ('EFNOTE', 'EFNOTE 5', '電子鼓', '組', null, null, '樂器', null),
+  ('EFNOTE', 'EFNOTE 3', '電子鼓', '組', null, null, '樂器', null),
+  ('Stander', 'K-724B', '樂器架', '座', null, null, '樂器', null),
+  ('Hercules', 'GS412BPLUS', '樂器架', '座', null, null, '樂器', null),
+  ('Unika', 'ProIS2 （雙通道）', 'DI Box', '顆', null, null, '樂器', null),
+  ('Unika', 'Pro148 （單通道）', 'DI Box', '顆', null, null, '樂器', null),
+  ('NEUTRIK', 'NE8FDX-Y6-B (Cat.6A)', '網路母座', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NE8FDV-Y110-B', '網路母座', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NC3MD-LX', 'XLR公座 3pin', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NC3FD-LX', 'XLR母座 3pin', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NC5MD-LX-B', 'XLR公座 5pin', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NC5FD-LX-B', 'XLR母座 5pin', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NC3MXX', 'XLR公頭3pin', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NC3FXX', 'XLR母頭3pin', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NC5MXX', 'XLR公頭5pin', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NC5FXX', 'XLR母頭5pin', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NP2X', '6.3mmTS頭', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NP3X', '6.3mmTRS頭', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NL4FXX-W-S(四芯)', 'Speakon', '顆', null, null, '線材/接頭/配件', null),
+  ('NEUTRIK', 'NL2FXX-W-S(兩芯)', 'Speakon', '顆', null, null, '線材/接頭/配件', null),
+  ('ROXTONE', 'ROXTONE XLR母座 3pin', 'XLR母座 3pin', '顆', null, null, '線材/接頭/配件', null),
+  ('Stander', 'WPP-301Z-BK (一孔壁座面板)', '各種面板', '件', null, null, '五金配件/架子', null),
+  ('Stander', 'WPP-302Z-BK (兩孔壁座面板)', '各種面板', '件', null, null, '五金配件/架子', null),
+  (null, '機櫃Patch bay 16孔', '各種面板', '件', null, null, '五金配件/架子', null),
+  (null, '機櫃Patch bay 12孔', '各種面板', '件', null, null, '五金配件/架子', null),
+  (null, '機櫃Patch bay 8孔', '各種面板', '件', null, null, '五金配件/架子', null),
+  (null, '機櫃Patch bay 6孔', '各種面板', '件', null, null, '五金配件/架子', null),
+  (null, '機櫃Patch bay 無孔蓋板', '各種面板', '件', null, null, '五金配件/架子', null),
+  ('KINGSTAGE', '單聯盒', '各種盒子', '件', null, null, '五金配件/架子', null),
+  ('KINGSTAGE', '單連面板 2孔佳能', '各種面板', '件', null, null, '五金配件/架子', null),
+  ('KINGSTAGE', '雙聯盒', '各種盒子', '件', null, null, '五金配件/架子', null),
+  ('KINGSTAGE', '雙聯面板 4孔電源', '各種面板', '件', null, null, '五金配件/架子, 電源系統', null),
+  ('KINGSTAGE', '雙聯面板 4孔佳能', '各種面板', '件', null, null, '五金配件/架子', null),
+  ('KINGSTAGE', '雙連電源插座', '插座/插頭', '件', null, null, '五金配件/架子, 電源系統', null),
+  ('DREITEC', 'multi鐵盒8孔CANNON', '各種盒子', '件', null, null, '五金配件/架子', null),
+  ('Jiasound', 'multi鐵盒8孔 B5-8', '各種盒子', '件', null, null, '五金配件/架子', null),
+  (null, '防水H插公頭', '插座/插頭', '顆', null, null, '電源系統', null),
+  (null, '防水H插母頭', '插座/插頭', '顆', null, null, '電源系統', null),
+  ('Panasonic', 'H型插座壁座單孔', '插座/插頭', '件', null, null, '電源系統', null),
+  ('Panasonic', 'H型插座壁座2孔', '插座/插頭', '件', null, null, '電源系統', null),
+  (null, 'AC公插頭', '插座/插頭', '顆', null, null, '電源系統', null),
+  (null, 'AC母插頭', '插座/插頭', '顆', null, null, '電源系統', null),
+  ('REAN', 'NYS231BG', '3.5mm公頭', '顆', null, null, '線材/接頭/配件', null),
+  ('REAN', 'NYS240BG', '3.5mm母頭', '顆', null, null, '線材/接頭/配件', null),
+  ('Stander', 'P305-10', '3.5mm公頭', '顆', null, null, '線材/接頭/配件', null),
+  ('KINGSTAGE', '6.3單音接頭', '6.3mmTS頭', '顆', null, null, '線材/接頭/配件', null),
+  ('KINGSTAGE', '6.3立體音接頭', '6.3mmTRS頭', '顆', null, null, '線材/接頭/配件', null),
+  ('KINGSTAGE', 'CANNON公頭', 'XLR公頭3pin', '顆', null, null, '線材/接頭/配件', null),
+  ('KINGSTAGE', 'CANNON母頭', 'XLR母頭3pin', '顆', null, null, '線材/接頭/配件', null),
+  ('KINGSTAGE', 'H插公頭', '插座/插頭', '顆', null, null, '電源系統, 線材/接頭/配件', null),
+  ('KINGSTAGE', 'H插母頭', '插座/插頭', '顆', null, null, '電源系統, 線材/接頭/配件', null),
+  ('SUNRISE', 'SVP555X-Q-GY', 'XLR公頭3pin', '顆', null, null, '線材/接頭/配件', null),
+  ('SUNRISE', 'SVP556X-Q-GY', 'XLR母頭3pin', '顆', null, null, '線材/接頭/配件', null)
+on conflict do nothing;
