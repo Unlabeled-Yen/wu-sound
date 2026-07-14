@@ -118,7 +118,7 @@ export default function MoveDialog({ equipmentId, currentStatus, currentSiteId }
 
               {toStatus === 'on_site' && (
                 <label className="block space-y-1">
-                  <span className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>案場 *</span>
+                  <span className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>專案 *</span>
                   <select value={toSiteId} onChange={(e) => setToSiteId(e.target.value)} className="nm-input w-full text-[13px]">
                     <option value="">— 請選擇 —</option>
                     {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}

@@ -90,7 +90,7 @@ export default async function BossWorklogsPage({
             className={view === 'site' ? 'nm-btn-solid' : 'nm-btn'}
             style={{ padding: '6px 14px', minHeight: 'auto' }}
           >
-            依案場
+            依專案
           </Link>
         </nav>
       </header>
@@ -123,7 +123,7 @@ function EntryCard({ row, showSite = true, showDate = false }: { row: Row; showS
       <div className="mb-1 flex flex-wrap items-baseline gap-2 text-[13px]">
         <span className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>{row.users?.name || '(未知)'}</span>
         {showSite && (
-          <span style={{ color: 'var(--nm-text-secondary)' }}>· {row.sites?.name || '(未指定案場)'}</span>
+          <span style={{ color: 'var(--nm-text-secondary)' }}>· {row.sites?.name || '(未指定專案)'}</span>
         )}
         {showDate && <span style={{ color: 'var(--nm-text-muted)' }}>· {row.logged_on}</span>}
         <span className="ml-auto text-xs" style={{ color: 'var(--nm-text-faint)' }}>
@@ -189,7 +189,7 @@ function TimelineView({ rows }: { rows: Row[] }) {
 function SiteView({ rows }: { rows: Row[] }) {
   const groups = new Map<string, { name: string; byDate: Map<string, Row[]> }>();
   for (const r of rows) {
-    const key = r.sites?.name || '(未指定案場)';
+    const key = r.sites?.name || '(未指定專案)';
     if (!groups.has(key)) groups.set(key, { name: key, byDate: new Map() });
     const g = groups.get(key)!;
     if (!g.byDate.has(r.logged_on)) g.byDate.set(r.logged_on, []);

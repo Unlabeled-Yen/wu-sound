@@ -47,8 +47,8 @@ export async function POST(
 
   if (to_site_id) {
     const site = await sb.from('sites').select('id').eq('id', to_site_id).maybeSingle();
-    if (site.error) return NextResponse.json({ error: `案場查詢失敗: ${site.error.message}` }, { status: 500 });
-    if (!site.data) return NextResponse.json({ error: '找不到指定案場' }, { status: 400 });
+    if (site.error) return NextResponse.json({ error: `專案查詢失敗: ${site.error.message}` }, { status: 500 });
+    if (!site.data) return NextResponse.json({ error: '找不到指定專案' }, { status: 400 });
   }
 
   const before = { status: cur.data.status, current_site_id: cur.data.current_site_id };

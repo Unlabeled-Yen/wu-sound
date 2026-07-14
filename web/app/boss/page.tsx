@@ -126,7 +126,7 @@ export default async function BossDashboard() {
           />
           <StatCard
             href={`/boss/close?month=${s.month}`}
-            label="月結"
+            label="薪資結算"
             value={s.pendingCount > 0 ? '未可結算' : '可結算'}
             hint={s.pendingCount > 0 ? `尚有 ${s.pendingCount} 筆未處理` : '所有代墊已審完'}
             tone={s.pendingCount > 0 ? 'attention' : 'positive'}
@@ -165,7 +165,7 @@ export default async function BossDashboard() {
       <section className="pt-2">
         <div className="text-[11px] uppercase tracking-wider mb-3" style={{ color: 'var(--nm-text-muted)' }}>快速動作</div>
         <div className="flex flex-wrap gap-2">
-          <QuickLink href={`/boss/ledger/new?month=${s.month}`}>新增內帳</QuickLink>
+          <QuickLink href={`/boss/ledger/new?month=${s.month}`}>新增帳目</QuickLink>
           <QuickLink href="/boss/quotes/new">新增報價</QuickLink>
           <QuickLink href="/boss/equipment/new">新增設備</QuickLink>
           <QuickLink href="/boss/catalog">價目表</QuickLink>

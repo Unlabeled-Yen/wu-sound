@@ -96,13 +96,13 @@ export const EQUIPMENT_CATEGORY_LABEL: Record<EquipmentCategory, string> = {
 
 export const EQUIPMENT_STATUS_LABEL: Record<EquipmentStatus, string> = {
   in_storage: '庫房',
-  on_site: '案場中',
+  on_site: '專案中',
   in_repair: '維修中',
   retired: '淘汰',
 };
 
 export function formatEquipmentLocation(status: EquipmentStatus, site_name?: string | null): string {
-  if (status === 'on_site') return site_name ? `案場中 · ${site_name}` : '案場中';
+  if (status === 'on_site') return site_name ? `專案中 · ${site_name}` : '專案中';
   return EQUIPMENT_STATUS_LABEL[status];
 }
 
@@ -179,3 +179,7 @@ export interface CatalogItem { id:string; brand:string|null; name:string; item_t
 export interface Quote { id:string; client_name:string; project_name:string|null; status:QuoteStatus; need_text:string|null; ai_rationale:string|null; note:string|null; tax_rate:number; created_by:string; created_at:string; updated_at:string; }
 export interface QuoteLine { id:string; quote_id:string; catalog_item_id:string|null; name:string; spec:string|null; qty:number; unit:string|null; unit_price_twd:number|null; section:QuoteLineSection; is_ai_suggested:boolean; sort_order:number; created_at:string; }
 export const QUOTE_STATUS_LABEL: Record<QuoteStatus,string> = { draft:'草稿', sent:'已送出', won:'成交', lost:'未成交' };
+
+// 標配套組
+export interface BundleTemplate { id:string; name:string; applicable_to:string|null; note:string|null; active:boolean; created_at:string; updated_at:string; }
+export interface BundleLine { id:string; bundle_id:string; catalog_item_id:string|null; name:string; spec:string|null; qty:number; unit:string|null; section:QuoteLineSection; sort_order:number; created_at:string; }

@@ -37,12 +37,12 @@ export default function LockButton({ month, disabled }: { month: string; disable
         disabled={disabled || pending}
         className="nm-danger text-[13px]"
       >
-        鎖定月結
+        鎖定薪資結算
       </button>
       {confirming ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-w-sm w-full rounded-2xl nm-raised-lg p-5 flex flex-col gap-3" style={{ background: 'rgba(24,24,28,0.75)' }}>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>確定鎖定 {month} 月結?</h2>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>確定鎖定 {month} 薪資結算?</h2>
             <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
               鎖定後所有已確認代墊會標記為「已入帳」,無法再改。
             </p>

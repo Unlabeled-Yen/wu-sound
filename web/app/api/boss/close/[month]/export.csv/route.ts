@@ -54,7 +54,7 @@ export async function GET(
       return da < db ? -1 : da > db ? 1 : 0;
     });
 
-  const header = ['姓名', '日期', '分類', '品項', '案場', '金額'];
+  const header = ['姓名', '日期', '分類', '品項', '專案', '金額'];
   const lines = [header.join(',')];
   for (const r of rows) {
     lines.push(

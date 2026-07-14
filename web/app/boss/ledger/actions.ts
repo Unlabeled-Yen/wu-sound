@@ -172,7 +172,7 @@ export async function importBatch(batch_id: string): Promise<ImportResult> {
   const sb = getSupabaseAdmin();
   const batch = await sb.from('book_batches').select('*').eq('id', batch_id).maybeSingle();
   if (batch.error) return { ok: false, error: `查詢失敗: ${batch.error.message}` };
-  if (!batch.data) return { ok: false, error: '月結尚未鎖定' };
+  if (!batch.data) return { ok: false, error: '薪資結算尚未鎖定' };
 
   const monthStr = String(batch.data.month).slice(0, 10);
   const [y, m] = monthStr.split('-').map(Number);
@@ -199,7 +199,7 @@ export async function importBatch(batch_id: string): Promise<ImportResult> {
     if (sum <= 0) { skipped += 1; continue; }
     const ins = await sb.from('ledger_entries').insert({
       occurred_on, direction: 'expense', kind: 'reimbursement',
-      amount_twd: sum, party, memo: `${monthLabel}零用金月結`,
+      amount_twd: sum, party, memo: `${monthLabel}零用金薪資結算`,
       is_external: false, invoice_status: 'none', tax_amount_twd: 0,
       source_batch_id: batch_id, created_by: session.id,
     }).select('id').single();

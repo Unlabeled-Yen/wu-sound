@@ -14,9 +14,9 @@ export interface MoveInput {
 export function validateMove(input: MoveInput): string | null {
   const { to_status, to_site_id, current_status, current_site_id } = input;
   if (to_status === 'on_site') {
-    if (!to_site_id) return '案場中必須選擇案場';
+    if (!to_site_id) return '專案中必須選擇專案';
   } else {
-    if (to_site_id) return '此狀態不可有案場';
+    if (to_site_id) return '此狀態不可有專案';
   }
   if (to_status === current_status && (to_site_id ?? null) === (current_site_id ?? null)) {
     return '狀態未改變';

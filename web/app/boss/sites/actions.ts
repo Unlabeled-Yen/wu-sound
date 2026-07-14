@@ -24,12 +24,12 @@ async function audit(actor: string, action: string, id: string, diff: Record<str
 export async function createSite(formData: FormData) {
   const actor = await assertBoss();
   const name = (formData.get('name') as string || '').trim();
-  if (!name) throw new Error('案場名稱不得為空');
+  if (!name) throw new Error('專案名稱不得為空');
 
   const sb = getSupabaseAdmin();
   const dup = await sb.from('sites').select('id').eq('name', name).maybeSingle();
   if (dup.error) throw new Error(dup.error.message);
-  if (dup.data) throw new Error(`已有案場「${name}」`);
+  if (dup.data) throw new Error(`已有專案「${name}」`);
 
   const ins = await sb.from('sites').insert({ name, active: true }).select('id').single();
   if (ins.error) throw new Error(ins.error.message);
@@ -47,12 +47,12 @@ export async function renameSite(formData: FormData) {
   const sb = getSupabaseAdmin();
   const cur = await sb.from('sites').select('name').eq('id', id).maybeSingle();
   if (cur.error) throw new Error(cur.error.message);
-  if (!cur.data) throw new Error('案場不存在');
+  if (!cur.data) throw new Error('專案不存在');
   if (cur.data.name === name) return;
 
   const dup = await sb.from('sites').select('id').eq('name', name).neq('id', id).maybeSingle();
   if (dup.error) throw new Error(dup.error.message);
-  if (dup.data) throw new Error(`已有案場「${name}」`);
+  if (dup.data) throw new Error(`已有專案「${name}」`);
 
   const upd = await sb.from('sites').update({ name }).eq('id', id);
   if (upd.error) throw new Error(upd.error.message);
@@ -77,7 +77,7 @@ export async function setSiteActive(formData: FormData) {
       .eq('status', 'on_site');
     if (inUse.error) throw new Error(inUse.error.message);
     if ((inUse.count ?? 0) > 0) {
-      throw new Error(`案場中還有 ${inUse.count} 件設備,請先把設備移回庫房再停用`);
+      throw new Error(`專案中還有 ${inUse.count} 件設備,請先把設備移回庫房再停用`);
     }
   }
 

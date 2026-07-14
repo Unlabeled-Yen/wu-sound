@@ -69,7 +69,7 @@ export default async function BossClosePage({
   return (
     <div>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>月結 · {month}</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>薪資結算 · {month}</h1>
         <form className="flex items-center gap-2">
           <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>選擇月份</label>
           <input
@@ -99,7 +99,7 @@ export default async function BossClosePage({
           }}
         >
           <div className="text-lg font-bold">
-            尚有 {pending.length} 筆未處理,無法結算
+            尚有 {pending.length} 筆未處理,無法完成薪資結算
           </div>
           <ul className="mt-2 text-[13px] space-y-1">
             {Array.from(pendingByUser.values()).map((u) => (
@@ -168,7 +168,7 @@ export default async function BossClosePage({
           }
           style={(blocked || confirmed.length === 0) ? { opacity: 0.5 } : undefined}
         >
-          產出月結 CSV
+          匯出 CSV
         </a>
         <LockButton month={month} disabled={blocked || confirmed.length === 0} />
       </div>

@@ -30,7 +30,7 @@ export default function ImportBatchDialog() {
   }, [open]);
 
   async function submit() {
-    if (!selected) { setError('請選擇一個月結'); return; }
+    if (!selected) { setError('請選擇一個薪資結算'); return; }
     setBusy(true);
     setError(null);
     try {
@@ -68,12 +68,12 @@ export default function ImportBatchDialog() {
         type="button"
         onClick={() => setOpen(true)}
         className="nm-btn text-[13px]"
-      >從月結匯入零用金</button>
+      >從薪資結算匯入零用金</button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="rounded-2xl nm-raised-lg max-w-md w-full p-6 space-y-4" style={{ background: 'rgba(24,24,28,0.75)' }}>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>從月結匯入零用金</h2>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>從薪資結算匯入零用金</h2>
 
             {result ? (
               <div className="text-[13px]" style={{ color: 'var(--nm-text-body)' }}>
@@ -86,7 +86,7 @@ export default function ImportBatchDialog() {
               <>
                 {!batches && <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>載入中…</p>}
                 {batches && batches.length === 0 && (
-                  <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>尚未有任何已鎖定的月結</p>
+                  <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>尚未有任何已鎖定的薪資結算</p>
                 )}
                 {batches && batches.length > 0 && (
                   <div className="space-y-2">
@@ -99,7 +99,7 @@ export default function ImportBatchDialog() {
                           checked={selected === b.id}
                           onChange={() => setSelected(b.id)}
                         />
-                        <span>{b.month.slice(0, 7)} 月結</span>
+                        <span>{b.month.slice(0, 7)} 薪資結算</span>
                         {b.has_reimbursement_entries && (
                           <span className="text-xs" style={{ color: 'var(--nm-warning)' }}>(已匯入部分)</span>
                         )}

@@ -20,25 +20,28 @@ const SECTIONS: NavSection[] = [
     label: '財務',
     icon: <WalletIcon />,
     items: [
-      { href: '/boss/expenses', label: '零用金審核' },
-      { href: '/boss/close', label: '月結' },
-      { href: '/boss/ledger', label: '內帳' },
+      { href: '/boss/expenses', label: '零用金管理' },
+      { href: '/boss/close', label: '薪資結算' },
+      { href: '/boss/ledger', label: '帳務管理' },
     ],
   },
   {
     key: 'quotes',
-    label: '報價',
+    label: '報價系統',
     icon: <DocIcon />,
-    items: [{ href: '/boss/quotes', label: '報價單' }],
+    items: [
+      { href: '/boss/quotes', label: '報價單' },
+      { href: '/boss/bundles', label: '標配套組' },
+      { href: '/boss/catalog', label: '價目表' },
+    ],
   },
   {
     key: 'catalog',
-    label: '主檔',
+    label: '案件管理',
     icon: <BoxIcon />,
     items: [
-      { href: '/boss/catalog', label: '價目表' },
-      { href: '/boss/equipment', label: '設備' },
-      { href: '/boss/sites', label: '案場' },
+      { href: '/boss/equipment', label: '設備庫存' },
+      { href: '/boss/sites', label: '專案' },
     ],
   },
   {

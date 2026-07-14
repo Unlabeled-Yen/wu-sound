@@ -17,7 +17,7 @@ export default async function EditLedgerPage(
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>編輯內帳</h1>
+      <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>編輯帳目</h1>
       <LedgerForm mode="edit" initial={row} locked={locked} />
     </div>
   );

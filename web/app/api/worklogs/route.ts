@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   const beforeFile = form.get('before_photo');
   const afterFile = form.get('after_photo');
 
-  if (!siteId) return NextResponse.json({ error: '請選擇案場' }, { status: 400 });
+  if (!siteId) return NextResponse.json({ error: '請選擇專案' }, { status: 400 });
   if (!note) return NextResponse.json({ error: '請填寫一句話說明' }, { status: 400 });
   if (note.length > 200) return NextResponse.json({ error: '說明超過 200 字' }, { status: 400 });
 

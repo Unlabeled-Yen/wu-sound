@@ -62,7 +62,7 @@ export default function StaffWorklogPage() {
       }
       if (!sitesRes.ok) {
         const j = await sitesRes.json().catch(() => ({}));
-        throw new Error(j.error || '讀取案場失敗');
+        throw new Error(j.error || '讀取專案失敗');
       }
       const lj = await logsRes.json();
       const sj = await sitesRes.json();
@@ -84,7 +84,7 @@ export default function StaffWorklogPage() {
     setFormError(null);
 
     if (!siteId) {
-      setFormError('請選擇案場');
+      setFormError('請選擇專案');
       return;
     }
     if (!note.trim()) {
@@ -152,7 +152,7 @@ export default function StaffWorklogPage() {
             <li key={log.id} className="nm-raised rounded-[20px] p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-                  {log.sites?.name || '(未指定案場)'}
+                  {log.sites?.name || '(未指定專案)'}
                 </div>
                 <div className="tabular text-[12px] shrink-0" style={{ color: 'var(--nm-text-muted)' }}>
                   {new Date(log.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
@@ -218,7 +218,7 @@ export default function StaffWorklogPage() {
             )}
 
             <label className="mb-3 block">
-              <span className="mb-1 block text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>案場</span>
+              <span className="mb-1 block text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>專案</span>
               <select
                 value={siteId}
                 onChange={(e) => setSiteId(e.target.value)}

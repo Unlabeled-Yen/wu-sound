@@ -13,6 +13,6 @@ export async function GET(req: Request) {
   let q = supabase.from('sites').select('id, name, active').order('name', { ascending: true });
   if (activeOnly) q = q.eq('active', true);
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: `讀取案場失敗: ${error.message}` }, { status: 500 });
+  if (error) return NextResponse.json({ error: `讀取專案失敗: ${error.message}` }, { status: 500 });
   return NextResponse.json({ ok: true, sites: data || [] });
 }

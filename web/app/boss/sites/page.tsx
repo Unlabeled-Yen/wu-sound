@@ -37,8 +37,8 @@ export default async function BossSitesPage() {
   return (
     <div>
       <div className="mb-4">
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>案場管理</h1>
-        <p className="text-[13px] mt-0.5" style={{ color: 'var(--nm-text-secondary)' }}>共 {sites.length} 個案場。停用後不會出現在新的下拉選單,但歷史紀錄保留。</p>
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>專案</h1>
+        <p className="text-[13px] mt-0.5" style={{ color: 'var(--nm-text-secondary)' }}>共 {sites.length} 個專案。停用後不會出現在新的下拉選單,但歷史紀錄保留。</p>
       </div>
 
       {error ? (
@@ -58,7 +58,7 @@ export default async function BossSitesPage() {
         <input
           name="name"
           required
-          placeholder="新增案場名稱"
+          placeholder="新增專案名稱"
           className="flex-1 nm-input text-[13px]"
         />
         <button
@@ -119,7 +119,7 @@ export default async function BossSitesPage() {
                       disabled={s.active && s.in_use > 0}
                       className="nm-btn text-xs disabled:opacity-40"
                       style={{ padding: '4px 10px', minHeight: 'auto' }}
-                      title={s.active && s.in_use > 0 ? '有設備在此案場,請先把設備移走' : ''}
+                      title={s.active && s.in_use > 0 ? '有設備在此專案,請先把設備移走' : ''}
                     >
                       {s.active ? '停用' : '啟用'}
                     </button>

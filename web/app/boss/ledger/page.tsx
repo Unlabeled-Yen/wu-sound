@@ -235,7 +235,7 @@ export default async function LedgerPage(
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>
                     {LEDGER_KIND_LABEL[r.kind]}
                     {r.source_batch_id && (
-                      <span className="nm-pill nm-pill-muted ml-2">零用金月結</span>
+                      <span className="nm-pill nm-pill-muted ml-2">薪資結算匯入</span>
                     )}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.party ?? '—'}</td>

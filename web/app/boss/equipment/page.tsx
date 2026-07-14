@@ -78,7 +78,7 @@ export default async function BossEquipmentPage({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-          大型設備 ({rows.length})
+          設備庫存 ({rows.length})
         </h1>
         <Link href="/boss/equipment/new" className="nm-btn-solid text-[13px] whitespace-nowrap">
           新增設備
@@ -131,7 +131,7 @@ export default async function BossEquipmentPage({
                 <th className="text-left px-3 py-2 font-normal whitespace-nowrap">類別</th>
                 <th className="text-left px-3 py-2 font-normal whitespace-nowrap">數量</th>
                 <th className="text-left px-3 py-2 font-normal whitespace-nowrap">狀態</th>
-                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">目前案場</th>
+                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">目前專案</th>
                 <th className="text-left px-3 py-2 font-normal whitespace-nowrap">動作</th>
               </tr>
             </thead>

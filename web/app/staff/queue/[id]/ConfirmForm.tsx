@@ -181,7 +181,7 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
 
       {sites.length > 0 ? (
         <div>
-          <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>案場 (選填)</label>
+          <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>專案 (選填)</label>
           <select
             value={siteId}
             onChange={(e) => setSiteId(e.target.value)}

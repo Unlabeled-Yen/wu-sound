@@ -135,7 +135,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
             color: 'var(--nm-warning-glass-text)',
           }}
         >
-          本筆由月結匯入,只能補備註與發票資訊
+          本筆由薪資結算匯入,只能補備註與發票資訊
         </div>
       )}
 

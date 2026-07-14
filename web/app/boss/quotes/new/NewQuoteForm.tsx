@@ -1,12 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { BundleTemplate } from '@/lib/types';
 
 export default function NewQuoteForm() {
   const [clientName, setClientName] = useState('');
   const [projectName, setProjectName] = useState('');
+  const [bundleId, setBundleId] = useState('');
+  const [bundles, setBundles] = useState<BundleTemplate[]>([]);
+  const [bundlesError, setBundlesError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/bundles');
+        const j = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) { setBundlesError(j.error ?? '套組載入失敗'); return; }
+        setBundles((j.bundles ?? []) as BundleTemplate[]);
+      } catch {
+        if (!cancelled) setBundlesError('套組載入失敗');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedBundle = bundles.find((b) => b.id === bundleId) ?? null;
 
   const inputCls = 'nm-input';
 
@@ -19,7 +41,11 @@ export default function NewQuoteForm() {
       const res = await fetch('/api/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_name: clientName.trim(), project_name: projectName.trim() || null }),
+        body: JSON.stringify({
+          client_name: clientName.trim(),
+          project_name: projectName.trim() || null,
+          bundle_id: bundleId || null,
+        }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j.quote) { setError(j.error ?? '建立失敗'); setBusy(false); return; }
@@ -39,6 +65,28 @@ export default function NewQuoteForm() {
       <div>
         <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>案件名稱</label>
         <input value={projectName} onChange={(e) => setProjectName(e.target.value)} className={inputCls} placeholder="選填,例:主堂音響更新" />
+      </div>
+      <div>
+        <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>從標配套組開始(選填)</label>
+        <select value={bundleId} onChange={(e) => setBundleId(e.target.value)} className={inputCls}>
+          <option value="">不使用套組(從空白開始)</option>
+          {bundles.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}{b.applicable_to ? ` · 適用:${b.applicable_to}` : ''}
+            </option>
+          ))}
+        </select>
+        {bundlesError && (
+          <div className="text-[12px] mt-1" style={{ color: 'var(--nm-danger)' }}>{bundlesError}</div>
+        )}
+        {selectedBundle && (
+          <div className="rounded-xl nm-inset px-3 py-2 mt-2 text-[12px]" style={{ color: 'var(--nm-text-secondary)' }}>
+            <div>已選:{selectedBundle.name}</div>
+            {selectedBundle.applicable_to && <div>適用:{selectedBundle.applicable_to}</div>}
+            {selectedBundle.note && <div style={{ color: 'var(--nm-text-muted)' }}>備註:{selectedBundle.note}</div>}
+            <div style={{ color: 'var(--nm-text-muted)' }}>建立後會依此套組展開明細,單價會抓價目表當下售價。</div>
+          </div>
+        )}
       </div>
       {error && (
         <div

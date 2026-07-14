@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   const sb = getSupabaseAdmin();
   const batch = await sb.from('book_batches').select('*').eq('id', batch_id).maybeSingle();
   if (batch.error) return NextResponse.json({ error: `查詢失敗: ${batch.error.message}` }, { status: 500 });
-  if (!batch.data) return NextResponse.json({ error: '月結尚未鎖定' }, { status: 400 });
+  if (!batch.data) return NextResponse.json({ error: '薪資結算尚未鎖定' }, { status: 400 });
 
   // book_batches.month 為該月第一天;採用當月最後一天作為 occurred_on
   const monthStr = String(batch.data.month).slice(0, 10); // YYYY-MM-01
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
         kind: 'reimbursement',
         amount_twd: sum,
         party,
-        memo: `${monthLabel}零用金月結`,
+        memo: `${monthLabel}零用金薪資結算`,
         is_external: false,
         invoice_status: 'none',
         tax_amount_twd: 0,

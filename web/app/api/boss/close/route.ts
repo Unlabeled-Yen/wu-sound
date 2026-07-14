@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     if (/duplicate|unique/i.test(msg)) {
       return NextResponse.json({ error: '此月份已鎖定過' }, { status: 409 });
     }
-    return NextResponse.json({ error: `建立月結批次失敗: ${msg}` }, { status: 500 });
+    return NextResponse.json({ error: `建立薪資結算批次失敗: ${msg}` }, { status: 500 });
   }
   const batchId = batchIns.data.id as string;
 

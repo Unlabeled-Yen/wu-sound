@@ -60,7 +60,7 @@ export default async function BossExpensesPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-        零用金審核 · 待確認 ({rows.length})
+        零用金管理 · 待確認 ({rows.length})
       </h1>
 
       {drafts.length > 0 && (
@@ -108,7 +108,7 @@ export default async function BossExpensesPage() {
                 <th className="px-3 py-2 font-normal whitespace-nowrap">日期</th>
                 <th className="px-3 py-2 font-normal whitespace-nowrap">分類</th>
                 <th className="px-3 py-2 font-normal whitespace-nowrap">品項</th>
-                <th className="px-3 py-2 font-normal whitespace-nowrap">案場</th>
+                <th className="px-3 py-2 font-normal whitespace-nowrap">專案</th>
                 <th className="px-3 py-2 text-right font-normal whitespace-nowrap">金額</th>
                 <th className="px-3 py-2 font-normal whitespace-nowrap">收據</th>
                 <th className="px-3 py-2 font-normal whitespace-nowrap">動作</th>
