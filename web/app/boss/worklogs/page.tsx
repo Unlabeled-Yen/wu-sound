@@ -74,19 +74,21 @@ export default async function BossWorklogsPage({
   const { rows, error } = await loadWorklogs();
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-6">
+    <div>
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">工作記錄</h1>
-        <nav className="flex gap-1 rounded-lg border border-neutral-200 bg-white p-1 text-sm">
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--nm-text-primary)' }}>工作記錄</h1>
+        <nav className="flex gap-1 rounded-2xl nm-inset p-1 text-[13px]">
           <Link
             href="/boss/worklogs?view=timeline"
-            className={`rounded px-3 py-1.5 ${view === 'timeline' ? 'bg-blue-600 text-white' : 'text-neutral-700'}`}
+            className={view === 'timeline' ? 'nm-btn-solid' : 'nm-btn'}
+            style={{ padding: '6px 14px', minHeight: 'auto' }}
           >
             時間軸
           </Link>
           <Link
             href="/boss/worklogs?view=site"
-            className={`rounded px-3 py-1.5 ${view === 'site' ? 'bg-blue-600 text-white' : 'text-neutral-700'}`}
+            className={view === 'site' ? 'nm-btn-solid' : 'nm-btn'}
+            style={{ padding: '6px 14px', minHeight: 'auto' }}
           >
             依案場
           </Link>
@@ -94,13 +96,20 @@ export default async function BossWorklogsPage({
       </header>
 
       {error && (
-        <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <div
+          className="mb-4 rounded-xl p-3 text-[13px]"
+          style={{
+            background: 'rgba(224, 122, 122, 0.08)',
+            border: '1px solid rgba(224, 122, 122, 0.34)',
+            color: 'var(--nm-danger-glass-text)',
+          }}
+        >
           讀取工作記錄失敗:{error}
         </div>
       )}
 
       {rows.length === 0 && !error && (
-        <p className="text-sm text-neutral-500">尚無工作記錄</p>
+        <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>尚無工作記錄</p>
       )}
 
       {view === 'timeline' ? <TimelineView rows={rows} /> : <SiteView rows={rows} />}
@@ -110,23 +119,23 @@ export default async function BossWorklogsPage({
 
 function EntryCard({ row, showSite = true, showDate = false }: { row: Row; showSite?: boolean; showDate?: boolean }) {
   return (
-    <li className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className="mb-1 flex flex-wrap items-baseline gap-2 text-sm">
-        <span className="font-semibold text-neutral-900">{row.users?.name || '(未知)'}</span>
+    <li className="rounded-2xl nm-raised p-4">
+      <div className="mb-1 flex flex-wrap items-baseline gap-2 text-[13px]">
+        <span className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>{row.users?.name || '(未知)'}</span>
         {showSite && (
-          <span className="text-neutral-600">· {row.sites?.name || '(未指定案場)'}</span>
+          <span style={{ color: 'var(--nm-text-secondary)' }}>· {row.sites?.name || '(未指定案場)'}</span>
         )}
-        {showDate && <span className="text-neutral-500">· {row.logged_on}</span>}
-        <span className="ml-auto text-xs text-neutral-400">
+        {showDate && <span style={{ color: 'var(--nm-text-muted)' }}>· {row.logged_on}</span>}
+        <span className="ml-auto text-xs" style={{ color: 'var(--nm-text-faint)' }}>
           {new Date(row.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
-      <p className="mb-2 text-sm text-neutral-800">{row.note}</p>
+      <p className="mb-2 text-[13px]" style={{ color: 'var(--nm-text-body)' }}>{row.note}</p>
       {row.photo_urls.length > 0 ? (
         <div className="flex flex-wrap gap-3">
           {row.photo_urls.map((p, i) => (
             <div key={i}>
-              <div className="mb-1 text-xs text-neutral-500">
+              <div className="mb-1 text-xs" style={{ color: 'var(--nm-text-muted)' }}>
                 {p.kind === 'before' ? '施工前' : '施工後'}
               </div>
               {p.url ? (
@@ -134,16 +143,17 @@ function EntryCard({ row, showSite = true, showDate = false }: { row: Row; showS
                 <img
                   src={p.url}
                   alt={p.kind}
-                  className="h-28 w-28 rounded object-cover border border-neutral-200"
+                  className="h-28 w-28 rounded-lg object-cover"
+                  style={{ border: '1px solid var(--nm-border-glass)' }}
                 />
               ) : (
-                <div className="h-28 w-28 rounded bg-neutral-100" />
+                <div className="h-28 w-28 rounded-lg nm-inset" />
               )}
             </div>
           ))}
         </div>
       ) : (
-        <div className="text-xs text-neutral-500">
+        <div className="text-xs" style={{ color: 'var(--nm-text-muted)' }}>
           無照片原因:
           {row.no_photo_reason ? REASON_LABEL[row.no_photo_reason] || row.no_photo_reason : '未填'}
         </div>
@@ -164,7 +174,7 @@ function TimelineView({ rows }: { rows: Row[] }) {
     <div className="space-y-6">
       {keys.map((date) => (
         <section key={date}>
-          <h2 className="mb-2 text-lg font-semibold text-neutral-800">{date}</h2>
+          <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>{date}</h2>
           <ul className="space-y-2">
             {groups.get(date)!.map((r) => (
               <EntryCard key={r.id} row={r} />
@@ -193,11 +203,11 @@ function SiteView({ rows }: { rows: Row[] }) {
         const dates = Array.from(g.byDate.keys()).sort((a, b) => b.localeCompare(a));
         return (
           <section key={sk}>
-            <h2 className="mb-2 text-lg font-semibold text-neutral-800">{sk}</h2>
+            <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>{sk}</h2>
             <div className="space-y-4 pl-2">
               {dates.map((d) => (
                 <div key={d}>
-                  <h3 className="mb-1 text-sm font-medium text-neutral-600">{d}</h3>
+                  <h3 className="mb-1 text-[13px] font-medium" style={{ color: 'var(--nm-text-secondary)' }}>{d}</h3>
                   <ul className="space-y-2">
                     {g.byDate.get(d)!.map((r) => (
                       <EntryCard key={r.id} row={r} showSite={false} />

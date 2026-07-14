@@ -100,50 +100,49 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">確認一筆代墊</h1>
+      <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>確認一筆代墊</h1>
 
       {receiptUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={receiptUrl}
           alt="收據"
-          className="w-full max-h-72 object-contain rounded-2xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800"
+          className="w-full max-h-72 object-contain rounded-2xl nm-inset"
         />
       ) : (
-        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 p-6 text-center text-sm text-neutral-500">
+        <div className="rounded-2xl nm-inset p-6 text-center text-sm" style={{ color: 'var(--nm-text-muted)', border: '1px dashed rgba(255,255,255,0.18)' }}>
           無收據
         </div>
       )}
 
       {needManual ? (
-        <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 text-sm font-medium">
+        <div
+          className="rounded-xl px-4 py-3 text-sm font-medium"
+          style={{ background: 'rgba(224,122,122,0.1)', border: '1px solid rgba(224,122,122,0.34)', color: 'var(--nm-danger-glass-text)' }}
+        >
           AI 未辨識,請手動填寫
         </div>
       ) : null}
 
       <div>
-        <label className="text-sm text-neutral-600 dark:text-neutral-400">日期</label>
+        <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>日期</label>
         <input
           type="date"
           value={spentOn}
           onChange={(e) => setSpentOn(e.target.value)}
-          className="mt-1 w-full px-3 py-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-base"
+          className="mt-1 nm-input text-base"
         />
       </div>
 
       <div>
-        <label className="text-sm text-neutral-600 dark:text-neutral-400">分類</label>
+        <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>分類</label>
         <div className="mt-1 grid grid-cols-2 gap-2">
           {CATS.map((c) => (
             <button
               key={c}
               type="button"
               onClick={() => setCategory(c)}
-              className={`py-3 rounded-xl border text-base ${
-                category === c
-                  ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900'
-                  : 'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700'
-              }`}
+              className={category === c ? 'nm-btn-solid py-3 text-base' : 'nm-btn py-3 text-base'}
             >
               {CATEGORY_LABEL[c]}
             </button>
@@ -152,7 +151,7 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
       </div>
 
       <div>
-        <label className="text-sm text-neutral-600 dark:text-neutral-400">金額 (NT$)</label>
+        <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>金額 ($)</label>
         <input
           type="text"
           inputMode="numeric"
@@ -160,33 +159,33 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
           value={amount}
           onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
           placeholder="請輸入金額"
-          className="mt-1 w-full px-3 py-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-lg tabular-nums"
+          className="mt-1 nm-input text-lg tabular"
         />
         {amount ? (
-          <p className="mt-1 text-sm text-neutral-500 tabular-nums">
-            = NT$ {parseInt(amount, 10).toLocaleString('zh-TW')}
+          <p className="mt-1 text-sm tabular" style={{ color: 'var(--nm-text-muted)' }}>
+            = ${parseInt(amount, 10).toLocaleString('zh-TW')}
           </p>
         ) : null}
       </div>
 
       <div>
-        <label className="text-sm text-neutral-600 dark:text-neutral-400">品項</label>
+        <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>品項</label>
         <input
           type="text"
           value={itemText}
           onChange={(e) => setItemText(e.target.value)}
           placeholder="例:加油、變壓器"
-          className="mt-1 w-full px-3 py-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-base"
+          className="mt-1 nm-input text-base"
         />
       </div>
 
       {sites.length > 0 ? (
         <div>
-          <label className="text-sm text-neutral-600 dark:text-neutral-400">案場 (選填)</label>
+          <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>案場 (選填)</label>
           <select
             value={siteId}
             onChange={(e) => setSiteId(e.target.value)}
-            className="mt-1 w-full px-3 py-3 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-base"
+            className="mt-1 nm-input text-base"
           >
             <option value="">— 未指定 —</option>
             {sites.map((s) => (
@@ -199,7 +198,7 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
       ) : null}
 
       {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+        <p className="text-sm" style={{ color: 'var(--nm-danger)' }} role="alert">
           {error}
         </p>
       ) : null}
@@ -208,14 +207,14 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
         <button
           onClick={voidIt}
           disabled={busy}
-          className="flex-1 py-3 rounded-2xl border border-neutral-300 dark:border-neutral-700 text-base disabled:opacity-50"
+          className="flex-1 nm-danger text-base"
         >
           作廢
         </button>
         <button
           onClick={submit}
           disabled={busy}
-          className="flex-[2] py-3 rounded-2xl bg-emerald-600 text-white text-base font-semibold disabled:opacity-50"
+          className="flex-[2] nm-success-btn text-base"
         >
           {busy ? '送出中…' : '送出'}
         </button>

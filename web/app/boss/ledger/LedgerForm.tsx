@@ -120,18 +120,27 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
     }
   }
 
-  const inputCls = 'w-full border border-neutral-300 dark:border-neutral-700 rounded px-3 py-2 bg-white dark:bg-neutral-900 disabled:opacity-50';
+  const inputCls = 'nm-input disabled:opacity-50';
+  const labelCls = 'text-[13px]';
+  const labelStyle = { color: 'var(--nm-text-secondary)' };
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 max-w-2xl">
       {locked && (
-        <div className="rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 text-amber-900 dark:text-amber-200 px-3 py-2 text-sm">
+        <div
+          className="rounded-xl px-3 py-2 text-[13px]"
+          style={{
+            background: 'rgba(217, 181, 107, 0.08)',
+            border: '1px solid rgba(217, 181, 107, 0.28)',
+            color: 'var(--nm-warning-glass-text)',
+          }}
+        >
           本筆由月結匯入,只能補備註與發票資訊
         </div>
       )}
 
       <div>
-        <label className="text-sm text-neutral-500">日期</label>
+        <label className={labelCls} style={labelStyle}>日期</label>
         <input
           type="date"
           value={occurred}
@@ -143,8 +152,8 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       </div>
 
       <div>
-        <label className="text-sm text-neutral-500">方向</label>
-        <div className="flex gap-3 mt-1">
+        <label className={labelCls} style={labelStyle}>方向</label>
+        <div className="flex gap-3 mt-1" style={{ color: 'var(--nm-text-body)' }}>
           <label className="flex items-center gap-1">
             <input
               type="radio"
@@ -167,7 +176,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       </div>
 
       <div>
-        <label className="text-sm text-neutral-500">類別</label>
+        <label className={labelCls} style={labelStyle}>類別</label>
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value as LedgerKind)}
@@ -181,7 +190,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       </div>
 
       <div>
-        <label className="text-sm text-neutral-500">金額(元)</label>
+        <label className={labelCls} style={labelStyle}>金額(元)</label>
         <input
           type="number"
           inputMode="numeric"
@@ -196,7 +205,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       </div>
 
       <div>
-        <label className="text-sm text-neutral-500">對象(客戶/廠商/員工)</label>
+        <label className={labelCls} style={labelStyle}>對象(客戶/廠商/員工)</label>
         <input
           type="text"
           value={party}
@@ -207,7 +216,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       </div>
 
       <div>
-        <label className="text-sm text-neutral-500">備註</label>
+        <label className={labelCls} style={labelStyle}>備註</label>
         <textarea
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
@@ -217,7 +226,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       </div>
 
       <div>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2" style={{ color: 'var(--nm-text-body)' }}>
           <input
             type="checkbox"
             checked={isExternal}
@@ -229,10 +238,10 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       </div>
 
       {isExternal && (
-        <div className="rounded border border-neutral-200 dark:border-neutral-800 p-3 space-y-3">
+        <div className="rounded-xl nm-inset p-3 space-y-3">
           <div>
-            <label className="text-sm text-neutral-500">發票狀態</label>
-            <div className="flex gap-3 mt-1">
+            <label className={labelCls} style={labelStyle}>發票狀態</label>
+            <div className="flex gap-3 mt-1" style={{ color: 'var(--nm-text-body)' }}>
               {(['none', 'to_issue', 'issued'] as const).map((s) => (
                 <label key={s} className="flex items-center gap-1">
                   <input
@@ -247,7 +256,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
             </div>
           </div>
           <div>
-            <label className="text-sm text-neutral-500">發票號</label>
+            <label className={labelCls} style={labelStyle}>發票號</label>
             <input
               type="text"
               value={invoiceNo}
@@ -256,7 +265,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
             />
           </div>
           <div>
-            <label className="text-sm text-neutral-500">發票日期{invoiceStatus === 'issued' && ' *'}</label>
+            <label className={labelCls} style={labelStyle}>發票日期{invoiceStatus === 'issued' && ' *'}</label>
             <input
               type="date"
               value={invoiceDate}
@@ -266,7 +275,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
             />
           </div>
           <div>
-            <label className="text-sm text-neutral-500">
+            <label className={labelCls} style={labelStyle}>
               稅額(元)· 建議 5%: ${suggestTax(Number(amount) || 0).toLocaleString('zh-TW')}
             </label>
             <input
@@ -283,7 +292,14 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       )}
 
       {error && (
-        <div className="rounded border border-red-300 bg-red-50 dark:bg-red-950/40 dark:border-red-800 text-red-700 dark:text-red-200 px-3 py-2 text-sm">
+        <div
+          className="rounded-xl px-3 py-2 text-[13px]"
+          style={{
+            background: 'rgba(224, 122, 122, 0.08)',
+            border: '1px solid rgba(224, 122, 122, 0.34)',
+            color: 'var(--nm-danger-glass-text)',
+          }}
+        >
           {error}
         </div>
       )}
@@ -292,9 +308,9 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
         <button
           type="submit"
           disabled={busy}
-          className="px-4 py-2 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 disabled:opacity-50"
+          className="nm-btn-solid text-[13px]"
         >{busy ? '送出中…' : (mode === 'create' ? '新增' : '儲存')}</button>
-        <a href="/boss/ledger" className="px-4 py-2 rounded border border-neutral-300 dark:border-neutral-700">取消</a>
+        <a href="/boss/ledger" className="nm-btn text-[13px]">取消</a>
       </div>
     </form>
   );

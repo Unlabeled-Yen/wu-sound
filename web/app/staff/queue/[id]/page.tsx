@@ -51,9 +51,5 @@ export default async function StaffQueueDetailPage({
     .order('name', { ascending: true });
   const sites: Site[] = (siteRows ?? []) as Site[];
 
-  return (
-    <div className="max-w-lg mx-auto px-4 py-5">
-      <ConfirmForm row={row} receiptUrl={receiptUrl} sites={sites} />
-    </div>
-  );
+  return <ConfirmForm row={row} receiptUrl={receiptUrl} sites={sites} />;
 }

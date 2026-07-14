@@ -40,13 +40,13 @@ export default async function StaffQueuePage() {
   );
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-5">
-      <h1 className="text-xl font-semibold mb-4">
-        待確認 <span className="text-neutral-500 text-base">({rows.length})</span>
+    <div className="space-y-4">
+      <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
+        待確認 <span className="text-base font-normal" style={{ color: 'var(--nm-text-muted)' }}>({rows.length})</span>
       </h1>
 
       {rows.length === 0 ? (
-        <p className="text-center text-sm text-neutral-500 mt-16">目前沒有待確認項目</p>
+        <p className="text-center text-[13px] mt-16" style={{ color: 'var(--nm-text-muted)' }}>目前沒有待確認項目</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {items.map(({ r, url, ageDays, stale }) => {
@@ -58,9 +58,9 @@ export default async function StaffQueuePage() {
               <li key={r.id}>
                 <Link
                   href={`/staff/queue/${r.id}`}
-                  className="flex gap-3 p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 active:scale-[0.99]"
+                  className="flex gap-3 p-3 rounded-2xl nm-raised active:scale-[0.99] transition"
                 >
-                  <div className="w-20 h-20 rounded-xl bg-neutral-100 dark:bg-neutral-800 overflow-hidden flex items-center justify-center text-xs text-neutral-500 shrink-0">
+                  <div className="w-20 h-20 rounded-xl nm-inset overflow-hidden flex items-center justify-center text-xs shrink-0" style={{ color: 'var(--nm-text-muted)' }}>
                     {url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={url} alt="收據縮圖" className="w-full h-full object-cover" />
@@ -70,31 +70,31 @@ export default async function StaffQueuePage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm text-neutral-500">
+                      <span className="text-sm" style={{ color: 'var(--nm-text-muted)' }}>
                         {new Date(r.captured_at).toLocaleDateString('zh-TW')}
                       </span>
                       {stale ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-300">
+                        <span className="nm-pill nm-pill-danger">
                           已放置 {ageDays} 天
                         </span>
                       ) : null}
                     </div>
-                    <div className="mt-1 text-base">
+                    <div className="mt-1 text-base" style={{ color: 'var(--nm-text-body)' }}>
                       {shownCat ? CATEGORY_LABEL[shownCat] : '未分類'}
                       {r.item_text ? ` · ${r.item_text}` : ''}
                     </div>
-                    <div className="mt-1 text-lg font-semibold tabular-nums">
+                    <div className="mt-1 text-lg font-semibold tabular" style={{ color: 'var(--nm-text-primary)' }}>
                       {shownAmt != null ? (
                         <>
-                          NT$ {shownAmt.toLocaleString('zh-TW')}
+                          ${shownAmt.toLocaleString('zh-TW')}
                           {r.amount_twd == null && aiAmt != null ? (
-                            <span className="ml-2 text-xs font-normal text-amber-600 border border-amber-400 rounded px-1.5 py-0.5">
+                            <span className="ml-2 nm-pill nm-pill-warning">
                               AI 建議 · 待確認
                             </span>
                           ) : null}
                         </>
                       ) : (
-                        <span className="text-red-600 text-sm font-medium">請手動填寫金額</span>
+                        <span className="text-sm font-medium" style={{ color: 'var(--nm-danger)' }}>請手動填寫金額</span>
                       )}
                     </div>
                   </div>

@@ -1,7 +1,8 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { CatalogItem } from '@/lib/types';
-import CatalogRow from './CatalogRow';
+import CategoryCarousel, { type CarouselPanel } from './CategoryCarousel';
 import NewItemButton from './NewItemButton';
+import ViewportLock from './ViewportLock';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,10 +18,13 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
 
   const sb = getSupabaseAdmin();
 
-  // 分類選項(全部 active 品項的 distinct category)
   const catQ = await sb.from('catalog_items').select('category').eq('active', true);
   const categories = Array.from(
-    new Set(((catQ.data ?? []) as { category: string | null }[]).map((r) => r.category).filter((c): c is string => !!c)),
+    new Set(
+      ((catQ.data ?? []) as { category: string | null }[])
+        .map((r) => r.category)
+        .filter((c): c is string => !!c),
+    ),
   ).sort();
 
   let query = sb.from('catalog_items').select('*').eq('active', true);
@@ -31,13 +35,53 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const items = (data ?? []) as CatalogItem[];
 
   const missingCount = items.filter((i) => i.sell_price_twd === null).length;
+  const isFiltered = Boolean(q || category);
+
+  // 依 category 分組(未 filter 時才分)
+  const missingItems = items.filter((i) => i.sell_price_twd === null);
+  const groups = groupByCategory(items);
+
+  const panels: CarouselPanel[] = isFiltered
+    ? [
+        {
+          key: 'filtered',
+          title: category || `搜尋結果:${q}`,
+          hint: category ? `分類:${category}` : `找到 ${items.length} 項`,
+          items,
+        },
+      ]
+    : [
+        ...(missingItems.length > 0
+          ? [
+              {
+                key: 'missing',
+                title: '⚠️ 待補售價',
+                hint: `${missingItems.length} 項,補完才能報價出金額`,
+                items: missingItems,
+                tone: 'warning' as const,
+              },
+            ]
+          : []),
+        ...groups.map((g) => ({
+          key: g.category,
+          title: g.category,
+          hint: `${g.items.length} 項`,
+          items: g.items,
+        })),
+      ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold">品項庫</h1>
+    <ViewportLock>
+      {/* Header */}
+      <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
+          價目表
+        </h1>
+        <span className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>
+          共 {items.length} 項
+        </span>
         {missingCount > 0 && (
-          <span className="text-sm px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          <span className="nm-pill nm-pill-warning">
             {missingCount} 項待設定售價
           </span>
         )}
@@ -46,59 +90,74 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         </div>
       </div>
 
-      <form action="/boss/catalog" method="get" className="flex flex-wrap items-center gap-2 text-sm">
+      {/* Search */}
+      <form
+        action="/boss/catalog"
+        method="get"
+        className="flex flex-wrap items-center gap-3 text-[13px] rounded-2xl nm-inset px-4 py-3 shrink-0"
+      >
         <input
           type="text"
           name="q"
           defaultValue={q}
           placeholder="搜尋品名 / 品牌 / 類型"
-          className="border border-neutral-300 dark:border-neutral-700 rounded px-3 py-1.5 bg-white dark:bg-neutral-900 min-w-[14rem]"
+          className="flex-1 min-w-[16rem] bg-transparent outline-none nm-focus px-2 py-1 rounded"
+          style={{ color: 'var(--nm-text-primary)' }}
         />
         <select
           name="category"
           defaultValue={category}
-          className="border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1.5 bg-white dark:bg-neutral-900"
+          className="nm-btn text-[13px]"
+          style={{ paddingTop: 8, paddingBottom: 8, minHeight: 40 }}
         >
           <option value="">分類:全部</option>
           {categories.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
-        <button type="submit" className="px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 rounded">
+        <button type="submit" className="nm-btn nm-focus text-[13px]" style={{ minHeight: 40 }}>
           查詢
         </button>
-        {(q || category) && (
-          <a href="/boss/catalog" className="px-3 py-1.5 text-neutral-500 underline">清除</a>
+        {isFiltered && (
+          <a
+            href="/boss/catalog"
+            className="text-[13px] underline underline-offset-2 nm-focus rounded px-2 py-1"
+            style={{ color: 'var(--nm-text-muted)' }}
+          >
+            清除
+          </a>
         )}
       </form>
 
-      <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-x-auto bg-white dark:bg-neutral-900">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-50 dark:bg-neutral-950 text-neutral-500">
-            <tr>
-              <th className="text-left px-3 py-2">品牌</th>
-              <th className="text-left px-3 py-2">品名</th>
-              <th className="text-left px-3 py-2">類型</th>
-              <th className="text-left px-3 py-2">單位</th>
-              <th className="text-right px-3 py-2">進價</th>
-              <th className="text-right px-3 py-2">售價</th>
-              <th className="text-left px-3 py-2">分類</th>
-              <th className="text-left px-3 py-2 w-20">動作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {error && (
-              <tr><td colSpan={8} className="px-3 py-4 text-red-600">查詢失敗: {error.message}</td></tr>
-            )}
-            {!error && items.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-6 text-center text-neutral-500">沒有符合的品項</td></tr>
-            )}
-            {items.map((item) => (
-              <CatalogRow key={item.id} item={item} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {error && (
+        <div className="rounded-xl nm-inset p-4 text-[13px] shrink-0" style={{ color: 'var(--nm-danger)' }}>
+          查詢失敗:{error.message}
+        </div>
+      )}
+
+      {!error && items.length === 0 && (
+        <div className="rounded-2xl nm-inset p-10 text-center shrink-0">
+          <div className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+            沒有符合的品項
+          </div>
+        </div>
+      )}
+
+      {/* 分類群組 → 橫向滑動 carousel(單一結果時不顯示分頁控制,只有內部滾動) */}
+      {!error && items.length > 0 && <CategoryCarousel panels={panels} />}
+    </ViewportLock>
   );
+}
+
+function groupByCategory(items: CatalogItem[]): { category: string; items: CatalogItem[] }[] {
+  const map = new Map<string, CatalogItem[]>();
+  for (const it of items) {
+    const key = it.category ?? '未分類';
+    const arr = map.get(key) ?? [];
+    arr.push(it);
+    map.set(key, arr);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b, 'zh-Hant'))
+    .map(([category, items]) => ({ category, items }));
 }

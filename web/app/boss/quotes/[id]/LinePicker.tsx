@@ -38,38 +38,41 @@ export default function LinePicker({
   }, [q]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-16">
-      <div className="w-full max-w-2xl rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex flex-col max-h-[70vh]">
-        <div className="p-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center gap-2">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-16">
+      <div className="w-full max-w-2xl rounded-2xl nm-raised-lg flex flex-col max-h-[70vh]" style={{ background: 'rgba(24,24,28,0.75)' }}>
+        <div className="p-4 flex items-center gap-2" style={{ borderBottom: '1px solid var(--nm-border-hair)' }}>
           <input
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="搜尋品名 / 品牌 / 類型"
-            className="flex-1 border border-neutral-300 dark:border-neutral-700 rounded px-3 py-2 bg-white dark:bg-neutral-900"
+            className="flex-1 nm-input"
           />
-          <button onClick={onClose} className="px-3 py-2 rounded border border-neutral-300 dark:border-neutral-700">關閉</button>
+          <button onClick={onClose} className="nm-btn text-[13px]">關閉</button>
         </div>
-        <div className="overflow-y-auto">
-          {loading && <div className="px-4 py-6 text-center text-neutral-500">查詢中…</div>}
-          {error && <div className="px-4 py-4 text-red-600">{error}</div>}
+        <div className="overflow-y-auto overflow-x-auto">
+          {loading && <div className="px-4 py-6 text-center" style={{ color: 'var(--nm-text-secondary)' }}>查詢中…</div>}
+          {error && <div className="px-4 py-4" style={{ color: 'var(--nm-danger)' }}>{error}</div>}
           {!loading && !error && items.length === 0 && (
-            <div className="px-4 py-6 text-center text-neutral-500">沒有符合的品項</div>
+            <div className="px-4 py-6 text-center" style={{ color: 'var(--nm-text-secondary)' }}>沒有符合的品項</div>
           )}
-          <table className="w-full text-sm">
+          <table className="w-full text-[13px]" style={{ minWidth: 600, borderCollapse: 'collapse' }}>
             <tbody>
               {items.map((item) => (
                 <tr
                   key={item.id}
-                  className="border-t border-neutral-100 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 cursor-pointer"
+                  className="cursor-pointer nm-lift"
+                  style={{ borderTop: '1px solid var(--nm-border-hair)' }}
                   onClick={() => onPick(item)}
                 >
-                  <td className="px-3 py-2">{item.brand ?? ''}</td>
-                  <td className="px-3 py-2 font-medium">{item.name}</td>
-                  <td className="px-3 py-2 text-neutral-500">{item.item_type ?? ''}</td>
-                  <td className="px-3 py-2 text-right font-mono">
-                    {item.sell_price_twd !== null ? `$${fmt(item.sell_price_twd)}` : (
-                      <span className="text-amber-600 dark:text-amber-400 text-xs">待設定售價</span>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{item.brand ?? ''}</td>
+                  <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>{item.name}</td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{item.item_type ?? ''}</td>
+                  <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap">
+                    {item.sell_price_twd !== null ? (
+                      <span style={{ color: 'var(--nm-text-body)' }}>${fmt(item.sell_price_twd)}</span>
+                    ) : (
+                      <span className="nm-pill nm-pill-warning">待設定售價</span>
                     )}
                   </td>
                 </tr>

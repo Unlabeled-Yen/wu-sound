@@ -16,13 +16,13 @@ const STATUSES = Object.keys(EQUIPMENT_STATUS_LABEL) as EquipmentStatus[];
 function statusPillClass(status: EquipmentStatus): string {
   switch (status) {
     case 'in_storage':
-      return 'bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200';
+      return 'nm-pill nm-pill-neutral';
     case 'on_site':
-      return 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200';
+      return 'nm-pill nm-pill-warning';
     case 'in_repair':
-      return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200';
+      return 'nm-pill nm-pill-danger';
     case 'retired':
-      return 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-900 dark:text-neutral-500';
+      return 'nm-pill nm-pill-muted line-through';
   }
 }
 
@@ -77,11 +77,10 @@ export default async function BossEquipmentPage({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">大型設備 ({rows.length})</h1>
-        <Link
-          href="/boss/equipment/new"
-          className="px-3 py-1.5 rounded bg-neutral-900 text-white text-sm dark:bg-white dark:text-neutral-900"
-        >
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
+          大型設備 ({rows.length})
+        </h1>
+        <Link href="/boss/equipment/new" className="nm-btn-solid text-[13px] whitespace-nowrap">
           新增設備
         </Link>
       </div>
@@ -91,94 +90,88 @@ export default async function BossEquipmentPage({
           name="q"
           defaultValue={q}
           placeholder="名稱 / 型號 / 品牌"
-          className="px-2 py-1.5 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm min-w-[220px]"
+          className="nm-input text-[13px] min-w-[220px]"
         />
-        <select
-          name="category"
-          defaultValue={category}
-          className="px-2 py-1.5 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
-        >
+        <select name="category" defaultValue={category} className="nm-btn text-[13px]">
           <option value="">全部分類</option>
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>{EQUIPMENT_CATEGORY_LABEL[c]}</option>
           ))}
         </select>
-        <select
-          name="status"
-          defaultValue={status}
-          className="px-2 py-1.5 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
-        >
+        <select name="status" defaultValue={status} className="nm-btn text-[13px]">
           <option value="">全部狀態</option>
           {STATUSES.map((s) => (
             <option key={s} value={s}>{EQUIPMENT_STATUS_LABEL[s]}</option>
           ))}
         </select>
-        <button type="submit" className="px-3 py-1.5 rounded border border-neutral-300 dark:border-neutral-700 text-sm">
+        <button type="submit" className="nm-btn nm-focus text-[13px]">
           篩選
         </button>
         {(q || category || status) && (
-          <Link href="/boss/equipment" className="text-sm underline text-neutral-500">
+          <Link href="/boss/equipment" className="text-[13px] underline underline-offset-2" style={{ color: 'var(--nm-text-muted)' }}>
             重設
           </Link>
         )}
       </form>
 
       {error && (
-        <div className="p-3 rounded border border-red-300 bg-red-50 text-red-800 text-sm">
+        <div className="rounded-xl nm-inset p-3 text-[13px]" style={{ color: 'var(--nm-danger)' }}>
           讀取失敗:{error.message}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-800">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-100 dark:bg-neutral-900 text-left">
-            <tr>
-              <th className="px-3 py-2 font-medium">名稱</th>
-              <th className="px-3 py-2 font-medium">品牌</th>
-              <th className="px-3 py-2 font-medium">型號</th>
-              <th className="px-3 py-2 font-medium">類別</th>
-              <th className="px-3 py-2 font-medium">數量</th>
-              <th className="px-3 py-2 font-medium">狀態</th>
-              <th className="px-3 py-2 font-medium">目前案場</th>
-              <th className="px-3 py-2 font-medium">動作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-neutral-500">
-                  沒有符合條件的設備
-                </td>
+      <div className="rounded-2xl nm-raised overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]" style={{ minWidth: 780, borderCollapse: 'collapse' }}>
+            <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
+              <tr style={{ color: 'var(--nm-text-muted)' }}>
+                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">名稱</th>
+                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">品牌</th>
+                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">型號</th>
+                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">類別</th>
+                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">數量</th>
+                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">狀態</th>
+                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">目前案場</th>
+                <th className="text-left px-3 py-2 font-normal whitespace-nowrap">動作</th>
               </tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t border-neutral-200 dark:border-neutral-800">
-                <td className="px-3 py-2">
-                  <Link href={`/boss/equipment/${r.id}`} className="hover:underline font-medium">
-                    {r.name}
-                  </Link>
-                </td>
-                <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">{r.brand || '—'}</td>
-                <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">{r.model_number || '—'}</td>
-                <td className="px-3 py-2">{EQUIPMENT_CATEGORY_LABEL[r.category]}</td>
-                <td className="px-3 py-2">{r.quantity} {r.unit}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-block px-2 py-0.5 rounded text-xs ${statusPillClass(r.status)}`}>
-                    {EQUIPMENT_STATUS_LABEL[r.status]}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">
-                  {r.status === 'on_site' ? (r.sites?.name || '(未知)') : '—'}
-                </td>
-                <td className="px-3 py-2">
-                  <Link href={`/boss/equipment/${r.id}`} className="text-sm underline">
-                    詳情
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-3 py-6 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-muted)' }}>
+                    沒有符合條件的設備
+                  </td>
+                </tr>
+              )}
+              {rows.map((r) => (
+                <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <Link href={`/boss/equipment/${r.id}`} className="hover:underline font-medium nm-focus" style={{ color: 'var(--nm-text-body)' }}>
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.brand || '—'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.model_number || '—'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{EQUIPMENT_CATEGORY_LABEL[r.category]}</td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.quantity} {r.unit}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <span className={statusPillClass(r.status)}>
+                      {EQUIPMENT_STATUS_LABEL[r.status]}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>
+                    {r.status === 'on_site' ? (r.sites?.name || '(未知)') : '—'}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <Link href={`/boss/equipment/${r.id}`} className="text-[13px] underline nm-focus" style={{ color: 'var(--nm-text-muted)' }}>
+                      詳情
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

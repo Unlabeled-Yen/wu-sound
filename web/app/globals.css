@@ -1,26 +1,360 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* --- Dark glass tokens (design handoff: 暗色玻璃 UI, 灰階單色 + 照片襯底 + 毛玻璃) --- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surface */
+  --nm-bg: #0f0f11;
+  --nm-bg-deep: #08080a;
+
+  /* Text — grayscale ladder from spec */
+  --nm-text-primary:   #f0f0f2;  /* 標題 */
+  --nm-text-body:      #e4e4e7;  /* 主文字 */
+  --nm-text-secondary: #9c9293;  /* 次文字 */
+  --nm-text-muted:     #6d6e73;  /* 弱化/標籤 */
+  --nm-text-faint:     #5a5b60;  /* 更弱 */
+  --nm-icon-idle:      #7d7e83;
+
+  /* Status — small dots of color only */
+  --nm-accent:  #ffffff;
+  --nm-danger:  #e07a7a;
+  --nm-danger-glass-text: #e5a0a0;
+  --nm-success: #7ecf9d;
+  --nm-success-glass-text: #a9e3c1;
+  --nm-warning: #d9b56b;
+  --nm-warning-glass-text: #e7ca8c;
+
+  /* Borders */
+  --nm-border-hair: rgba(255, 255, 255, 0.05);
+  --nm-border-glass: rgba(255, 255, 255, 0.17);
+
+  /* Shape */
+  --nm-radius:      13px;
+  --nm-radius-lg:   20px;
+  --nm-radius-xl:   28px;
+  --nm-radius-pill: 999px;
+
+  --background: var(--nm-bg);
+  --foreground: var(--nm-text-body);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--nm-bg);
+  --color-foreground: var(--nm-text-body);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+  background: var(--nm-bg-deep);
+}
+body {
+  background: transparent;
+  color: var(--nm-text-body);
+  font-family: "Noto Sans TC", "PingFang TC", var(--font-geist-sans), -apple-system, system-ui, sans-serif;
+  font-feature-settings: "palt" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100vh;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+::selection { background: rgba(228, 228, 231, 0.16); }
+
+/* --- Backdrop: aged console photo, fixed, one layer only (perf) --- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(120% 85% at 50% 39%, transparent 41%, rgba(0, 0, 0, 0.5) 100%),
+    linear-gradient(
+      180deg,
+      rgba(8, 8, 10, 0.93) 0%,
+      rgba(8, 8, 10, 0.79) 40%,
+      rgba(8, 8, 10, 0.5) 74%,
+      rgba(8, 8, 10, 0.28) 100%
+    ),
+    url("/console.jpg");
+  background-repeat: no-repeat;
+  background-position: center, center top, center bottom;
+  background-size: cover, cover, cover;
+  filter: grayscale(1) brightness(0.68) contrast(1.03) sepia(0.12);
+}
+
+/* --- Grain overlay: topmost, mix-blend-mode overlay --- */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before, body::after { display: none; }
+}
+
+/* Numbers: tabular alignment helper */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Glass panel utilities ---
+   Layering rule: base surfaces sit further from the photo (more blur, more opaque);
+   accent chips/inputs sit closer to the photo (less blur, more transparent). */
+
+/* Sidebar / large panel (main shell) */
+.nm-raised-lg {
+  background: rgba(19, 19, 23, 0.32);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+  border: 1px solid var(--nm-border-glass);
+  box-shadow: 0 24px 70px -28px rgba(0, 0, 0, 0.85);
+}
+
+/* Generic raised panel (table blocks, section cards) */
+.nm-raised {
+  background: rgba(30, 30, 36, 0.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid var(--nm-border-glass);
+  box-shadow: 0 18px 42px -20px rgba(0, 0, 0, 0.85);
+}
+
+/* Stat card / number card */
+.nm-raised-sm {
+  background: rgba(18, 18, 22, 0.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 42px -20px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+
+/* Recessed surface: search bars, inset inputs, small square wells (avatars) */
+.nm-inset {
+  background: rgba(8, 8, 10, 0.4);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Small inset: active nav pill (flat, not glass — matches spec literal) */
+.nm-inset-sm {
+  background: #26262b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Flat chip (quick-action pills) */
+.nm-flat {
+  background: rgba(40, 40, 46, 0.4);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Lift on hover — nav items */
+.nm-lift {
+  transition: background 140ms ease, color 140ms ease, border-color 150ms ease;
+}
+.nm-lift:hover:not([aria-current="page"]) {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--nm-text-primary);
+}
+
+/* Interactive button: glass chip */
+.nm-btn {
+  background: rgba(40, 40, 46, 0.4);
+  color: #cfcfd2;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--nm-radius);
+  padding: 10px 18px;
+  min-height: 44px;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+}
+.nm-btn:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--nm-text-primary);
+}
+.nm-btn:active { transform: scale(0.98); }
+.nm-btn:disabled {
+  color: var(--nm-text-faint);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Solid primary CTA — 實心白鈕 (＋ 新增品項 / 新增設備) */
+.nm-btn-solid {
+  background: #f0f0f2;
+  color: #17171a;
+  border: none;
+  border-radius: var(--nm-radius);
+  padding: 10px 18px;
+  min-height: 44px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.nm-btn-solid:hover { background: #ffffff; }
+.nm-btn-solid:active { transform: scale(0.98); }
+.nm-btn-solid:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Focus ring — mandatory on all interactive elements */
+.nm-focus:focus-visible,
+.nm-btn:focus-visible,
+.nm-btn-solid:focus-visible {
+  outline: 2px solid var(--nm-accent);
+  outline-offset: 3px;
+}
+
+/* Danger action — glass red (退回 / 刪除) */
+.nm-danger {
+  background: rgba(224, 122, 122, 0.08);
+  color: var(--nm-danger-glass-text);
+  border: 1px solid rgba(224, 122, 122, 0.34);
+  border-radius: var(--nm-radius);
+  padding: 10px 18px;
+  min-height: 44px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.nm-danger:hover { background: rgba(224, 122, 122, 0.14); }
+.nm-danger:active { transform: scale(0.98); }
+.nm-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Success glass action (確認) */
+.nm-success-btn {
+  background: rgba(126, 207, 157, 0.16);
+  color: var(--nm-success-glass-text);
+  border: 1px solid rgba(126, 207, 157, 0.4);
+  border-radius: var(--nm-radius);
+  padding: 10px 18px;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.nm-success-btn:hover { background: rgba(126, 207, 157, 0.24); }
+.nm-success-btn:active { transform: scale(0.98); }
+.nm-success-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Input — recessed glass well */
+.nm-input {
+  background: rgba(8, 8, 10, 0.4);
+  color: var(--nm-text-body);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: var(--nm-radius);
+  padding: 10px 14px;
+  min-height: 44px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition: border-color 150ms ease;
+  width: 100%;
+}
+.nm-input::placeholder { color: var(--nm-text-faint); }
+.nm-input:focus-visible {
+  outline: 2px solid var(--nm-accent);
+  outline-offset: 2px;
+}
+
+/* Status pills */
+.nm-pill {
+  display: inline-block;
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: var(--nm-radius-pill);
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.nm-pill-neutral {
+  color: #b8b8bb;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.nm-pill-warning {
+  color: var(--nm-warning);
+  background: rgba(217, 181, 107, 0.08);
+  border-color: rgba(217, 181, 107, 0.28);
+}
+.nm-pill-danger {
+  color: var(--nm-danger);
+  background: rgba(224, 122, 122, 0.08);
+  border-color: rgba(224, 122, 122, 0.26);
+}
+.nm-pill-muted {
+  color: var(--nm-text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nm-btn, .nm-btn-solid, .nm-danger, .nm-success-btn, .nm-input, .nm-focus, .nm-lift { transition: none !important; }
+}
+
+/* --- Custom glass-toned scrollbar for internally-scrolling panels (carousel tables etc) --- */
+.app-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.app-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.app-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.app-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.18);
+  border-radius: var(--nm-radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.app-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  background-clip: padding-box;
+}
+.app-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* --- Carousel slide track (category swipe panels) --- */
+.carousel-track {
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .carousel-track { transition: none !important; }
+}
+
+/* Bridge for pages still using Tailwind neutral tokens.
+   Existing pages use bg-white / dark:bg-neutral-950 etc.; force them onto the glass palette. */
+.bg-white:not(.nm-btn-solid):not(.keep-light) {
+  background-color: rgba(30, 30, 36, 0.3) !important;
+}
+.dark\:bg-neutral-900,
+.dark\:bg-neutral-950 {
+  background-color: rgba(19, 19, 23, 0.32) !important;
+}
+.text-neutral-900:not(.keep-dark) { color: var(--nm-text-primary) !important; }
+.text-neutral-700 { color: var(--nm-text-secondary) !important; }
+.text-neutral-600 { color: var(--nm-text-secondary) !important; }
+.text-neutral-500 { color: var(--nm-text-secondary) !important; }
+.text-neutral-400 { color: var(--nm-text-muted) !important; }
+.border-neutral-200, .border-neutral-300 {
+  border-color: var(--nm-border-glass) !important;
+}
+.border-neutral-800 {
+  border-color: var(--nm-border-hair) !important;
 }

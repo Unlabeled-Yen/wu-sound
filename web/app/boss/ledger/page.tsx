@@ -10,9 +10,9 @@ import {
   type LedgerDirection,
   type LedgerStatus,
 } from '@/lib/types';
-import { voidEntryForm } from './actions';
 import ImportBatchDialog from './ImportBatchDialog';
 import ExportCsvDialog from './ExportCsvDialog';
+import { VoidDialog } from './VoidDialog';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,44 +113,45 @@ export default async function LedgerPage(
     <div className="space-y-4">
       {/* 頂部:月份 + 篩選 */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-[13px]">
           <Link
             href={buildHref(base, { month: shiftMonth(month, -1) })}
-            className="px-2 py-1 border border-neutral-300 dark:border-neutral-700 rounded"
+            className="nm-btn"
+            style={{ padding: '4px 10px', minHeight: 'auto' }}
           >← 上月</Link>
-          <span className="font-semibold min-w-[6rem] text-center">{month}</span>
+          <span className="font-semibold min-w-[6rem] text-center" style={{ color: 'var(--nm-text-primary)' }}>{month}</span>
           <Link
             href={buildHref(base, { month: shiftMonth(month, 1) })}
-            className="px-2 py-1 border border-neutral-300 dark:border-neutral-700 rounded"
+            className="nm-btn"
+            style={{ padding: '4px 10px', minHeight: 'auto' }}
           >下月 →</Link>
           <Link
             href={buildHref(base, { month: currentMonth() })}
-            className="px-2 py-1 text-neutral-500 underline"
+            className="underline"
+            style={{ color: 'var(--nm-text-muted)', padding: '4px 8px' }}
           >回本月</Link>
         </div>
 
-        <div className="flex gap-1 text-sm">
+        <div className="flex gap-1 text-[13px]">
           {(['all', 'internal', 'external'] as const).map((f) => (
             <Link
               key={f}
               href={buildHref(base, { filter: f })}
-              className={`px-3 py-1 rounded-full border ${
-                filter === f
-                  ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-neutral-100 dark:text-neutral-900'
-                  : 'border-neutral-300 dark:border-neutral-700'
-              }`}
+              className={filter === f ? 'nm-btn-solid' : 'nm-btn'}
+              style={{ borderRadius: 999, padding: '4px 14px', minHeight: 'auto' }}
             >{f === 'all' ? '全部' : f === 'internal' ? '內帳' : '外帳'}</Link>
           ))}
         </div>
 
-        <form action="/boss/ledger" method="get" className="flex items-center gap-2 text-sm">
+        <form action="/boss/ledger" method="get" className="flex items-center gap-2 text-[13px]">
           <input type="hidden" name="month" value={month} />
           <input type="hidden" name="filter" value={filter} />
           {statusVal !== 'active' && <input type="hidden" name="status" value={statusVal} />}
           <select
             name="direction"
             defaultValue={direction ?? ''}
-            className="border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1 bg-white dark:bg-neutral-900"
+            className="nm-input"
+            style={{ width: 'auto', minHeight: 34, padding: '4px 10px' }}
           >
             <option value="">方向:全部</option>
             <option value="income">收入</option>
@@ -159,7 +160,8 @@ export default async function LedgerPage(
           <select
             name="kind"
             defaultValue={kind ?? ''}
-            className="border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1 bg-white dark:bg-neutral-900"
+            className="nm-input"
+            style={{ width: 'auto', minHeight: 34, padding: '4px 10px' }}
           >
             <option value="">類別:全部</option>
             {kindOptions.map((k) => (
@@ -168,13 +170,15 @@ export default async function LedgerPage(
           </select>
           <button
             type="submit"
-            className="px-3 py-1 border border-neutral-300 dark:border-neutral-700 rounded"
+            className="nm-btn"
+            style={{ padding: '4px 14px', minHeight: 'auto' }}
           >套用</button>
         </form>
 
         <Link
           href={buildHref(base, { status: statusVal === 'active' ? 'voided' : 'active' })}
-          className="text-sm text-neutral-500 underline ml-auto"
+          className="text-[13px] underline ml-auto"
+          style={{ color: 'var(--nm-text-muted)' }}
         >
           {statusVal === 'active' ? '顯示已作廢' : '返回作用中'}
         </Link>
@@ -185,101 +189,97 @@ export default async function LedgerPage(
         <SummaryCard label="當月收入合計" value={`$${fmt(income)}`} tone="income" />
         <SummaryCard label="當月支出合計" value={`$${fmt(expense)}`} tone="expense" />
         <SummaryCard label="淨額" value={`$${fmt(net)}`} tone={net >= 0 ? 'income' : 'expense'} />
-        <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3 text-sm">
-          <div className="text-neutral-500">外帳彙總</div>
-          <div className="mt-1">收入合計 <span className="font-semibold">${fmt(extIncome)}</span></div>
-          <div>稅額合計 <span className="font-semibold">${fmt(extTax)}</span></div>
+        <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
+          <div style={{ color: 'var(--nm-text-secondary)' }}>外帳彙總</div>
+          <div className="mt-1" style={{ color: 'var(--nm-text-body)' }}>收入合計 <span className="font-semibold">${fmt(extIncome)}</span></div>
+          <div style={{ color: 'var(--nm-text-body)' }}>稅額合計 <span className="font-semibold">${fmt(extTax)}</span></div>
         </div>
       </div>
 
       {/* 表格 */}
-      <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-x-auto bg-white dark:bg-neutral-900">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-50 dark:bg-neutral-950 text-neutral-500">
-            <tr>
-              <th className="text-left px-3 py-2">日期</th>
-              <th className="text-left px-3 py-2">方向</th>
-              <th className="text-left px-3 py-2">類別</th>
-              <th className="text-left px-3 py-2">對象</th>
-              <th className="text-right px-3 py-2">金額</th>
-              <th className="text-left px-3 py-2">內外帳</th>
-              <th className="text-left px-3 py-2">發票</th>
-              <th className="text-left px-3 py-2">備註</th>
-              <th className="text-left px-3 py-2">動作</th>
+      <div className="rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
+        <table className="w-full text-[13px]" style={{ minWidth: 1100, borderCollapse: 'collapse' }}>
+          <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
+            <tr style={{ color: 'var(--nm-text-muted)' }}>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">日期</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">方向</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">類別</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">對象</th>
+              <th className="text-right px-3 py-2 font-normal whitespace-nowrap">金額</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">內外帳</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">發票</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">備註</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">動作</th>
             </tr>
           </thead>
           <tbody>
             {error && (
-              <tr><td colSpan={9} className="px-3 py-4 text-red-600">查詢失敗: {error.message}</td></tr>
+              <tr><td colSpan={9} className="px-3 py-4 whitespace-nowrap" style={{ color: 'var(--nm-danger)' }}>查詢失敗: {error.message}</td></tr>
             )}
             {!error && rows.length === 0 && (
-              <tr><td colSpan={9} className="px-3 py-6 text-center text-neutral-500">本月沒有紀錄</td></tr>
+              <tr><td colSpan={9} className="px-3 py-6 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>本月沒有紀錄</td></tr>
             )}
             {rows.map((r) => {
               const voided = r.status === 'voided';
               return (
-                <tr key={r.id} className={`border-t border-neutral-100 dark:border-neutral-800 ${voided ? 'opacity-50' : ''}`}>
-                  <td className="px-3 py-2 whitespace-nowrap">{r.occurred_on}</td>
-                  <td className="px-3 py-2">
+                <tr
+                  key={r.id}
+                  style={{ borderTop: '1px solid var(--nm-border-hair)', opacity: voided ? 0.5 : 1 }}
+                >
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.occurred_on}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
                     {r.direction === 'income'
-                      ? <span className="text-emerald-600">↑ 收</span>
-                      : <span className="text-rose-600">↓ 支</span>}
+                      ? <span style={{ color: 'var(--nm-success-glass-text)' }}>↑ 收</span>
+                      : <span style={{ color: 'var(--nm-danger-glass-text)' }}>↓ 支</span>}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>
                     {LEDGER_KIND_LABEL[r.kind]}
                     {r.source_batch_id && (
-                      <span className="ml-2 inline-block text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-white">零用金月結</span>
+                      <span className="nm-pill nm-pill-muted ml-2">零用金月結</span>
                     )}
                   </td>
-                  <td className="px-3 py-2">{r.party ?? '—'}</td>
-                  <td className={`px-3 py-2 text-right font-mono ${voided ? 'line-through' : ''}`}>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.party ?? '—'}</td>
+                  <td className={`px-3 py-2 text-right font-mono tabular whitespace-nowrap ${voided ? 'line-through' : ''}`} style={{ color: 'var(--nm-text-body)' }}>
                     ${fmt(r.amount_twd)}
                   </td>
-                  <td className="px-3 py-2">
-                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full ${
-                      r.is_external
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'
-                        : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-                    }`}>{r.is_external ? '外帳' : '內帳'}</span>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <span className={`nm-pill ${r.is_external ? 'nm-pill-neutral' : 'nm-pill-muted'}`}>{r.is_external ? '外帳' : '內帳'}</span>
                     {r.is_external && r.tax_amount_twd > 0 && (
-                      <span className="ml-1 text-xs text-neutral-500">稅 ${fmt(r.tax_amount_twd)}</span>
+                      <span className="ml-1 text-xs" style={{ color: 'var(--nm-text-muted)' }}>稅 ${fmt(r.tax_amount_twd)}</span>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    {r.invoice_status === 'none' && '—'}
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {r.invoice_status === 'none' && <span style={{ color: 'var(--nm-text-secondary)' }}>—</span>}
                     {r.invoice_status === 'to_issue' && (
-                      <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+                      <span className="nm-pill nm-pill-warning">
                         {INVOICE_STATUS_LABEL.to_issue}
                       </span>
                     )}
                     {r.invoice_status === 'issued' && (
-                      <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+                      <span className="nm-pill" style={{ color: 'var(--nm-success-glass-text)', background: 'rgba(126,207,157,0.1)', borderColor: 'rgba(126,207,157,0.28)' }}>
                         {INVOICE_STATUS_LABEL.issued}
-                        {r.invoice_date && <span className="ml-1 text-neutral-500">{r.invoice_date}</span>}
+                        {r.invoice_date && <span className="ml-1" style={{ color: 'var(--nm-text-muted)' }}>{r.invoice_date}</span>}
                       </span>
                     )}
                   </td>
                   <td className="px-3 py-2 max-w-[16rem]">
-                    <div className="truncate" title={r.memo ?? ''}>{r.memo ?? ''}</div>
+                    <div className="truncate" title={r.memo ?? ''} style={{ color: 'var(--nm-text-secondary)' }}>{r.memo ?? ''}</div>
                     {voided && r.voided_reason && (
-                      <div className="text-xs text-neutral-500">作廢原因:{r.voided_reason}</div>
+                      <div className="text-xs whitespace-nowrap" style={{ color: 'var(--nm-text-muted)' }}>作廢原因:{r.voided_reason}</div>
                     )}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     {!voided && (
                       <div className="flex gap-2 items-center">
                         <Link
                           href={`/boss/ledger/${r.id}`}
-                          className="text-blue-600 dark:text-blue-400 underline"
+                          className="underline"
+                          style={{ color: 'var(--nm-text-secondary)' }}
                         >編輯</Link>
-                        <form action={voidEntryForm}>
-                          <input type="hidden" name="id" value={r.id} />
-                          <input type="hidden" name="reason" value="" />
-                          <button
-                            type="submit"
-                            className="text-rose-600 dark:text-rose-400 underline"
-                          >作廢</button>
-                        </form>
+                        <VoidDialog
+                          id={r.id}
+                          summary={`${r.occurred_on} · ${LEDGER_KIND_LABEL[r.kind]} · ${r.party ?? '—'} · $${fmt(r.amount_twd)}`}
+                        />
                       </div>
                     )}
                   </td>
@@ -294,7 +294,7 @@ export default async function LedgerPage(
       <div className="flex flex-wrap gap-3 items-center pt-2">
         <Link
           href={`/boss/ledger/new?month=${month}`}
-          className="px-4 py-2 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+          className="nm-btn-solid text-[13px]"
         >新增一筆</Link>
         <ImportBatchDialog />
         <ExportCsvDialog defaultMonth={month} />
@@ -304,13 +304,11 @@ export default async function LedgerPage(
 }
 
 function SummaryCard({ label, value, tone }: { label: string; value: string; tone: 'income' | 'expense' }) {
-  const color = tone === 'income'
-    ? 'text-emerald-700 dark:text-emerald-300'
-    : 'text-rose-700 dark:text-rose-300';
+  const color = tone === 'income' ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)';
   return (
-    <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3">
-      <div className="text-sm text-neutral-500">{label}</div>
-      <div className={`text-2xl font-semibold mt-1 ${color}`}>{value}</div>
+    <div className="rounded-2xl nm-raised-sm p-3">
+      <div className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>{label}</div>
+      <div className="text-2xl font-semibold mt-1" style={{ color }}>{value}</div>
     </div>
   );
 }

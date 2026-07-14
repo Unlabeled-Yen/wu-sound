@@ -113,60 +113,78 @@ export default function StaffClockinPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-4">
-      <header className="mb-4">
-        <h1 className="text-xl font-bold">打卡</h1>
-        <p className="text-sm text-neutral-500">{new Date().toLocaleDateString('zh-TW')}</p>
+    <div className="space-y-5">
+      <header>
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>打卡</h1>
+        <p className="text-[13px] mt-0.5" style={{ color: 'var(--nm-text-muted)' }}>
+          {new Date().toLocaleDateString('zh-TW')}
+        </p>
       </header>
 
       {error && (
-        <div className="mb-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <div className="nm-inset rounded-xl p-3 text-[13px]" style={{ color: 'var(--nm-danger)' }}>
           {error}
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
           onClick={() => clockNow('in')}
           disabled={posting !== null}
-          className="rounded-xl bg-emerald-600 py-8 text-2xl font-bold text-white shadow-md active:bg-emerald-700 disabled:bg-neutral-400"
+          className="flex flex-col items-center justify-center gap-1.5 rounded-[22px] h-32 active:scale-[0.97] transition disabled:opacity-60 nm-focus"
+          style={{
+            background: 'rgba(126,207,157,0.14)',
+            border: '1px solid rgba(126,207,157,0.35)',
+            color: 'var(--nm-success-glass-text)',
+          }}
         >
-          {posting === 'in' ? '記錄中…' : '上班'}
+          <ClockInIcon />
+          <span className="text-[21px] font-semibold">{posting === 'in' ? '記錄中…' : '上班'}</span>
         </button>
         <button
           type="button"
           onClick={() => clockNow('out')}
           disabled={posting !== null}
-          className="rounded-xl bg-orange-600 py-8 text-2xl font-bold text-white shadow-md active:bg-orange-700 disabled:bg-neutral-400"
+          className="flex flex-col items-center justify-center gap-1.5 rounded-[22px] h-32 active:scale-[0.97] transition disabled:opacity-60 nm-focus"
+          style={{
+            background: 'rgba(217,181,107,0.14)',
+            border: '1px solid rgba(217,181,107,0.35)',
+            color: 'var(--nm-warning-glass-text)',
+          }}
         >
-          {posting === 'out' ? '記錄中…' : '下班'}
+          <ClockOutIcon />
+          <span className="text-[21px] font-semibold">{posting === 'out' ? '記錄中…' : '下班'}</span>
         </button>
       </div>
 
-      <section className="mb-6">
-        <h2 className="mb-2 text-base font-semibold">今日打卡</h2>
+      <section className="space-y-2">
+        <h2 className="text-xs uppercase tracking-wide" style={{ color: 'var(--nm-text-muted)' }}>
+          今日打卡
+        </h2>
         {loading ? (
-          <p className="text-sm text-neutral-500">載入中…</p>
+          <p className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>載入中…</p>
         ) : todayList.length === 0 ? (
-          <p className="text-sm text-neutral-500">今天還沒有打卡記錄</p>
+          <p className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>今天還沒有打卡記錄</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="nm-raised rounded-2xl divide-y overflow-hidden" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
             {todayList.map((c) => (
               <li
                 key={c.id}
-                className="flex items-center justify-between rounded border border-neutral-200 bg-white p-3 text-sm"
+                className="flex items-center gap-3 px-4 py-3"
+                style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
               >
-                <span className="font-medium">{c.type === 'in' ? '上班' : '下班'}</span>
-                <span className="text-neutral-700">
-                  {new Date(c.ts).toLocaleTimeString('zh-TW', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: c.type === 'in' ? 'var(--nm-success)' : 'var(--nm-warning)' }}
+                />
+                <span className="text-[14px] font-medium flex-1" style={{ color: 'var(--nm-text-body)' }}>
+                  {c.type === 'in' ? '上班' : '下班'}
                 </span>
-                {c.is_backfill && (
-                  <span className="rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-800">補</span>
-                )}
+                <span className="tabular text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+                  {new Date(c.ts).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {c.is_backfill && <span className="nm-pill nm-pill-warning">補</span>}
               </li>
             ))}
           </ul>
@@ -177,82 +195,68 @@ export default function StaffClockinPage() {
         <button
           type="button"
           onClick={() => setShowBackfill((v) => !v)}
-          className="text-sm text-blue-600 underline"
+          className="text-[13px] underline underline-offset-2 nm-focus rounded px-2 py-1"
+          style={{ color: 'var(--nm-text-muted)' }}
         >
           補打卡
         </button>
       </div>
 
       {showBackfill && (
-        <form
-          onSubmit={submitBackfill}
-          className="mt-3 rounded-lg border border-neutral-300 bg-white p-4 shadow-sm"
-        >
-          <h3 className="mb-3 text-base font-semibold">補打卡</h3>
+        <form onSubmit={submitBackfill} className="nm-raised rounded-2xl p-4 space-y-3">
+          <h3 className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>補打卡</h3>
           {bfError && (
-            <div className="mb-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            <div className="nm-inset rounded-xl p-3 text-[13px]" style={{ color: 'var(--nm-danger)' }}>
               {bfError}
             </div>
           )}
-          <label className="mb-3 block text-sm">
-            <span className="mb-1 block font-medium">類型</span>
+          <label className="block text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+            <span className="mb-1.5 block font-medium">類型</span>
             <div className="flex gap-4">
-              <label className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="bfType"
-                  value="in"
-                  checked={bfType === 'in'}
-                  onChange={() => setBfType('in')}
-                />
+              <label className="flex items-center gap-1.5">
+                <input type="radio" name="bfType" value="in" checked={bfType === 'in'} onChange={() => setBfType('in')} />
                 上班
               </label>
-              <label className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="bfType"
-                  value="out"
-                  checked={bfType === 'out'}
-                  onChange={() => setBfType('out')}
-                />
+              <label className="flex items-center gap-1.5">
+                <input type="radio" name="bfType" value="out" checked={bfType === 'out'} onChange={() => setBfType('out')} />
                 下班
               </label>
             </div>
           </label>
-          <label className="mb-3 block text-sm">
-            <span className="mb-1 block font-medium">補打卡時間</span>
+          <label className="block text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+            <span className="mb-1.5 block font-medium">補打卡時間</span>
             <input
               type="datetime-local"
               value={bfTs}
               onChange={(e) => setBfTs(e.target.value)}
-              className="w-full rounded border border-neutral-300 p-2"
+              className="nm-input"
               required
             />
           </label>
-          <label className="mb-3 block text-sm">
-            <span className="mb-1 block font-medium">原因</span>
+          <label className="block text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+            <span className="mb-1.5 block font-medium">原因</span>
             <textarea
               value={bfReason}
               onChange={(e) => setBfReason(e.target.value)}
               rows={2}
-              className="w-full rounded border border-neutral-300 p-2"
+              className="nm-input"
               placeholder="為什麼要補打卡"
               required
             />
           </label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button
               type="button"
               onClick={() => setShowBackfill(false)}
               disabled={bfSubmitting}
-              className="flex-1 rounded border border-neutral-300 py-2 text-sm"
+              className="flex-1 nm-btn text-[13px] nm-focus"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={bfSubmitting}
-              className="flex-[2] rounded bg-blue-600 py-2 text-sm font-bold text-white disabled:bg-neutral-400"
+              className="flex-[2] nm-btn-solid text-[13px] nm-focus"
             >
               {bfSubmitting ? '送出中…' : '送出補打卡'}
             </button>
@@ -260,5 +264,22 @@ export default function StaffClockinPage() {
         </form>
       )}
     </div>
+  );
+}
+
+function ClockInIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+function ClockOutIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9 12h6" />
+    </svg>
   );
 }

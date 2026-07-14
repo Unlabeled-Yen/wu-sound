@@ -38,14 +38,14 @@ export async function voidEntry(id: string, reason?: string): Promise<Result> {
   const { session, err } = await assertBoss();
   if (!session) return { ok: false, error: err ?? '未登入' };
   if (!id) return { ok: false, error: '缺少 id' };
+  const r = (reason ?? '').trim();
+  if (r.length < 2) return { ok: false, error: '請填寫作廢原因(至少 2 字)' };
 
   const sb = getSupabaseAdmin();
   const cur = await sb.from('ledger_entries').select('*').eq('id', id).maybeSingle();
   if (cur.error) return { ok: false, error: `查詢失敗: ${cur.error.message}` };
   if (!cur.data) return { ok: false, error: '找不到記錄' };
   if (cur.data.status === 'voided') return { ok: false, error: '此筆已作廢' };
-
-  const r = (reason?.trim()) || '作廢';
   const upd = await sb
     .from('ledger_entries')
     .update({ status: 'voided', voided_reason: r })

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { QUOTE_STATUS_LABEL, type Quote, type QuoteLine, type QuoteStatus } from '@/lib/types';
 
@@ -7,10 +8,17 @@ export const dynamic = 'force-dynamic';
 const fmt = (n: number) => n.toLocaleString('zh-TW');
 
 const STATUS_STYLE: Record<QuoteStatus, string> = {
-  draft: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
-  sent: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
-  won: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
-  lost: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
+  draft: 'nm-pill-muted',
+  sent: 'nm-pill-neutral',
+  won: '',
+  lost: 'nm-pill-danger',
+};
+const STATUS_INLINE: Partial<Record<QuoteStatus, CSSProperties>> = {
+  won: {
+    color: 'var(--nm-success-glass-text)',
+    background: 'rgba(126, 207, 157, 0.08)',
+    borderColor: 'rgba(126, 207, 157, 0.26)',
+  },
 };
 
 export default async function QuotesPage() {
@@ -37,33 +45,33 @@ export default async function QuotesPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold">報價單</h1>
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>報價單</h1>
         <Link
           href="/boss/quotes/new"
-          className="ml-auto px-4 py-2 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+          className="ml-auto nm-btn-solid text-[13px]"
         >
           新增報價單
         </Link>
       </div>
 
-      <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-x-auto bg-white dark:bg-neutral-900">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-50 dark:bg-neutral-950 text-neutral-500">
-            <tr>
-              <th className="text-left px-3 py-2">客戶</th>
-              <th className="text-left px-3 py-2">案件</th>
-              <th className="text-left px-3 py-2">狀態</th>
-              <th className="text-right px-3 py-2">明細數</th>
-              <th className="text-right px-3 py-2">總額</th>
-              <th className="text-left px-3 py-2">建立日期</th>
+      <div className="rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
+        <table className="w-full text-[13px]" style={{ minWidth: 900, borderCollapse: 'collapse' }}>
+          <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
+            <tr style={{ color: 'var(--nm-text-muted)' }}>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">客戶</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">案件</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">狀態</th>
+              <th className="text-right px-3 py-2 font-normal whitespace-nowrap">明細數</th>
+              <th className="text-right px-3 py-2 font-normal whitespace-nowrap">總額</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">建立日期</th>
             </tr>
           </thead>
           <tbody>
             {error && (
-              <tr><td colSpan={6} className="px-3 py-4 text-red-600">查詢失敗: {error.message}</td></tr>
+              <tr><td colSpan={6} className="px-3 py-4 whitespace-nowrap" style={{ color: 'var(--nm-danger)' }}>查詢失敗: {error.message}</td></tr>
             )}
             {!error && quotes.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-neutral-500">還沒有報價單</td></tr>
+              <tr><td colSpan={6} className="px-3 py-6 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>還沒有報價單</td></tr>
             )}
             {quotes.map((q) => {
               const lines = byQuote.get(q.id) ?? [];
@@ -74,29 +82,29 @@ export default async function QuotesPage() {
                 else total += l.qty * l.unit_price_twd;
               }
               return (
-                <tr key={q.id} className="border-t border-neutral-100 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/40">
-                  <td className="px-3 py-2 font-medium">
-                    <Link href={`/boss/quotes/${q.id}`} className="text-blue-600 dark:text-blue-400 underline">
+                <tr key={q.id} style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
+                  <td className="px-3 py-2 font-medium whitespace-nowrap">
+                    <Link href={`/boss/quotes/${q.id}`} className="underline" style={{ color: 'var(--nm-text-body)' }}>
                       {q.client_name}
                     </Link>
                   </td>
-                  <td className="px-3 py-2">{q.project_name ?? '—'}</td>
-                  <td className="px-3 py-2">
-                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATUS_STYLE[q.status]}`}>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{q.project_name ?? '—'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <span className={`nm-pill ${STATUS_STYLE[q.status]}`} style={STATUS_INLINE[q.status]}>
                       {QUOTE_STATUS_LABEL[q.status]}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right">{lines.length}</td>
-                  <td className="px-3 py-2 text-right font-mono">
+                  <td className="px-3 py-2 text-right whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{lines.length}</td>
+                  <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap">
                     {lines.length === 0 ? (
-                      <span className="text-neutral-400">—</span>
+                      <span style={{ color: 'var(--nm-text-muted)' }}>—</span>
                     ) : missing > 0 ? (
-                      <span className="text-amber-600 dark:text-amber-400">{missing} 項待補價</span>
+                      <span style={{ color: 'var(--nm-warning)' }}>{missing} 項待補價</span>
                     ) : (
-                      `$${fmt(total)}`
+                      <span style={{ color: 'var(--nm-text-body)' }}>${fmt(total)}</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">{q.created_at.slice(0, 10)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{q.created_at.slice(0, 10)}</td>
                 </tr>
               );
             })}

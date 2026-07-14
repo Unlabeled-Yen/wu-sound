@@ -20,7 +20,7 @@ export default function CatalogRow({ item }: { item: CatalogItem }) {
   const [sell, setSell] = useState(item.sell_price_twd !== null ? String(item.sell_price_twd) : '');
   const [category, setCategory] = useState(item.category ?? '');
 
-  const inputCls = 'w-full border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1 bg-white dark:bg-neutral-900';
+  const inputCls = 'nm-input text-[13px]';
 
   async function save() {
     setError(null);
@@ -54,29 +54,31 @@ export default function CatalogRow({ item }: { item: CatalogItem }) {
     }
   }
 
+  const rowBorder = { borderTop: '1px solid rgba(255,255,255,0.04)' };
+
   if (editing) {
     return (
-      <tr className="border-t border-neutral-100 dark:border-neutral-800 align-top">
-        <td className="px-2 py-1"><input value={brand} onChange={(e) => setBrand(e.target.value)} className={inputCls} /></td>
-        <td className="px-2 py-1"><input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></td>
-        <td className="px-2 py-1"><input value={itemType} onChange={(e) => setItemType(e.target.value)} className={inputCls} /></td>
-        <td className="px-2 py-1"><input value={unit} onChange={(e) => setUnit(e.target.value)} className={`${inputCls} w-14`} /></td>
-        <td className="px-2 py-1">
+      <tr style={rowBorder} className="align-top">
+        <td className="px-2 py-1.5"><input value={brand} onChange={(e) => setBrand(e.target.value)} className={inputCls} /></td>
+        <td className="px-2 py-1.5"><input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></td>
+        <td className="px-2 py-1.5"><input value={itemType} onChange={(e) => setItemType(e.target.value)} className={inputCls} /></td>
+        <td className="px-2 py-1.5"><input value={unit} onChange={(e) => setUnit(e.target.value)} className={`${inputCls} w-14`} /></td>
+        <td className="px-2 py-1.5">
           <input inputMode="numeric" value={cost} onChange={(e) => setCost(e.target.value)} className={`${inputCls} text-right`} placeholder="—" />
         </td>
-        <td className="px-2 py-1">
+        <td className="px-2 py-1.5">
           <input inputMode="numeric" value={sell} onChange={(e) => setSell(e.target.value)} className={`${inputCls} text-right`} placeholder="待設定" />
         </td>
-        <td className="px-2 py-1"><input value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} /></td>
-        <td className="px-2 py-1">
+        <td className="px-2 py-1.5"><input value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} /></td>
+        <td className="px-2 py-1.5">
           <div className="flex flex-col gap-1">
-            <div className="flex gap-2">
-              <button onClick={save} disabled={busy} className="text-emerald-600 underline disabled:opacity-50">
+            <div className="flex gap-3 justify-end whitespace-nowrap">
+              <button onClick={save} disabled={busy} className="text-[13px] nm-focus disabled:opacity-50" style={{ color: 'var(--nm-success)' }}>
                 {busy ? '存…' : '儲存'}
               </button>
-              <button onClick={() => { setEditing(false); setError(null); }} className="text-neutral-500 underline">取消</button>
+              <button onClick={() => { setEditing(false); setError(null); }} className="text-[13px] nm-focus" style={{ color: 'var(--nm-text-muted)' }}>取消</button>
             </div>
-            {error && <span className="text-xs text-red-600">{error}</span>}
+            {error && <span className="text-xs" style={{ color: 'var(--nm-danger)' }}>{error}</span>}
           </div>
         </td>
       </tr>
@@ -85,24 +87,28 @@ export default function CatalogRow({ item }: { item: CatalogItem }) {
 
   const noSell = item.sell_price_twd === null;
   return (
-    <tr className="border-t border-neutral-100 dark:border-neutral-800">
-      <td className="px-3 py-2">{item.brand ?? '—'}</td>
-      <td className="px-3 py-2 font-medium">{item.name}</td>
-      <td className="px-3 py-2">{item.item_type ?? '—'}</td>
-      <td className="px-3 py-2">{item.unit}</td>
-      <td className="px-3 py-2 text-right font-mono">{item.cost_price_twd !== null ? fmt(item.cost_price_twd) : '—'}</td>
-      <td className="px-3 py-2 text-right font-mono">
+    <tr style={rowBorder}>
+      <td className="px-3.5 py-3 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{item.brand ?? '—'}</td>
+      <td className="px-3.5 py-3 font-medium whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>{item.name}</td>
+      <td className="px-3.5 py-3 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{item.item_type ?? '—'}</td>
+      <td className="px-3.5 py-3 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{item.unit}</td>
+      <td className="px-3.5 py-3 text-right tabular whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{item.cost_price_twd !== null ? fmt(item.cost_price_twd) : '—'}</td>
+      <td className="px-3.5 py-3 text-right tabular whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>
         {noSell ? (
-          <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-            待設定售價
-          </span>
+          <span className="nm-pill nm-pill-warning whitespace-nowrap">待設定售價</span>
         ) : (
           fmt(item.sell_price_twd as number)
         )}
       </td>
-      <td className="px-3 py-2">{item.category ?? '—'}</td>
-      <td className="px-3 py-2">
-        <button onClick={() => setEditing(true)} className="text-blue-600 dark:text-blue-400 underline">編輯</button>
+      <td className="px-3.5 py-3 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{item.category ?? '—'}</td>
+      <td className="px-5 py-3 text-right">
+        <button
+          onClick={() => setEditing(true)}
+          className="nm-focus"
+          style={{ color: '#8a8b90', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: 1 }}
+        >
+          編輯
+        </button>
       </td>
     </tr>
   );

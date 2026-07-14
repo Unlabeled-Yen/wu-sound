@@ -26,11 +26,11 @@ export default function RetireButton({ id }: { id: string }) {
         type="button"
         onClick={onClick}
         disabled={pending}
-        className="px-4 py-2 rounded border border-red-400 text-red-700 dark:text-red-300 disabled:opacity-50"
+        className="nm-danger text-[13.5px]"
       >
         {pending ? '處理中…' : '刪除(改為淘汰)'}
       </button>
-      {error && <div className="text-sm text-red-700">{error}</div>}
+      {error && <div className="text-[13px]" style={{ color: 'var(--nm-danger)' }}>{error}</div>}
     </div>
   );
 }

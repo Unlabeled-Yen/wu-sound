@@ -128,48 +128,65 @@ export default function StaffWorklogPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-4 pb-24">
-      <header className="mb-4">
-        <h1 className="text-xl font-bold">今日工作記錄</h1>
-        <p className="text-sm text-neutral-500">{new Date().toLocaleDateString('zh-TW')}</p>
+    <div className="space-y-4">
+      <header>
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>今日工作記錄</h1>
+        <p className="text-[13px] mt-0.5" style={{ color: 'var(--nm-text-muted)' }}>
+          {new Date().toLocaleDateString('zh-TW')}
+        </p>
       </header>
 
       {listError && (
-        <div className="mb-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <div className="nm-inset rounded-xl p-3 text-[13px]" style={{ color: 'var(--nm-danger)' }}>
           {listError}
         </div>
       )}
 
       {loading ? (
-        <p className="text-sm text-neutral-500">載入中…</p>
+        <p className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>載入中…</p>
       ) : logs.length === 0 ? (
-        <p className="text-sm text-neutral-500">今天還沒有工作記錄</p>
+        <p className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>今天還沒有工作記錄</p>
       ) : (
         <ul className="space-y-3">
           {logs.map((log) => (
-            <li key={log.id} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
-              <div className="mb-1 text-sm font-medium text-neutral-800">
-                {log.sites?.name || '(未指定案場)'}
+            <li key={log.id} className="nm-raised rounded-[20px] p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
+                  {log.sites?.name || '(未指定案場)'}
+                </div>
+                <div className="tabular text-[12px] shrink-0" style={{ color: 'var(--nm-text-muted)' }}>
+                  {new Date(log.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
-              <div className="mb-2 text-sm text-neutral-700">{log.note}</div>
+              <div
+                className="mt-1.5 text-[14px]"
+                style={{ color: 'var(--nm-text-secondary)', lineHeight: 1.7 }}
+              >
+                {log.note}
+              </div>
               {log.photo_urls.length > 0 ? (
-                <div className="flex gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   {log.photo_urls.map((p, i) => (
-                    <div key={i} className="text-xs">
-                      <div className="mb-0.5 text-neutral-500">
+                    <div key={i}>
+                      <div className="mb-1 text-[11px]" style={{ color: 'var(--nm-text-muted)' }}>
                         {p.kind === 'before' ? '施工前' : '施工後'}
                       </div>
                       {p.url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.url} alt={p.kind} className="h-20 w-20 rounded object-cover" />
+                        <img
+                          src={p.url}
+                          alt={p.kind}
+                          className="w-full h-[84px] rounded-xl object-cover"
+                          style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+                        />
                       ) : (
-                        <div className="h-20 w-20 rounded bg-neutral-100" />
+                        <div className="w-full h-[84px] rounded-xl nm-inset" />
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-xs text-neutral-500">
+                <div className="mt-3 text-[12px]" style={{ color: 'var(--nm-text-muted)' }}>
                   無照片原因:{log.no_photo_reason ? REASON_LABEL[log.no_photo_reason] || log.no_photo_reason : '未填'}
                 </div>
               )}
@@ -182,32 +199,30 @@ export default function StaffWorklogPage() {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="fixed bottom-4 left-4 right-4 rounded-lg bg-blue-600 py-4 text-lg font-bold text-white shadow-lg active:bg-blue-700"
+          className="fixed left-[22px] right-[22px] bottom-24 z-30 nm-btn-solid rounded-2xl"
+          style={{ height: 54 }}
         >
-          + 新增工作記錄
+          ＋ 新增工作記錄
         </button>
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-10 bg-black/40 p-4 pt-10 overflow-y-auto">
-          <form
-            onSubmit={onSubmit}
-            className="mx-auto max-w-md rounded-lg bg-white p-4 shadow-xl"
-          >
-            <h2 className="mb-3 text-lg font-bold">新增工作記錄</h2>
+        <div className="fixed inset-0 z-50 bg-black/60 p-4 pt-10 overflow-y-auto">
+          <form onSubmit={onSubmit} className="mx-auto max-w-md nm-raised-lg rounded-2xl p-4">
+            <h2 className="mb-3 text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>新增工作記錄</h2>
 
             {formError && (
-              <div className="mb-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+              <div className="mb-3 nm-inset rounded-xl p-3 text-[13px]" style={{ color: 'var(--nm-danger)' }}>
                 {formError}
               </div>
             )}
 
             <label className="mb-3 block">
-              <span className="mb-1 block text-sm font-medium">案場</span>
+              <span className="mb-1 block text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>案場</span>
               <select
                 value={siteId}
                 onChange={(e) => setSiteId(e.target.value)}
-                className="w-full rounded border border-neutral-300 bg-white p-2 text-sm"
+                className="nm-input text-sm"
                 required
               >
                 <option value="">請選擇</option>
@@ -220,9 +235,9 @@ export default function StaffWorklogPage() {
             </label>
 
             <label className="mb-3 block">
-              <span className="mb-1 flex justify-between text-sm font-medium">
+              <span className="mb-1 flex justify-between text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>
                 <span>一句話說明</span>
-                <span className={note.length > 200 ? 'text-red-600' : 'text-neutral-400'}>
+                <span style={{ color: note.length > 200 ? 'var(--nm-danger)' : 'var(--nm-text-faint)' }}>
                   {note.length}/200
                 </span>
               </span>
@@ -230,7 +245,7 @@ export default function StaffWorklogPage() {
                 value={note}
                 onChange={(e) => setNote(e.target.value.slice(0, 200))}
                 rows={2}
-                className="w-full rounded border border-neutral-300 p-2 text-sm"
+                className="nm-input text-sm"
                 placeholder="今天做了什麼"
                 required
               />
@@ -238,7 +253,7 @@ export default function StaffWorklogPage() {
 
             <div className="mb-3 grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="mb-1 block text-sm font-medium">施工前照片</span>
+                <span className="mb-1 block text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>施工前照片</span>
                 <input
                   ref={beforeRef}
                   type="file"
@@ -246,10 +261,11 @@ export default function StaffWorklogPage() {
                   capture="environment"
                   onChange={(e) => setHasBefore(!!e.target.files?.[0])}
                   className="block w-full text-xs"
+                  style={{ color: 'var(--nm-text-secondary)' }}
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-sm font-medium">施工後照片</span>
+                <span className="mb-1 block text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>施工後照片</span>
                 <input
                   ref={afterRef}
                   type="file"
@@ -257,16 +273,20 @@ export default function StaffWorklogPage() {
                   capture="environment"
                   onChange={(e) => setHasAfter(!!e.target.files?.[0])}
                   className="block w-full text-xs"
+                  style={{ color: 'var(--nm-text-secondary)' }}
                 />
               </label>
             </div>
 
             {needReason && (
-              <fieldset className="mb-3 rounded border border-amber-300 bg-amber-50 p-3">
-                <legend className="px-1 text-sm font-medium text-amber-800">無照片原因(必填)</legend>
+              <fieldset
+                className="mb-3 rounded-xl p-3"
+                style={{ background: 'rgba(217,181,107,0.08)', border: '1px solid rgba(217,181,107,0.28)' }}
+              >
+                <legend className="px-1 text-sm font-medium" style={{ color: 'var(--nm-warning)' }}>無照片原因(必填)</legend>
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   {(Object.keys(REASON_LABEL) as Array<keyof typeof REASON_LABEL>).map((k) => (
-                    <label key={k} className="flex items-center gap-2 text-sm">
+                    <label key={k} className="flex items-center gap-2 text-sm" style={{ color: 'var(--nm-text-body)' }}>
                       <input
                         type="radio"
                         name="no_photo_reason"
@@ -286,14 +306,14 @@ export default function StaffWorklogPage() {
                 type="button"
                 onClick={() => setShowForm(false)}
                 disabled={submitting}
-                className="flex-1 rounded border border-neutral-300 py-3 text-sm font-medium"
+                className="flex-1 nm-btn text-sm nm-focus"
               >
                 取消
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-[2] rounded bg-blue-600 py-3 text-sm font-bold text-white disabled:bg-neutral-400"
+                className="flex-[2] nm-btn-solid text-sm nm-focus"
               >
                 {submitting ? '送出中…' : '送出'}
               </button>

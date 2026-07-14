@@ -76,25 +76,33 @@ export default function MoveDialog({ equipmentId, currentStatus, currentSiteId }
       <button
         type="button"
         onClick={() => { setOpen(true); setToStatus(currentStatus); setToSiteId(currentSiteId ?? ''); setError(null); }}
-        className="px-4 py-2 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+        className="nm-btn-solid text-[13.5px]"
       >
         移動
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-md rounded bg-white dark:bg-neutral-900 p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setOpen(false)}>
+          <div
+            className="w-full max-w-md rounded-2xl nm-raised-lg p-6 space-y-4"
+            style={{ background: 'rgba(24,24,28,0.75)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">移動設備</h2>
-              <button onClick={() => setOpen(false)} className="text-neutral-500">✕</button>
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>移動設備</h2>
+              <button onClick={() => setOpen(false)} className="nm-focus" style={{ color: 'var(--nm-text-muted)' }}>✕</button>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-3">
               <fieldset className="space-y-2">
-                <legend className="text-sm text-neutral-700 dark:text-neutral-300">目的狀態</legend>
+                <legend className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>目的狀態</legend>
                 <div className="grid grid-cols-2 gap-2">
                   {STATUSES.map((s) => (
-                    <label key={s} className={`flex items-center gap-2 p-2 rounded border cursor-pointer ${toStatus === s ? 'border-neutral-900 dark:border-white' : 'border-neutral-300 dark:border-neutral-700'}`}>
+                    <label
+                      key={s}
+                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer text-[13px] ${toStatus === s ? 'nm-inset-sm' : 'nm-flat'}`}
+                      style={{ color: toStatus === s ? 'var(--nm-text-primary)' : 'var(--nm-text-secondary)' }}
+                    >
                       <input
                         type="radio"
                         name="to_status"
@@ -110,9 +118,8 @@ export default function MoveDialog({ equipmentId, currentStatus, currentSiteId }
 
               {toStatus === 'on_site' && (
                 <label className="block space-y-1">
-                  <span className="text-sm text-neutral-700 dark:text-neutral-300">案場 *</span>
-                  <select value={toSiteId} onChange={(e) => setToSiteId(e.target.value)}
-                    className="w-full px-2 py-1.5 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+                  <span className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>案場 *</span>
+                  <select value={toSiteId} onChange={(e) => setToSiteId(e.target.value)} className="nm-input w-full text-[13px]">
                     <option value="">— 請選擇 —</option>
                     {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
@@ -120,25 +127,27 @@ export default function MoveDialog({ equipmentId, currentStatus, currentSiteId }
               )}
 
               <label className="block space-y-1">
-                <span className="text-sm text-neutral-700 dark:text-neutral-300">備註</span>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
+                <span className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>備註</span>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
                   placeholder="例:音圈燒了送 XX 維修中"
-                  className="w-full px-2 py-1.5 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900" />
+                  className="nm-input w-full text-[13px]"
+                />
               </label>
 
               {(error || clientErr) && (
-                <div className="p-2 rounded bg-red-50 border border-red-300 text-red-800 text-sm">
+                <div className="rounded-xl nm-inset p-2 text-[13px]" style={{ color: 'var(--nm-danger)' }}>
                   {error || clientErr}
                 </div>
               )}
 
-              <div className="flex gap-2 justify-end">
-                <button type="button" onClick={() => setOpen(false)}
-                  className="px-4 py-2 rounded border border-neutral-300 dark:border-neutral-700">
+              <div className="flex gap-3 justify-end pt-1">
+                <button type="button" onClick={() => setOpen(false)} className="nm-btn text-[13px]">
                   取消
                 </button>
-                <button type="submit" disabled={submitting || !!clientErr}
-                  className="px-4 py-2 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 disabled:opacity-50">
+                <button type="submit" disabled={submitting || !!clientErr} className="nm-btn-solid text-[13.5px]">
                   {submitting ? '移動中…' : '確認移動'}
                 </button>
               </div>

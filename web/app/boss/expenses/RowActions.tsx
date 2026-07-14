@@ -41,14 +41,15 @@ export default function RowActions({ id }: { id: string }) {
           onChange={(e) => setReason(e.target.value)}
           placeholder="退回原因 (員工會看到)"
           rows={2}
-          className="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+          className="w-full nm-input text-[13px]"
         />
-        {error ? <span className="text-xs text-red-600">{error}</span> : null}
+        {error ? <span className="text-xs" style={{ color: 'var(--nm-danger)' }}>{error}</span> : null}
         <div className="flex gap-2">
           <button
             onClick={doReject}
             disabled={pending}
-            className="px-3 py-1 rounded bg-red-600 text-white text-sm disabled:opacity-50"
+            className="nm-danger text-[13px] disabled:opacity-50"
+            style={{ padding: '4px 12px', minHeight: 'auto' }}
           >
             確定退回
           </button>
@@ -59,7 +60,8 @@ export default function RowActions({ id }: { id: string }) {
               setError(null);
             }}
             disabled={pending}
-            className="px-3 py-1 rounded border border-neutral-300 dark:border-neutral-700 text-sm"
+            className="nm-btn text-[13px]"
+            style={{ padding: '4px 12px', minHeight: 'auto' }}
           >
             取消
           </button>
@@ -74,19 +76,21 @@ export default function RowActions({ id }: { id: string }) {
         <button
           onClick={doConfirm}
           disabled={pending}
-          className="px-3 py-1 rounded bg-emerald-600 text-white text-sm disabled:opacity-50"
+          className="nm-success-btn text-[13px] disabled:opacity-50"
+          style={{ padding: '4px 12px', minHeight: 'auto' }}
         >
           確認
         </button>
         <button
           onClick={() => setRejecting(true)}
           disabled={pending}
-          className="px-3 py-1 rounded border border-red-400 text-red-600 text-sm"
+          className="nm-danger text-[13px]"
+          style={{ padding: '4px 12px', minHeight: 'auto' }}
         >
           退回
         </button>
       </div>
-      {error ? <span className="text-xs text-red-600">{error}</span> : null}
+      {error ? <span className="text-xs" style={{ color: 'var(--nm-danger)' }}>{error}</span> : null}
     </div>
   );
 }

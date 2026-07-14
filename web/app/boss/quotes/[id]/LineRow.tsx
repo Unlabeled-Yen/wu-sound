@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { QuoteLine } from '@/lib/types';
+import type { QuoteLine, QuoteLineSection } from '@/lib/types';
 
 const fmt = (n: number) => n.toLocaleString('zh-TW');
 
@@ -27,11 +27,12 @@ export default function LineRow({
   const [qty, setQty] = useState(String(line.qty));
   const [unit, setUnit] = useState(line.unit ?? '');
   const [price, setPrice] = useState(line.unit_price_twd !== null ? String(line.unit_price_twd) : '');
+  const [section, setSection] = useState<QuoteLineSection>(line.section);
   const [saveToCatalog, setSaveToCatalog] = useState<boolean>(Boolean(line.catalog_item_id));
 
   const noPrice = line.unit_price_twd === null;
   const subtotal = line.unit_price_twd !== null ? line.qty * line.unit_price_twd : null;
-  const inputCls = 'w-full border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1 bg-white dark:bg-neutral-900';
+  const inputCls = 'nm-input text-[13px]';
 
   async function callLines(action: string, payload: Record<string, unknown>): Promise<QuoteLine | null> {
     const res = await fetch(`/api/quotes/${quoteId}/lines`, {
@@ -56,6 +57,7 @@ export default function LineRow({
         qty: Number(qty),
         unit: unit.trim() || null,
         unit_price_twd: priceVal,
+        section,
       });
       if (!updated) { setBusy(false); return; }
       // 有連品項庫、且勾選存回、且有填價 → 同時更新品項庫售價
@@ -95,29 +97,40 @@ export default function LineRow({
 
   if (editing) {
     return (
-      <tr className="border-t border-neutral-100 dark:border-neutral-800 align-top">
-        <td className="px-2 py-2 text-neutral-500">{index + 1}</td>
-        <td className="px-2 py-1"><input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></td>
+      <tr className="align-top" style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
+        <td className="px-2 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{index + 1}</td>
+        <td className="px-2 py-1">
+          <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+          <select
+            value={section}
+            onChange={(e) => setSection(e.target.value as QuoteLineSection)}
+            className="nm-input text-[12px] mt-1"
+            style={{ minHeight: 28, padding: '2px 6px' }}
+          >
+            <option value="器材">器材</option>
+            <option value="安裝">安裝</option>
+          </select>
+        </td>
         <td className="px-2 py-1"><input value={spec} onChange={(e) => setSpec(e.target.value)} className={inputCls} /></td>
         <td className="px-2 py-1"><input inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} className={`${inputCls} w-16 text-right`} /></td>
         <td className="px-2 py-1"><input value={unit} onChange={(e) => setUnit(e.target.value)} className={`${inputCls} w-14`} /></td>
         <td className="px-2 py-1">
           <input inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} className={`${inputCls} w-24 text-right`} placeholder="待設定" />
           {line.catalog_item_id && (
-            <label className="flex items-center gap-1 mt-1 text-xs text-neutral-500">
+            <label className="flex items-center gap-1 mt-1 text-xs whitespace-nowrap" style={{ color: 'var(--nm-text-muted)' }}>
               <input type="checkbox" checked={saveToCatalog} onChange={(e) => setSaveToCatalog(e.target.checked)} />
-              存回品項庫
+              存回價目表
             </label>
           )}
         </td>
-        <td className="px-2 py-2 text-right text-neutral-400">—</td>
+        <td className="px-2 py-2 text-right whitespace-nowrap" style={{ color: 'var(--nm-text-faint)' }}>—</td>
         <td className="px-2 py-2">
           <div className="flex flex-col gap-1">
-            <div className="flex gap-2">
-              <button onClick={save} disabled={busy} className="text-emerald-600 underline disabled:opacity-50">{busy ? '存…' : '儲存'}</button>
-              <button onClick={() => { setEditing(false); setError(null); }} className="text-neutral-500 underline">取消</button>
+            <div className="flex gap-2 whitespace-nowrap">
+              <button onClick={save} disabled={busy} className="nm-focus underline disabled:opacity-50" style={{ color: 'var(--nm-success)' }}>{busy ? '存…' : '儲存'}</button>
+              <button onClick={() => { setEditing(false); setError(null); }} className="nm-focus underline" style={{ color: 'var(--nm-text-muted)' }}>取消</button>
             </div>
-            {error && <span className="text-xs text-red-600">{error}</span>}
+            {error && <span className="text-xs" style={{ color: 'var(--nm-danger)' }}>{error}</span>}
           </div>
         </td>
       </tr>
@@ -125,33 +138,36 @@ export default function LineRow({
   }
 
   return (
-    <tr className="border-t border-neutral-100 dark:border-neutral-800">
-      <td className="px-2 py-2 text-neutral-500">{index + 1}</td>
-      <td className="px-3 py-2">
-        <div className="font-medium">{line.name}</div>
+    <tr style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
+      <td className="px-2 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{index + 1}</td>
+      <td className="px-3 py-2 whitespace-nowrap">
+        <div className="font-medium" style={{ color: 'var(--nm-text-body)' }}>{line.name}</div>
         {line.is_ai_suggested && (
-          <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">AI 建議</span>
+          <span
+            className="inline-block mt-0.5 text-[11px] px-1.5 py-0.5 rounded"
+            style={{ color: 'var(--nm-text-secondary)', background: 'rgba(140, 120, 200, 0.15)' }}
+          >AI 建議</span>
         )}
       </td>
-      <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">{line.spec ?? '—'}</td>
-      <td className="px-3 py-2 text-right">{line.qty}</td>
-      <td className="px-3 py-2">{line.unit ?? '—'}</td>
-      <td className="px-3 py-2 text-right font-mono">
+      <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{line.spec ?? '—'}</td>
+      <td className="px-3 py-2 text-right whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{line.qty}</td>
+      <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{line.unit ?? '—'}</td>
+      <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap">
         {noPrice ? (
-          <button onClick={() => setEditing(true)} className="inline-block text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 underline">
+          <button onClick={() => setEditing(true)} className="nm-pill nm-pill-warning underline">
             待設定售價
           </button>
         ) : (
-          `$${fmt(line.unit_price_twd as number)}`
+          <span style={{ color: 'var(--nm-text-body)' }}>${fmt(line.unit_price_twd as number)}</span>
         )}
       </td>
-      <td className="px-3 py-2 text-right font-mono">{subtotal !== null ? `$${fmt(subtotal)}` : '—'}</td>
-      <td className="px-3 py-2 print-hide">
+      <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>{subtotal !== null ? `$${fmt(subtotal)}` : '—'}</td>
+      <td className="px-3 py-2 whitespace-nowrap print-hide">
         <div className="flex gap-2">
-          <button onClick={() => setEditing(true)} className="text-blue-600 dark:text-blue-400 underline">編輯</button>
-          <button onClick={del} disabled={busy} className="text-rose-600 dark:text-rose-400 underline disabled:opacity-50">刪除</button>
+          <button onClick={() => setEditing(true)} className="underline" style={{ color: 'var(--nm-text-secondary)' }}>編輯</button>
+          <button onClick={del} disabled={busy} className="underline disabled:opacity-50" style={{ color: 'var(--nm-danger-glass-text)' }}>刪除</button>
         </div>
-        {error && <div className="text-xs text-red-600">{error}</div>}
+        {error && <div className="text-xs" style={{ color: 'var(--nm-danger)' }}>{error}</div>}
       </td>
     </tr>
   );

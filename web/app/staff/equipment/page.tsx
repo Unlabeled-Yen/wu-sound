@@ -29,13 +29,13 @@ interface Row {
 function statusPillClass(status: EquipmentStatus): string {
   switch (status) {
     case 'in_storage':
-      return 'bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200';
+      return 'nm-pill-neutral';
     case 'on_site':
-      return 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200';
+      return 'nm-pill-warning';
     case 'in_repair':
-      return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200';
+      return 'nm-pill-danger';
     case 'retired':
-      return 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-900 dark:text-neutral-500';
+      return 'nm-pill-muted';
   }
 }
 
@@ -72,61 +72,62 @@ export default async function StaffEquipmentPage({
   });
 
   return (
-    <div className="p-4 space-y-3">
-      <h1 className="text-lg font-semibold">設備查詢</h1>
+    <div className="space-y-3">
+      <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>設備查詢</h1>
 
       <form method="get" className="space-y-2">
         <input
           name="q"
           defaultValue={q}
           placeholder="名稱 / 型號 / 品牌"
-          className="w-full px-3 py-2 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900"
+          className="nm-input text-sm"
         />
         <div className="flex gap-2">
-          <select name="category" defaultValue={category}
-            className="flex-1 px-2 py-2 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm">
+          <select name="category" defaultValue={category} className="nm-input text-sm flex-1">
             <option value="">全部分類</option>
             {CATEGORIES.map((c) => <option key={c} value={c}>{EQUIPMENT_CATEGORY_LABEL[c]}</option>)}
           </select>
-          <button type="submit" className="px-3 py-2 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-sm">
+          <button type="submit" className="nm-btn-solid text-sm">
             搜尋
           </button>
         </div>
         {(q || category) && (
-          <Link href="/staff/equipment" className="text-xs underline text-neutral-500">重設</Link>
+          <Link href="/staff/equipment" className="text-xs underline nm-focus" style={{ color: 'var(--nm-text-muted)' }}>重設</Link>
         )}
       </form>
 
       {error && (
-        <div className="p-3 rounded border border-red-300 bg-red-50 text-red-800 text-sm">
+        <div className="nm-inset rounded-xl p-3 text-[13px]" style={{ color: 'var(--nm-danger)' }}>
           讀取失敗:{error.message}
         </div>
       )}
 
-      <div className="text-xs text-neutral-500">共 {rows.length} 筆</div>
+      <div className="text-xs" style={{ color: 'var(--nm-text-muted)' }}>共 {rows.length} 筆</div>
 
-      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <ul className="grid grid-cols-1 gap-2">
         {rows.length === 0 && (
-          <li className="text-center text-neutral-500 py-8">沒有符合的設備</li>
+          <li className="text-center py-8 text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>沒有符合的設備</li>
         )}
         {rows.map((r) => (
-          <li key={r.id} className="rounded border border-neutral-200 dark:border-neutral-800 p-3 bg-white dark:bg-neutral-900 space-y-1">
+          <li key={r.id} className="nm-raised rounded-2xl p-3 space-y-1.5">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <div className="font-medium">{r.name}</div>
-                {r.model_number && <div className="text-xs text-neutral-500">{r.brand ? r.brand + ' · ' : ''}{r.model_number}</div>}
+                <div className="font-medium text-[14px]" style={{ color: 'var(--nm-text-body)' }}>{r.name}</div>
+                {r.model_number && (
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--nm-text-muted)' }}>
+                    {r.brand ? r.brand + ' · ' : ''}{r.model_number}
+                  </div>
+                )}
               </div>
-              <span className={`shrink-0 inline-block px-2 py-0.5 rounded text-xs ${statusPillClass(r.status)}`}>
+              <span className={`nm-pill shrink-0 ${statusPillClass(r.status)}`}>
                 {EQUIPMENT_STATUS_LABEL[r.status]}
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-400">
-              <span className="inline-block px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800">
-                {EQUIPMENT_CATEGORY_LABEL[r.category]}
-              </span>
-              <span>{r.quantity} {r.unit}</span>
+            <div className="flex items-center justify-between text-xs" style={{ color: 'var(--nm-text-secondary)' }}>
+              <span className="nm-pill nm-pill-muted">{EQUIPMENT_CATEGORY_LABEL[r.category]}</span>
+              <span className="tabular">{r.quantity} {r.unit}</span>
             </div>
-            <div className="text-sm">
+            <div className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>
               {formatEquipmentLocation(r.status, r.sites?.name)}
             </div>
           </li>

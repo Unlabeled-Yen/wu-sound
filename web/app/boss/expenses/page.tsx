@@ -19,6 +19,22 @@ export default async function BossExpensesPage() {
     .order('captured_at', { ascending: false });
   if (error) throw new Error(`Supabase 查詢失敗: ${error.message}`);
 
+  // 員工手機裡還沒送出的 draft(拍了照沒填內容)——boss 看得到才知道要催誰
+  const { data: draftData } = await sb
+    .from('expenses')
+    .select('id, user_id, captured_at, receipt_url, amount_twd, users!inner(name)')
+    .eq('status', 'draft')
+    .order('captured_at', { ascending: false });
+  const drafts = (draftData ?? []) as unknown as (ExpenseRecord & { users?: { name?: string } })[];
+  const draftsByUser = new Map<string, { name: string; count: number; latest: string }>();
+  for (const d of drafts) {
+    const cur = draftsByUser.get(d.user_id) ?? { name: d.users?.name ?? '?', count: 0, latest: '' };
+    cur.count += 1;
+    if (!cur.latest || d.captured_at > cur.latest) cur.latest = d.captured_at;
+    draftsByUser.set(d.user_id, cur);
+  }
+  const draftGroups = Array.from(draftsByUser.entries()).sort(([, a], [, b]) => b.count - a.count);
+
   const rows = await Promise.all(
     ((data ?? []) as unknown[]).map(async (raw) => {
       const r = raw as ExpenseRecord & {
@@ -42,38 +58,75 @@ export default async function BossExpensesPage() {
   );
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold mb-4">零用金審核 · 待確認 ({rows.length})</h1>
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
+        零用金審核 · 待確認 ({rows.length})
+      </h1>
+
+      {drafts.length > 0 && (
+        <section
+          className="rounded-2xl nm-raised p-4"
+          style={{ color: 'var(--nm-text-primary)' }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--nm-warning)' }}>
+              員工草稿 · {drafts.length} 筆
+            </h2>
+            <span className="text-[11px]" style={{ color: 'var(--nm-text-muted)' }}>
+              員工拍了照但還沒填金額/送出——需要提醒員工去 App 完成
+            </span>
+          </div>
+          <ul className="space-y-1">
+            {draftGroups.map(([uid, g]) => (
+              <li
+                key={uid}
+                className="flex items-center justify-between rounded-lg nm-inset-sm px-3 py-2 text-xs"
+              >
+                <span>
+                  <span style={{ color: 'var(--nm-text-primary)' }}>{g.name}</span>
+                  <span className="ml-2" style={{ color: 'var(--nm-text-muted)' }}>
+                    最近一筆 {g.latest.slice(0, 10)}
+                  </span>
+                </span>
+                <span style={{ color: 'var(--nm-warning)' }}>{g.count} 筆</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {rows.length === 0 ? (
-        <p className="text-neutral-500 mt-12">目前沒有待審核的項目</p>
+        <p className="mt-4" style={{ color: 'var(--nm-text-secondary)' }}>
+          目前沒有待審核的項目(員工還沒送出)
+        </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
-          <table className="min-w-full text-sm">
-            <thead className="bg-neutral-100 dark:bg-neutral-800 text-left">
-              <tr>
-                <th className="px-3 py-2">姓名</th>
-                <th className="px-3 py-2">日期</th>
-                <th className="px-3 py-2">分類</th>
-                <th className="px-3 py-2">品項</th>
-                <th className="px-3 py-2">案場</th>
-                <th className="px-3 py-2 text-right">金額</th>
-                <th className="px-3 py-2">收據</th>
-                <th className="px-3 py-2">動作</th>
+        <div className="rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
+          <table className="w-full text-[13px]" style={{ minWidth: 900, borderCollapse: 'collapse' }}>
+            <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
+              <tr className="text-left" style={{ color: 'var(--nm-text-muted)' }}>
+                <th className="px-3 py-2 font-normal whitespace-nowrap">姓名</th>
+                <th className="px-3 py-2 font-normal whitespace-nowrap">日期</th>
+                <th className="px-3 py-2 font-normal whitespace-nowrap">分類</th>
+                <th className="px-3 py-2 font-normal whitespace-nowrap">品項</th>
+                <th className="px-3 py-2 font-normal whitespace-nowrap">案場</th>
+                <th className="px-3 py-2 text-right font-normal whitespace-nowrap">金額</th>
+                <th className="px-3 py-2 font-normal whitespace-nowrap">收據</th>
+                <th className="px-3 py-2 font-normal whitespace-nowrap">動作</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr
                   key={r.id}
-                  className="border-t border-neutral-200 dark:border-neutral-800 align-top"
+                  className="align-top"
+                  style={{ borderTop: '1px solid var(--nm-border-hair)' }}
                 >
-                  <td className="px-3 py-2 font-medium">{r.user_name}</td>
-                  <td className="px-3 py-2 tabular-nums">{r.spent_on ?? '—'}</td>
-                  <td className="px-3 py-2">{r.category ? CATEGORY_LABEL[r.category] : '—'}</td>
-                  <td className="px-3 py-2">{r.item_text ?? '—'}</td>
-                  <td className="px-3 py-2">{r.site_name ?? '—'}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                  <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>{r.user_name}</td>
+                  <td className="px-3 py-2 tabular whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.spent_on ?? '—'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.category ? CATEGORY_LABEL[r.category] : '—'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.item_text ?? '—'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.site_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-right tabular font-semibold whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>
                     {r.amount_twd != null ? `NT$ ${r.amount_twd.toLocaleString('zh-TW')}` : '—'}
                   </td>
                   <td className="px-3 py-2">
@@ -83,11 +136,12 @@ export default async function BossExpensesPage() {
                         <img
                           src={r.thumb_url}
                           alt="收據"
-                          className="w-[100px] h-[100px] object-cover rounded-lg border border-neutral-200 dark:border-neutral-700"
+                          className="w-[100px] h-[100px] object-cover rounded-lg"
+                          style={{ border: '1px solid var(--nm-border-glass)' }}
                         />
                       </a>
                     ) : (
-                      <span className="text-neutral-500">無收據</span>
+                      <span className="whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>無收據</span>
                     )}
                   </td>
                   <td className="px-3 py-2">

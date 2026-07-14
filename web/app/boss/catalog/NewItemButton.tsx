@@ -17,7 +17,7 @@ export default function NewItemButton() {
   const [sell, setSell] = useState('');
   const [category, setCategory] = useState('');
 
-  const inputCls = 'w-full border border-neutral-300 dark:border-neutral-700 rounded px-3 py-2 bg-white dark:bg-neutral-900';
+  const inputCls = 'nm-input text-[13px]';
 
   async function submit() {
     setError(null);
@@ -51,32 +51,29 @@ export default function NewItemButton() {
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="px-4 py-2 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-      >
-        新增品項
+      <button onClick={() => setOpen(true)} className="nm-btn-solid text-[13.5px] whitespace-nowrap">
+        ＋ 新增品項
       </button>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 space-y-3">
-        <h2 className="text-lg font-semibold">新增品項</h2>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <label className="col-span-1">品牌<input value={brand} onChange={(e) => setBrand(e.target.value)} className={inputCls} /></label>
-          <label className="col-span-1">品名 *<input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></label>
-          <label className="col-span-1">類型<input value={itemType} onChange={(e) => setItemType(e.target.value)} className={inputCls} /></label>
-          <label className="col-span-1">單位<input value={unit} onChange={(e) => setUnit(e.target.value)} className={inputCls} /></label>
-          <label className="col-span-1">進價<input inputMode="numeric" value={cost} onChange={(e) => setCost(e.target.value)} className={inputCls} placeholder="可留空" /></label>
-          <label className="col-span-1">售價<input inputMode="numeric" value={sell} onChange={(e) => setSell(e.target.value)} className={inputCls} placeholder="可留空" /></label>
-          <label className="col-span-2">分類<input value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} /></label>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-2xl nm-raised-lg p-6 space-y-4" style={{ background: 'rgba(24,24,28,0.75)' }}>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>新增品項</h2>
+        <div className="grid grid-cols-2 gap-3 text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+          <label className="col-span-1 flex flex-col gap-1">品牌<input value={brand} onChange={(e) => setBrand(e.target.value)} className={inputCls} /></label>
+          <label className="col-span-1 flex flex-col gap-1">品名 *<input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></label>
+          <label className="col-span-1 flex flex-col gap-1">類型<input value={itemType} onChange={(e) => setItemType(e.target.value)} className={inputCls} /></label>
+          <label className="col-span-1 flex flex-col gap-1">單位<input value={unit} onChange={(e) => setUnit(e.target.value)} className={inputCls} /></label>
+          <label className="col-span-1 flex flex-col gap-1">進價<input inputMode="numeric" value={cost} onChange={(e) => setCost(e.target.value)} className={inputCls} placeholder="可留空" /></label>
+          <label className="col-span-1 flex flex-col gap-1">售價<input inputMode="numeric" value={sell} onChange={(e) => setSell(e.target.value)} className={inputCls} placeholder="可留空" /></label>
+          <label className="col-span-2 flex flex-col gap-1">分類<input value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} /></label>
         </div>
-        {error && <div className="text-sm text-red-600">{error}</div>}
+        {error && <div className="text-[13px]" style={{ color: 'var(--nm-danger)' }}>{error}</div>}
         <div className="flex gap-3 justify-end pt-1">
-          <button onClick={() => { setOpen(false); setError(null); }} className="px-4 py-2 rounded border border-neutral-300 dark:border-neutral-700">取消</button>
-          <button onClick={submit} disabled={busy} className="px-4 py-2 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 disabled:opacity-50">
+          <button onClick={() => { setOpen(false); setError(null); }} className="nm-btn text-[13px]">取消</button>
+          <button onClick={submit} disabled={busy} className="nm-btn-solid text-[13.5px]">
             {busy ? '新增中…' : '新增'}
           </button>
         </div>

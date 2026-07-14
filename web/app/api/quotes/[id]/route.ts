@@ -66,6 +66,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if ('note' in body) {
     patch.note = typeof body.note === 'string' && body.note.trim() ? body.note.trim() : null;
   }
+  if ('tax_rate' in body) {
+    const tr = Number(body.tax_rate);
+    if (!Number.isFinite(tr) || tr < 0 || tr > 1) {
+      return NextResponse.json({ error: '稅率必須是 0 到 1 之間的數字' }, { status: 400 });
+    }
+    patch.tax_rate = tr;
+  }
   if ('status' in body) {
     const st = body.status as QuoteStatus;
     if (!VALID_STATUS.includes(st)) return NextResponse.json({ error: '狀態不正確' }, { status: 400 });

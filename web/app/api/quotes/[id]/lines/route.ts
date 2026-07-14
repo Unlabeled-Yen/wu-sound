@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import type { CatalogItem, QuoteLine } from '@/lib/types';
+import type { CatalogItem, QuoteLine, QuoteLineSection } from '@/lib/types';
 
 export const runtime = 'nodejs';
+
+const VALID_SECTIONS: QuoteLineSection[] = ['器材', '安裝'];
 
 function parseQty(v: unknown): number | 'invalid' {
   const n = Number(v);
@@ -16,6 +18,11 @@ function parsePrice(v: unknown): number | null | 'invalid' {
   const n = Number(v);
   if (!Number.isInteger(n) || n < 0) return 'invalid';
   return n;
+}
+
+function parseSection(v: unknown): QuoteLineSection | 'invalid' {
+  if (!VALID_SECTIONS.includes(v as QuoteLineSection)) return 'invalid';
+  return v as QuoteLineSection;
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -64,6 +71,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const qty = parseQty(line.qty ?? 1);
     if (qty === 'invalid') return NextResponse.json({ error: '數量必須是正整數' }, { status: 400 });
 
+    const section = parseSection(line.section ?? '器材');
+    if (section === 'invalid') return NextResponse.json({ error: '分區必須是器材或安裝' }, { status: 400 });
+
     const maxQ = await sb
       .from('quote_lines')
       .select('sort_order')
@@ -82,6 +92,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         qty,
         unit,
         unit_price_twd: price,
+        section,
         is_ai_suggested: false,
         sort_order: sortOrder,
       })
@@ -132,6 +143,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       const sv = Number(line.sort_order);
       if (!Number.isInteger(sv)) return NextResponse.json({ error: '排序必須是整數' }, { status: 400 });
       patch.sort_order = sv;
+    }
+    if ('section' in line) {
+      const sec = parseSection(line.section);
+      if (sec === 'invalid') return NextResponse.json({ error: '分區必須是器材或安裝' }, { status: 400 });
+      patch.section = sec;
     }
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 });

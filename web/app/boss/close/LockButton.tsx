@@ -35,18 +35,18 @@ export default function LockButton({ month, disabled }: { month: string; disable
       <button
         onClick={() => setConfirming(true)}
         disabled={disabled || pending}
-        className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        className="nm-danger text-[13px]"
       >
         鎖定月結
       </button>
       {confirming ? (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-4">
-          <div className="max-w-sm w-full bg-white dark:bg-neutral-900 rounded-2xl p-5 flex flex-col gap-3">
-            <h2 className="text-lg font-semibold">確定鎖定 {month} 月結?</h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-w-sm w-full rounded-2xl nm-raised-lg p-5 flex flex-col gap-3" style={{ background: 'rgba(24,24,28,0.75)' }}>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>確定鎖定 {month} 月結?</h2>
+            <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
               鎖定後所有已確認代墊會標記為「已入帳」,無法再改。
             </p>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {error ? <p className="text-[13px]" style={{ color: 'var(--nm-danger)' }}>{error}</p> : null}
             <div className="flex gap-2 mt-2">
               <button
                 onClick={() => {
@@ -54,14 +54,14 @@ export default function LockButton({ month, disabled }: { month: string; disable
                   setError(null);
                 }}
                 disabled={pending}
-                className="flex-1 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 text-sm"
+                className="flex-1 nm-btn text-[13px]"
               >
                 取消
               </button>
               <button
                 onClick={doLock}
                 disabled={pending}
-                className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-medium disabled:opacity-50"
+                className="flex-1 nm-danger text-[13px]"
               >
                 {pending ? '鎖定中…' : '確定鎖定'}
               </button>

@@ -82,28 +82,30 @@ export default async function BossClockinsPage({
   const next = shift(1);
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-6">
+    <div>
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">打卡月表</h1>
-          <p className="text-sm text-neutral-500">{ym}</p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--nm-text-primary)' }}>打卡月表</h1>
+          <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>{ym}</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href={`/boss/clockins?month=${prev}`}
-            className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-sm"
+            className="nm-btn text-[13px]"
+            style={{ padding: '6px 14px', minHeight: 'auto' }}
           >
             ← 上個月
           </Link>
           <Link
             href={`/boss/clockins?month=${next}`}
-            className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-sm"
+            className="nm-btn text-[13px]"
+            style={{ padding: '6px 14px', minHeight: 'auto' }}
           >
             下個月 →
           </Link>
           <a
             href={`/api/boss/clockins/export.csv?month=${ym}`}
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
+            className="nm-btn-solid text-[13px]"
           >
             匯出 CSV
           </a>
@@ -111,20 +113,34 @@ export default async function BossClockinsPage({
       </header>
 
       {error && (
-        <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <div
+          className="mb-4 rounded-xl p-3 text-[13px]"
+          style={{
+            background: 'rgba(224, 122, 122, 0.08)',
+            border: '1px solid rgba(224, 122, 122, 0.34)',
+            color: 'var(--nm-danger-glass-text)',
+          }}
+        >
           讀取失敗:{error}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-        <table className="min-w-full border-collapse text-xs">
-          <thead className="bg-neutral-100">
+      <div className="rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
+        <table className="border-collapse text-xs" style={{ minWidth: 900 }}>
+          <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
             <tr>
-              <th className="sticky left-0 z-10 min-w-[6rem] border-b border-neutral-200 bg-neutral-100 p-2 text-left">
+              <th
+                className="sticky left-0 z-10 min-w-[6rem] p-2 text-left whitespace-nowrap"
+                style={{ background: 'rgba(20,20,24,0.96)', color: 'var(--nm-text-muted)', borderBottom: '1px solid var(--nm-border-hair)' }}
+              >
                 姓名
               </th>
               {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => (
-                <th key={d} className="border-b border-l border-neutral-200 p-1 text-center min-w-[3.5rem]">
+                <th
+                  key={d}
+                  className="p-1 text-center min-w-[3.5rem] whitespace-nowrap"
+                  style={{ color: 'var(--nm-text-muted)', borderBottom: '1px solid var(--nm-border-hair)', borderLeft: '1px solid var(--nm-border-hair)' }}
+                >
                   {d}
                 </th>
               ))}
@@ -133,7 +149,7 @@ export default async function BossClockinsPage({
           <tbody>
             {users.length === 0 && (
               <tr>
-                <td colSpan={daysInMonth + 1} className="p-4 text-center text-neutral-500">
+                <td colSpan={daysInMonth + 1} className="p-4 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>
                   尚無員工
                 </td>
               </tr>
@@ -142,30 +158,36 @@ export default async function BossClockinsPage({
               const days = byUser.get(u.id) || new Map<number, ClockinRow[]>();
               return (
                 <tr key={u.id} className="align-top">
-                  <td className="sticky left-0 z-10 border-b border-neutral-200 bg-white p-2 font-medium">
+                  <td
+                    className="sticky left-0 z-10 p-2 font-medium whitespace-nowrap"
+                    style={{ background: 'rgba(24,24,28,0.9)', color: 'var(--nm-text-body)', borderBottom: '1px solid var(--nm-border-hair)' }}
+                  >
                     {u.name}
                   </td>
                   {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => {
                     const entries = days.get(d) || [];
                     return (
-                      <td key={d} className="border-b border-l border-neutral-200 p-1 text-center">
+                      <td
+                        key={d}
+                        className="p-1 text-center whitespace-nowrap"
+                        style={{ borderBottom: '1px solid var(--nm-border-hair)', borderLeft: '1px solid var(--nm-border-hair)' }}
+                      >
                         {entries.length === 0 ? (
-                          <span className="text-neutral-300">·</span>
+                          <span style={{ color: 'var(--nm-text-faint)' }}>·</span>
                         ) : (
                           <div className="space-y-0.5">
                             {entries.map((e) => (
                               <div key={e.id} className="flex items-center justify-center gap-1">
                                 <span
-                                  className={
-                                    e.type === 'in' ? 'text-emerald-700' : 'text-orange-700'
-                                  }
+                                  style={{ color: e.type === 'in' ? 'var(--nm-success-glass-text)' : 'var(--nm-warning-glass-text)' }}
                                   title={e.type === 'in' ? '上班' : '下班'}
                                 >
                                   {e.type === 'in' ? '入' : '出'} {fmtTime(e.ts)}
                                 </span>
                                 {e.is_backfill && (
                                   <span
-                                    className="rounded bg-orange-100 px-1 text-[10px] text-orange-800"
+                                    className="nm-pill nm-pill-warning"
+                                    style={{ padding: '1px 6px', fontSize: 11 }}
                                     title={e.backfill_reason || '補登'}
                                   >
                                     補

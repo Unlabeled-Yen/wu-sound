@@ -58,7 +58,11 @@ export default async function EquipmentDetailPage({
     .eq('id', id)
     .maybeSingle();
   if (eq.error) {
-    return <div className="p-3 rounded bg-red-50 border border-red-300 text-red-800">讀取失敗:{eq.error.message}</div>;
+    return (
+      <div className="rounded-xl nm-inset p-3" style={{ color: 'var(--nm-danger)' }}>
+        讀取失敗:{eq.error.message}
+      </div>
+    );
   }
   if (!eq.data) notFound();
   const data = eq.data as unknown as EquipmentDetail;
@@ -80,18 +84,18 @@ export default async function EquipmentDetailPage({
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
-          <Link href="/boss/equipment" className="text-sm underline">← 大型設備</Link>
-          <h1 className="text-xl font-semibold mt-1">{data.name}</h1>
+          <Link href="/boss/equipment" className="text-[13px] underline nm-focus" style={{ color: 'var(--nm-text-muted)' }}>← 大型設備</Link>
+          <h1 className="text-xl font-semibold mt-1" style={{ color: 'var(--nm-text-primary)' }}>{data.name}</h1>
         </div>
       </div>
 
-      <section className="rounded border border-neutral-200 dark:border-neutral-800 p-4 space-y-3">
-        <h2 className="font-semibold">基本資料</h2>
+      <section className="rounded-2xl nm-raised p-4 space-y-3">
+        <h2 className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>基本資料</h2>
         <form action={saveAction} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <F label="名稱 *"><input name="name" defaultValue={data.name} required className={inp} /></F>
             <F label="分類">
-              <div className={`${inp} bg-neutral-100 dark:bg-neutral-800`}>
+              <div className="nm-inset-sm rounded-lg px-2 py-1.5 text-[13.5px]" style={{ color: 'var(--nm-text-secondary)' }}>
                 {EQUIPMENT_CATEGORY_LABEL[data.category]}
               </div>
             </F>
@@ -104,40 +108,40 @@ export default async function EquipmentDetailPage({
             </div>
           </div>
           <F label="備註"><textarea name="notes" defaultValue={data.notes ?? ''} rows={3} className={inp} /></F>
-          <button type="submit" className="px-4 py-2 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
+          <button type="submit" className="nm-btn-solid text-[13.5px]">
             儲存基本資料
           </button>
         </form>
       </section>
 
-      <section className="rounded border border-neutral-200 dark:border-neutral-800 p-4 space-y-3">
-        <h2 className="font-semibold">目前狀態</h2>
+      <section className="rounded-2xl nm-raised p-4 space-y-3">
+        <h2 className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>目前狀態</h2>
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm text-neutral-500">狀態 · 位置</div>
-            <div className="text-lg">{formatEquipmentLocation(data.status, data.sites?.name)}</div>
+            <div className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>狀態 · 位置</div>
+            <div className="text-lg" style={{ color: 'var(--nm-text-body)' }}>{formatEquipmentLocation(data.status, data.sites?.name)}</div>
           </div>
           <MoveDialog equipmentId={data.id} currentStatus={data.status} currentSiteId={data.current_site_id} />
         </div>
       </section>
 
-      <section className="rounded border border-neutral-200 dark:border-neutral-800 p-4 space-y-3">
-        <h2 className="font-semibold">移動歷史 ({movements.length})</h2>
+      <section className="rounded-2xl nm-raised p-4 space-y-3">
+        <h2 className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>移動歷史 ({movements.length})</h2>
         {movements.length === 0 ? (
-          <div className="text-sm text-neutral-500">目前沒有移動記錄</div>
+          <div className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>目前沒有移動記錄</div>
         ) : (
           <ol className="space-y-3">
             {movements.map((m) => (
-              <li key={m.id} className="border-l-2 border-neutral-300 dark:border-neutral-700 pl-3">
-                <div className="text-xs text-neutral-500">
+              <li key={m.id} className="pl-3" style={{ borderLeft: '2px solid var(--nm-border-hair)' }}>
+                <div className="text-xs" style={{ color: 'var(--nm-text-muted)' }}>
                   {new Date(m.moved_at).toLocaleString('zh-Hant')} · {m.users?.name || '(未知)'}
                 </div>
-                <div className="text-sm">
+                <div className="text-[13px]" style={{ color: 'var(--nm-text-body)' }}>
                   {formatEquipmentLocation(m.from_status, m.from_site?.name)}
                   {' → '}
                   <strong>{formatEquipmentLocation(m.to_status, m.to_site?.name)}</strong>
                 </div>
-                {m.notes && <div className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">備註:{m.notes}</div>}
+                {m.notes && <div className="text-[13px] mt-1" style={{ color: 'var(--nm-text-secondary)' }}>備註:{m.notes}</div>}
               </li>
             ))}
           </ol>
@@ -145,8 +149,8 @@ export default async function EquipmentDetailPage({
       </section>
 
       {data.status !== 'retired' && (
-        <section className="rounded border border-red-200 dark:border-red-900 p-4 space-y-2">
-          <h2 className="font-semibold text-red-700 dark:text-red-300">危險區</h2>
+        <section className="rounded-2xl nm-raised p-4 space-y-2" style={{ borderColor: 'rgba(224, 122, 122, 0.28)' }}>
+          <h2 className="font-semibold" style={{ color: 'var(--nm-danger)' }}>危險區</h2>
           <RetireButton id={data.id} />
         </section>
       )}
@@ -154,12 +158,12 @@ export default async function EquipmentDetailPage({
   );
 }
 
-const inp = 'w-full px-2 py-1.5 rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900';
+const inp = 'nm-input w-full text-[13.5px]';
 
 function F({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-sm text-neutral-700 dark:text-neutral-300">{label}</span>
+      <span className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>{label}</span>
       {children}
     </label>
   );

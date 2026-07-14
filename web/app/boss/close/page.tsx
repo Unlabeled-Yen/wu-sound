@@ -38,13 +38,17 @@ export default async function BossClosePage({
 
   const all = ((data ?? []) as unknown as JoinedRow[]).filter((r) => monthOf(r) === month);
 
-  const pending = all.filter((r) => r.status === 'draft' || r.status === 'submitted');
+  const drafts = all.filter((r) => r.status === 'draft');
+  const submitted = all.filter((r) => r.status === 'submitted');
+  const pending = [...drafts, ...submitted];
   const confirmed = all.filter((r) => r.status === 'confirmed');
 
-  const pendingByUser = new Map<string, { name: string; count: number }>();
+  type BreakdownRow = { name: string; draft: number; submitted: number };
+  const pendingByUser = new Map<string, BreakdownRow>();
   for (const r of pending) {
-    const cur = pendingByUser.get(r.user_id) ?? { name: r.users?.name ?? '?', count: 0 };
-    cur.count += 1;
+    const cur = pendingByUser.get(r.user_id) ?? { name: r.users?.name ?? '?', draft: 0, submitted: 0 };
+    if (r.status === 'draft') cur.draft += 1;
+    else if (r.status === 'submitted') cur.submitted += 1;
     pendingByUser.set(r.user_id, cur);
   }
 
@@ -65,18 +69,20 @@ export default async function BossClosePage({
   return (
     <div>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold">月結 · {month}</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>月結 · {month}</h1>
         <form className="flex items-center gap-2">
-          <label className="text-sm text-neutral-600 dark:text-neutral-400">選擇月份</label>
+          <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>選擇月份</label>
           <input
             type="month"
             name="month"
             defaultValue={month}
-            className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+            className="nm-input text-[13px]"
+            style={{ width: 'auto', minHeight: 36, padding: '6px 12px' }}
           />
           <button
             type="submit"
-            className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-sm"
+            className="nm-btn text-[13px]"
+            style={{ minHeight: 36, padding: '6px 12px' }}
           >
             切換
           </button>
@@ -84,46 +90,65 @@ export default async function BossClosePage({
       </div>
 
       {blocked ? (
-        <div className="mb-6 rounded-2xl bg-red-600 text-white px-5 py-4">
+        <div
+          className="mb-6 rounded-2xl px-5 py-4"
+          style={{
+            background: 'rgba(224, 122, 122, 0.1)',
+            border: '1px solid rgba(224, 122, 122, 0.34)',
+            color: 'var(--nm-danger-glass-text)',
+          }}
+        >
           <div className="text-lg font-bold">
             尚有 {pending.length} 筆未處理,無法結算
           </div>
-          <ul className="mt-2 text-sm space-y-0.5">
+          <ul className="mt-2 text-[13px] space-y-1">
             {Array.from(pendingByUser.values()).map((u) => (
               <li key={u.name}>
-                · {u.name}:{u.count} 筆待確認/待審核
+                · {u.name}:
+                {u.draft > 0 && <span className="ml-1">{u.draft} 筆員工尚未送出</span>}
+                {u.draft > 0 && u.submitted > 0 && <span>,</span>}
+                {u.submitted > 0 && <span className="ml-1">{u.submitted} 筆待您審核</span>}
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-sm opacity-90">
-            請員工在<Link href="/staff/queue" className="underline">待確認匣</Link>送出,
-            或在<Link href="/boss/expenses" className="underline">審核清單</Link>逐筆處理後才可結算。
+          <p className="mt-3 text-[13px] opacity-90 leading-relaxed">
+            {drafts.length > 0 && (
+              <>
+                <strong>員工尚未送出的</strong>:請通知員工在自己手機 App 的「待送出」抽屜完成金額/品項並送出。
+                <br />
+              </>
+            )}
+            {submitted.length > 0 && (
+              <>
+                <strong>待您審核的</strong>:到 <Link href="/boss/expenses" className="underline font-semibold">審核清單</Link> 逐筆確認/退回。
+              </>
+            )}
           </p>
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-neutral-100 dark:bg-neutral-800 text-left">
-            <tr>
-              <th className="px-3 py-2">姓名</th>
-              <th className="px-3 py-2 text-right">筆數</th>
-              <th className="px-3 py-2 text-right">已確認總額</th>
+      <div className="rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
+        <table className="w-full text-[13px]" style={{ minWidth: 780, borderCollapse: 'collapse' }}>
+          <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
+            <tr className="text-left" style={{ color: 'var(--nm-text-muted)' }}>
+              <th className="px-3 py-2 font-normal whitespace-nowrap">姓名</th>
+              <th className="px-3 py-2 text-right font-normal whitespace-nowrap">筆數</th>
+              <th className="px-3 py-2 text-right font-normal whitespace-nowrap">已確認總額</th>
             </tr>
           </thead>
           <tbody>
             {totalsByUser.size === 0 ? (
               <tr>
-                <td colSpan={3} className="px-3 py-8 text-center text-neutral-500">
+                <td colSpan={3} className="px-3 py-8 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>
                   本月尚無已確認的代墊
                 </td>
               </tr>
             ) : (
               Array.from(totalsByUser.values()).map((u) => (
-                <tr key={u.name} className="border-t border-neutral-200 dark:border-neutral-800">
-                  <td className="px-3 py-2 font-medium">{u.name}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{u.count}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                <tr key={u.name} style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
+                  <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>{u.name}</td>
+                  <td className="px-3 py-2 text-right tabular whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{u.count}</td>
+                  <td className="px-3 py-2 text-right tabular font-semibold whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>
                     NT$ {u.total.toLocaleString('zh-TW')}
                   </td>
                 </tr>
@@ -136,11 +161,12 @@ export default async function BossClosePage({
       <div className="mt-6 flex gap-3 flex-wrap">
         <a
           href={`/api/boss/close/${month}/export.csv`}
-          className={`px-4 py-2 rounded-xl text-sm font-medium ${
+          className={
             blocked || confirmed.length === 0
-              ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed pointer-events-none'
-              : 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-          }`}
+              ? 'nm-btn text-[13px] font-medium pointer-events-none'
+              : 'nm-btn-solid text-[13px]'
+          }
+          style={(blocked || confirmed.length === 0) ? { opacity: 0.5 } : undefined}
         >
           產出月結 CSV
         </a>

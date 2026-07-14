@@ -36,42 +36,49 @@ export default function ExportCsvDialog({ defaultMonth }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="px-4 py-2 rounded border border-neutral-300 dark:border-neutral-700"
+        className="nm-btn text-[13px]"
       >匯出外帳 CSV</button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white dark:bg-neutral-900 rounded-lg shadow-lg max-w-md w-full p-4 space-y-3">
-            <h2 className="text-lg font-semibold">匯出外帳 CSV</h2>
-            <p className="text-sm text-neutral-500">僅匯出「列外帳且未作廢」的紀錄</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="rounded-2xl nm-raised-lg max-w-md w-full p-6 space-y-4" style={{ background: 'rgba(24,24,28,0.75)' }}>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>匯出外帳 CSV</h2>
+            <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>僅匯出「列外帳且未作廢」的紀錄</p>
             <div>
-              <label className="text-sm text-neutral-500">起日</label>
+              <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>起日</label>
               <input
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                className="w-full border border-neutral-300 dark:border-neutral-700 rounded px-3 py-2 bg-white dark:bg-neutral-900"
+                className="nm-input"
               />
             </div>
             <div>
-              <label className="text-sm text-neutral-500">迄日</label>
+              <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>迄日</label>
               <input
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                className="w-full border border-neutral-300 dark:border-neutral-700 rounded px-3 py-2 bg-white dark:bg-neutral-900"
+                className="nm-input"
               />
             </div>
             {error && (
-              <div className="rounded border border-red-300 bg-red-50 dark:bg-red-950/40 dark:border-red-800 text-red-700 dark:text-red-200 px-3 py-2 text-sm">
+              <div
+                className="rounded-xl px-3 py-2 text-[13px]"
+                style={{
+                  background: 'rgba(224, 122, 122, 0.08)',
+                  border: '1px solid rgba(224, 122, 122, 0.34)',
+                  color: 'var(--nm-danger-glass-text)',
+                }}
+              >
                 {error}
               </div>
             )}
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setOpen(false)} className="px-4 py-2 rounded border border-neutral-300 dark:border-neutral-700">取消</button>
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setOpen(false)} className="nm-btn text-[13px]">取消</button>
               <button
                 onClick={submit}
-                className="px-4 py-2 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+                className="nm-btn-solid text-[13.5px]"
               >下載</button>
             </div>
           </div>
