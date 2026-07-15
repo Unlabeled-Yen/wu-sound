@@ -1,9 +1,34 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { ToastProvider } from './Toast';
+
+// Hot routes prefetched on mount so first-click nav is instant
+const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/close', '/boss/ledger', '/boss/quotes'];
+
+function useBossShellData() {
+  const router = useRouter();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    // Prefetch hot routes so nav feels instant
+    for (const href of PREFETCH_ROUTES) router.prefetch(href);
+  }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Fetch pending badge count client-side so layout doesn't block every nav
+    fetch('/api/boss/pending-count', { cache: 'no-store' })
+      .then((r) => r.ok ? r.json() : { count: 0 })
+      .then((j) => { if (!cancelled) setPendingCount(j.count ?? 0); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  return pendingCount;
+}
 
 type NavItem = { href: string; label: string };
 type NavSection = { key: string; label: string; icon: React.ReactNode; items: NavItem[] };
@@ -131,11 +156,9 @@ function findMobileTitle(pathname: string): { title: string; subtitle?: string }
 
 export function BossShell({
   userName,
-  pendingCount = 0,
   children,
 }: {
   userName: string;
-  pendingCount?: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname() ?? '/boss';
@@ -143,6 +166,7 @@ export function BossShell({
   const activeTab = useMemo(() => findActiveMobileTab(pathname), [pathname]);
   const mobileTitle = useMemo(() => findMobileTitle(pathname), [pathname]);
   const monthLabel = useMemo(() => currentMonthLabel(), []);
+  const pendingCount = useBossShellData();
 
   const desktopActiveLabel =
     active.items.find(
