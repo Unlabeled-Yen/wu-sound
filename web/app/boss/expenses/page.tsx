@@ -1,6 +1,7 @@
 import { getSupabaseAdmin, RECEIPTS_BUCKET } from '@/lib/supabase';
 import { CATEGORY_LABEL, type ExpenseRecord } from '@/lib/types';
 import RowActions from './RowActions';
+import ExpenseCardMobile from './ExpenseCardMobile';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,30 +36,80 @@ export default async function BossExpensesPage() {
   }
   const draftGroups = Array.from(draftsByUser.entries()).sort(([, a], [, b]) => b.count - a.count);
 
-  const rows = await Promise.all(
-    ((data ?? []) as unknown[]).map(async (raw) => {
-      const r = raw as ExpenseRecord & {
-        users?: { name?: string };
-        sites?: { name?: string } | null;
-      };
-      let thumb: string | null = null;
-      if (r.receipt_url) {
-        const { data: signed } = await sb.storage
-          .from(RECEIPTS_BUCKET)
-          .createSignedUrl(r.receipt_url, 600);
-        thumb = signed?.signedUrl ?? null;
-      }
-      return {
-        ...r,
-        user_name: r.users?.name ?? '?',
-        site_name: r.sites?.name ?? null,
-        thumb_url: thumb,
-      } as JoinedRow;
-    }),
-  );
+  // Batch-sign all receipt URLs in ONE request (was N+1 calls per receipt).
+  const raws = (data ?? []) as (ExpenseRecord & {
+    users?: { name?: string };
+    sites?: { name?: string } | null;
+  })[];
+  const receiptPaths = raws.map((r) => r.receipt_url).filter((p): p is string => !!p);
+  const signedByPath = new Map<string, string>();
+  if (receiptPaths.length > 0) {
+    const { data: signed } = await sb.storage
+      .from(RECEIPTS_BUCKET)
+      .createSignedUrls(receiptPaths, 600);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) signedByPath.set(s.path, s.signedUrl);
+    }
+  }
+  const rows: JoinedRow[] = raws.map((r) => ({
+    ...r,
+    user_name: r.users?.name ?? '?',
+    site_name: r.sites?.name ?? null,
+    thumb_url: r.receipt_url ? (signedByPath.get(r.receipt_url) ?? null) : null,
+  }));
+
+  const draftReminderSub =
+    draftGroups.length === 1
+      ? `${draftGroups[0][1].name}拍了照還沒填金額,需提醒去 App 完成`
+      : `員工拍了照還沒填金額,需提醒去 App 完成`;
 
   return (
     <div className="space-y-4">
+      {/* Mobile view */}
+      <div className="lg:hidden flex flex-col gap-4">
+        {drafts.length > 0 && (
+          <div
+            className="rounded-2xl px-4 py-3.5"
+            style={{
+              background: 'rgba(217,181,107,0.09)',
+              border: '1px solid rgba(217,181,107,0.3)',
+              textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div className="text-[13px] font-semibold mb-1" style={{ color: 'var(--nm-warning-glass-text)' }}>
+              員工草稿 · {drafts.length} 筆
+            </div>
+            <div className="text-[12px] leading-relaxed" style={{ color: '#b8ac8e' }}>
+              {draftReminderSub}
+            </div>
+          </div>
+        )}
+
+        {rows.length === 0 ? (
+          <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+            目前沒有待審核的項目(員工還沒送出)
+          </p>
+        ) : (
+          rows.map((r) => (
+            <ExpenseCardMobile
+              key={r.id}
+              row={{
+                id: r.id,
+                user_name: r.user_name,
+                amount_twd: r.amount_twd ?? null,
+                spent_on: r.spent_on ?? null,
+                category_label: r.category ? CATEGORY_LABEL[r.category] : '—',
+                site_name: r.site_name,
+                item_text: r.item_text ?? null,
+                thumb_url: r.thumb_url,
+              }}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Desktop view (unchanged) */}
+      <div className="hidden lg:block space-y-4">
       <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
         零用金管理 · 待確認 ({rows.length})
       </h1>
@@ -153,6 +204,7 @@ export default async function BossExpensesPage() {
           </table>
         </div>
       )}
+      </div>
     </div>
   );
 }

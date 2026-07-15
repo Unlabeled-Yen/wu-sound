@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import BossMobileDashboard from './BossMobileDashboard';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,7 +82,22 @@ export default async function BossDashboard() {
   const anyError = Object.values(s.errors).some(Boolean);
 
   return (
-    <div className="space-y-4">
+    <>
+      {/* Mobile-only view */}
+      <div className="lg:hidden">
+        {anyError && (
+          <div
+            className="rounded-xl p-4 text-[13px] nm-inset mb-4"
+            style={{ color: 'var(--nm-danger)' }}
+          >
+            部分資料讀取失敗
+          </div>
+        )}
+        <BossMobileDashboard s={s} />
+      </div>
+
+      {/* Desktop view (unchanged) */}
+      <div className="space-y-4 hidden lg:block">
       <div>
         <div className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>本月 {s.month}</div>
         <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>總覽</h1>
@@ -171,7 +187,8 @@ export default async function BossDashboard() {
           <QuickLink href="/boss/catalog">價目表</QuickLink>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 }
 
