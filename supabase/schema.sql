@@ -1,6 +1,7 @@
--- wu-sound-fde Phase 1 schema
+-- wu-sound-fde canonical 全庫 schema(反映 phase 1-4 應用後的完整狀態)
 -- 執行順序:在 Supabase SQL editor 一次貼上執行。
 -- 金額一律以整數(元)存 amount_twd。
+-- migrations/*.sql 是給已上線 DB 升級用的歷史 patch、新 setup 不必跑。
 
 create extension if not exists pgcrypto;
 
