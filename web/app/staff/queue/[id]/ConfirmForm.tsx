@@ -166,6 +166,9 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
             = ${parseInt(amount, 10).toLocaleString('zh-TW')}
           </p>
         ) : null}
+        <p className="mt-1 text-sm" style={{ color: 'var(--nm-text-muted)' }}>
+          金額由 AI 辨識,連續手寫零容易誤判位數,送出前請對照收據核對金額是否正確。
+        </p>
       </div>
 
       <div>
