@@ -78,6 +78,12 @@ const SECTIONS: NavSection[] = [
       { href: '/boss/clockins', label: '打卡' },
     ],
   },
+  {
+    key: 'tenders',
+    label: '標案',
+    icon: <DocIcon />,
+    items: [{ href: '/boss/tenders', label: '標案監測' }],
+  },
 ];
 
 const SETTINGS_SECTION: NavSection = {

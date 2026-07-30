@@ -32,6 +32,17 @@ const GROUPS: Group[] = [
     items: [{ href: '/boss/clockins', label: '打卡' }],
   },
   {
+    title: '標案',
+    items: [{ href: '/boss/tenders', label: '標案監測' }],
+  },
+  {
+    title: '工具',
+    items: [
+      { href: '/tools/spl-calculator', label: 'SPL 預算計算器' },
+      { href: '/tools/array-designer', label: '陣列設計器' },
+    ],
+  },
+  {
     title: '設定',
     items: [{ href: '/boss/users', label: '使用者管理' }],
   },
