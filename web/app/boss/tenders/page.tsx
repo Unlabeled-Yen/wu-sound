@@ -6,6 +6,11 @@ export const dynamic = 'force-dynamic';
 
 type FieldStatus = 'value' | 'withheld' | 'unfetched' | 'fetch_failed';
 
+interface TenderSignal {
+  code: string;
+  label: string;
+}
+
 interface TenderHit {
   id: string;
   job_number: string;
@@ -21,6 +26,7 @@ interface TenderHit {
   budget_status: FieldStatus;
   source_url: string;
   is_retender: number;
+  signals?: TenderSignal[];
 }
 
 interface LoadResult {
@@ -82,6 +88,11 @@ function formatDeadline(hit: TenderHit): string {
 
 function TenderCard({ hit }: { hit: TenderHit }) {
   const hasLink = hit.source_url.length > 0;
+  const signals = hit.signals ?? [];
+  // is_retender 是「歷史上出現過無法決標公告」的粗判斷；signals 裡的
+  // retender_round 是從招標公告本身的「招標狀態」欄位算出的精確輪次——
+  // 兩個訊號重疊時只顯示精確的那個,不要同一件事講兩次
+  const hasRetenderSignal = signals.some((s) => s.code === 'retender_round');
   return (
     <li className="rounded-2xl nm-raised p-4">
       <div className="mb-1 flex flex-wrap items-baseline gap-2 text-[13px]">
@@ -94,11 +105,20 @@ function TenderCard({ hit }: { hit: TenderHit }) {
         >
           {hit.notice_type}
         </span>
-        {hit.is_retender === 1 && (
+        {hit.is_retender === 1 && !hasRetenderSignal && (
           <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'rgba(224,179,80,0.14)', color: '#c99a3a' }}>
             ⚠️ 流標重招
           </span>
         )}
+        {signals.map((s) => (
+          <span
+            key={s.code}
+            className="rounded-full px-2 py-0.5 text-xs"
+            style={{ background: 'rgba(224,179,80,0.14)', color: '#c99a3a' }}
+          >
+            {s.label}
+          </span>
+        ))}
         <span className="ml-auto text-xs" style={{ color: 'var(--nm-text-faint)' }}>
           公告 {hit.publish_date}
         </span>
