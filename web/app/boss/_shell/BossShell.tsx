@@ -158,6 +158,8 @@ const MOBILE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/boss/equipment': { title: '設備庫存' },
   '/boss/sites': { title: '專案' },
   '/boss/users': { title: '使用者管理' },
+  '/tools/spl-calculator': { title: 'SPL 預算計算器', subtitle: '聲學規劃' },
+  '/tools/array-designer': { title: '陣列設計器', subtitle: '聲學規劃' },
 };
 
 function findMobileTitle(pathname: string): { title: string; subtitle?: string } {
