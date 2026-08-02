@@ -6,7 +6,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ToastProvider } from './Toast';
 
 // Hot routes prefetched on mount so first-click nav is instant
-const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/close', '/boss/ledger', '/boss/quotes'];
+// 陣列設計器頁面較重(畫布互動),不預抓,避免拖慢一般導覽
+const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/close', '/boss/ledger', '/boss/quotes', '/tools/spl-calculator'];
 
 function useBossShellData() {
   const router = useRouter();
@@ -48,6 +49,15 @@ const SECTIONS: NavSection[] = [
       { href: '/boss/expenses', label: '零用金管理' },
       { href: '/boss/close', label: '薪資結算' },
       { href: '/boss/ledger', label: '帳務管理' },
+    ],
+  },
+  {
+    key: 'acoustic',
+    label: '聲學規劃',
+    icon: <WaveIcon />,
+    items: [
+      { href: '/tools/spl-calculator', label: 'SPL 預算計算器' },
+      { href: '/tools/array-designer', label: '陣列設計器' },
     ],
   },
   {
@@ -423,6 +433,17 @@ function WalletIcon() {
       <rect x="3" y="6" width="18" height="14" rx="2" />
       <path d="M16 13h3" />
       <path d="M3 10h18" />
+    </svg>
+  );
+}
+function WaveIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 15V9" />
+      <path d="M8 18V6" />
+      <path d="M12 20.5v-17" />
+      <path d="M16 18V6" />
+      <path d="M20 15V9" />
     </svg>
   );
 }

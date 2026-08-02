@@ -65,6 +65,16 @@ export default async function StaffSettingsPage() {
       </section>
 
       <section className="nm-raised rounded-2xl p-4 space-y-3">
+        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>工具</h2>
+        <Link href="/tools/spl-calculator" className="nm-btn text-sm inline-block">
+          SPL 預算計算器
+        </Link>
+        <Link href="/tools/array-designer" className="nm-btn text-sm inline-block ml-2">
+          陣列設計器
+        </Link>
+      </section>
+
+      <section className="nm-raised rounded-2xl p-4 space-y-3">
         <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>帳號</h2>
         <form action="/api/auth/logout" method="post">
           <button type="submit" className="nm-btn text-sm">
