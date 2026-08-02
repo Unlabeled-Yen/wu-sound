@@ -21,5 +21,14 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
     .order('created_at', { ascending: true });
   const lines = (l.data ?? []) as QuoteLine[];
 
-  return <QuoteEditor quote={quote} initialLines={lines} />;
+  const catalogIds = Array.from(new Set(lines.map((ln) => ln.catalog_item_id).filter((v): v is string => Boolean(v))));
+  const costByItemId: Record<string, number | null> = {};
+  if (catalogIds.length > 0) {
+    const c = await sb.from('catalog_items').select('id, cost_price_twd').in('id', catalogIds);
+    for (const row of (c.data ?? []) as { id: string; cost_price_twd: number | null }[]) {
+      costByItemId[row.id] = row.cost_price_twd;
+    }
+  }
+
+  return <QuoteEditor quote={quote} initialLines={lines} initialCostByItemId={costByItemId} />;
 }

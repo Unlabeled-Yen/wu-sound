@@ -9,7 +9,7 @@ import {
   type QuoteLineSection,
   type QuoteStatus,
 } from '@/lib/types';
-import { computeQuoteTotals, groupQuoteLines } from '@/lib/quote-calc';
+import { computeQuoteMargin, computeQuoteTotals, groupQuoteLines } from '@/lib/quote-calc';
 import LineRow from './LineRow';
 import LinePicker from './LinePicker';
 
@@ -26,8 +26,17 @@ interface SpeechRecognitionLike {
   stop: () => void;
 }
 
-export default function QuoteEditor({ quote, initialLines }: { quote: Quote; initialLines: QuoteLine[] }) {
+export default function QuoteEditor({
+  quote,
+  initialLines,
+  initialCostByItemId,
+}: {
+  quote: Quote;
+  initialLines: QuoteLine[];
+  initialCostByItemId: Record<string, number | null>;
+}) {
   const [lines, setLines] = useState<QuoteLine[]>(initialLines);
+  const [costByItemId, setCostByItemId] = useState<Record<string, number | null>>(initialCostByItemId);
   const [clientName, setClientName] = useState(quote.client_name);
   const [projectName, setProjectName] = useState(quote.project_name ?? '');
   const [status, setStatus] = useState<QuoteStatus>(quote.status);
@@ -58,6 +67,7 @@ export default function QuoteEditor({ quote, initialLines }: { quote: Quote; ini
   const groups = useMemo(() => groupQuoteLines(lines), [lines]);
   const missing = groups.missingCount;
   const totals = useMemo(() => computeQuoteTotals(groups, Number(taxRate) || 0), [groups, taxRate]);
+  const margin = useMemo(() => computeQuoteMargin(lines, costByItemId), [lines, costByItemId]);
   const canSend = lines.length > 0 && missing === 0;
 
   function upsertLine(l: QuoteLine) {
@@ -157,6 +167,7 @@ export default function QuoteEditor({ quote, initialLines }: { quote: Quote; ini
     const j = await res.json().catch(() => ({}));
     if (!res.ok || !j.line) { setActionError(j.error ?? '加入失敗'); return; }
     setLines((prev) => [...prev, j.line as QuoteLine]);
+    setCostByItemId((prev) => ({ ...prev, [item.id]: item.cost_price_twd }));
   }
 
   async function addManual() {
@@ -279,21 +290,31 @@ export default function QuoteEditor({ quote, initialLines }: { quote: Quote; ini
                 <th className="text-left px-3 py-2 font-normal whitespace-nowrap">單位</th>
                 <th className="text-right px-3 py-2 font-normal whitespace-nowrap">單價</th>
                 <th className="text-right px-3 py-2 font-normal whitespace-nowrap">小計</th>
+                <th className="text-right px-3 py-2 font-normal whitespace-nowrap print-hide">毛利%</th>
                 <th className="text-left px-3 py-2 font-normal whitespace-nowrap print-hide">動作</th>
               </tr>
             </thead>
             <tbody>
               {section.rows.length === 0 && (
-                <tr><td colSpan={8} className="px-3 py-6 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>此區還沒有明細</td></tr>
+                <tr><td colSpan={9} className="px-3 py-6 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>此區還沒有明細</td></tr>
               )}
               {section.rows.map((line, i) => (
-                <LineRow key={line.id} line={line} index={i} quoteId={quote.id} onChanged={upsertLine} onDeleted={removeLine} />
+                <LineRow
+                  key={line.id}
+                  line={line}
+                  index={i}
+                  quoteId={quote.id}
+                  unitCost={line.catalog_item_id ? costByItemId[line.catalog_item_id] : undefined}
+                  onChanged={upsertLine}
+                  onDeleted={removeLine}
+                />
               ))}
             </tbody>
             <tfoot>
               <tr style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
                 <td colSpan={6} className="px-3 py-2 text-right whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{section.label}小計</td>
                 <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>${fmt(section.subtotal)}</td>
+                <td className="print-hide" />
                 <td className="print-hide" />
               </tr>
             </tfoot>
@@ -327,6 +348,17 @@ export default function QuoteEditor({ quote, initialLines }: { quote: Quote; ini
         <div className="flex items-center justify-between text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
           <span>安裝小計</span><span>${fmt(groups.installSubtotal)}</span>
         </div>
+        {lines.length > 0 && (
+          <div className="flex items-center justify-between text-[13px] print-hide" style={{ color: 'var(--nm-text-muted)' }}>
+            <span>
+              毛利(僅內部可見,不含人事、不會出現在列印/匯出)
+              {margin.coveredLines < margin.totalLines && (
+                <span style={{ color: 'var(--nm-warning)' }}> · 僅 {margin.coveredLines}/{margin.totalLines} 項有進價資料</span>
+              )}
+            </span>
+            <span>{margin.marginPct !== null ? `${margin.marginPct.toFixed(1)}%（$${fmt(margin.marginTwd)}）` : '—'}</span>
+          </div>
+        )}
         {missing > 0 ? (
           <div className="flex items-center justify-end">
             <span className="text-lg font-semibold" style={{ color: 'var(--nm-warning)' }}>尚有 {missing} 項待設定售價,無法送出</span>

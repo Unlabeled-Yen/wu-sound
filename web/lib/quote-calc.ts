@@ -42,3 +42,54 @@ export function computeQuoteTotals(groups: QuoteLineGroups, taxRate: number): Qu
   const grandTotal = total + tax;
   return { total, tax, grandTotal };
 }
+
+// 毛利計算(僅內部/老闆可見,絕不出現在給客戶的列印/匯出頁面)。
+// 不含人事成本,只算品項進價 vs 售價的差。缺進價資料的行不計入,
+// 不能拿「有資料的部分」冒充「整張報價的真實毛利」— 缺就 loud 原則。
+
+export interface LineMargin {
+  costKnown: boolean;
+  marginTwd: number | null;
+  marginPct: number | null; // 0-100
+}
+
+export function computeLineMargin(line: QuoteLine, unitCostTwd: number | null | undefined): LineMargin {
+  if (line.unit_price_twd == null || unitCostTwd == null) {
+    return { costKnown: false, marginTwd: null, marginPct: null };
+  }
+  const revenue = line.qty * line.unit_price_twd;
+  const cost = line.qty * unitCostTwd;
+  const marginTwd = revenue - cost;
+  const marginPct = revenue > 0 ? (marginTwd / revenue) * 100 : null;
+  return { costKnown: true, marginTwd, marginPct };
+}
+
+export interface QuoteMarginSummary {
+  knownRevenue: number;
+  knownCost: number;
+  marginTwd: number;
+  marginPct: number | null;
+  coveredLines: number;
+  totalLines: number;
+}
+
+export function computeQuoteMargin(
+  lines: QuoteLine[],
+  costByItemId: Record<string, number | null | undefined>,
+): QuoteMarginSummary {
+  let knownRevenue = 0;
+  let knownCost = 0;
+  let coveredLines = 0;
+  for (const line of lines) {
+    const unitCost = line.catalog_item_id ? costByItemId[line.catalog_item_id] : undefined;
+    const m = computeLineMargin(line, unitCost);
+    if (m.costKnown && line.unit_price_twd != null && unitCost != null) {
+      knownRevenue += line.qty * line.unit_price_twd;
+      knownCost += line.qty * unitCost;
+      coveredLines += 1;
+    }
+  }
+  const marginTwd = knownRevenue - knownCost;
+  const marginPct = knownRevenue > 0 ? (marginTwd / knownRevenue) * 100 : null;
+  return { knownRevenue, knownCost, marginTwd, marginPct, coveredLines, totalLines: lines.length };
+}

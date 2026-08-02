@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { QuoteLine, QuoteLineSection } from '@/lib/types';
+import { computeLineMargin } from '@/lib/quote-calc';
 
 const fmt = (n: number) => n.toLocaleString('zh-TW');
 
@@ -9,12 +10,14 @@ export default function LineRow({
   line,
   index,
   quoteId,
+  unitCost,
   onChanged,
   onDeleted,
 }: {
   line: QuoteLine;
   index: number;
   quoteId: string;
+  unitCost: number | null | undefined;
   onChanged: (l: QuoteLine) => void;
   onDeleted: (id: string) => void;
 }) {
@@ -32,6 +35,7 @@ export default function LineRow({
 
   const noPrice = line.unit_price_twd === null;
   const subtotal = line.unit_price_twd !== null ? line.qty * line.unit_price_twd : null;
+  const margin = computeLineMargin(line, unitCost);
   const inputCls = 'nm-input text-[13px]';
 
   async function callLines(action: string, payload: Record<string, unknown>): Promise<QuoteLine | null> {
@@ -124,6 +128,7 @@ export default function LineRow({
           )}
         </td>
         <td className="px-2 py-2 text-right whitespace-nowrap" style={{ color: 'var(--nm-text-faint)' }}>—</td>
+        <td className="px-2 py-2 text-right whitespace-nowrap print-hide" style={{ color: 'var(--nm-text-faint)' }}>—</td>
         <td className="px-2 py-2">
           <div className="flex flex-col gap-1">
             <div className="flex gap-2 whitespace-nowrap">
@@ -162,6 +167,9 @@ export default function LineRow({
         )}
       </td>
       <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>{subtotal !== null ? `$${fmt(subtotal)}` : '—'}</td>
+      <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap print-hide" style={{ color: margin.costKnown ? 'var(--nm-text-secondary)' : 'var(--nm-text-faint)' }}>
+        {margin.marginPct !== null ? `${margin.marginPct.toFixed(0)}%` : '—'}
+      </td>
       <td className="px-3 py-2 whitespace-nowrap print-hide">
         <div className="flex gap-2">
           <button onClick={() => setEditing(true)} className="underline" style={{ color: 'var(--nm-text-secondary)' }}>編輯</button>
