@@ -1,0 +1,601 @@
+<title>聲生 SSA — 畫面預覽 v1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --bg:#F5F5F4; --panel:#FFFFFF; --ink:#0A0A0A; --muted:#71717A;
+  --quiet:#A1A1AA; --line:#E7E5E4; --line-strong:#D6D3D1;
+  --accent:#0A0A0A; --danger:#DC2626; --danger-soft:#FEE2E2; --danger-line:#FCA5A5;
+  --warn:#F59E0B; --warn-soft:#FEF3C7;
+  --amber:#B45309;
+  --emerald:#059669; --emerald-soft:#D1FAE5;
+  --sans:"PingFang TC","Noto Sans TC",-apple-system,"Helvetica Neue",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0A0A0A; --panel:#171717; --ink:#F5F5F4; --muted:#A1A1AA;
+    --quiet:#71717A; --line:#262626; --line-strong:#404040;
+    --accent:#F5F5F4; --danger:#F87171; --danger-soft:#3F1D1D; --danger-line:#7F1D1D;
+    --warn:#FBBF24; --warn-soft:#3B2D0F;
+    --amber:#F59E0B;
+    --emerald:#34D399; --emerald-soft:#064E3B;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#F5F5F4; --panel:#FFFFFF; --ink:#0A0A0A; --muted:#71717A;
+  --quiet:#A1A1AA; --line:#E7E5E4; --line-strong:#D6D3D1;
+  --accent:#0A0A0A; --danger:#DC2626; --danger-soft:#FEE2E2; --danger-line:#FCA5A5;
+  --warn:#F59E0B; --warn-soft:#FEF3C7;
+  --amber:#B45309;
+  --emerald:#059669; --emerald-soft:#D1FAE5;
+}
+:root[data-theme="dark"]{
+  --bg:#0A0A0A; --panel:#171717; --ink:#F5F5F4; --muted:#A1A1AA;
+  --quiet:#71717A; --line:#262626; --line-strong:#404040;
+  --accent:#F5F5F4; --danger:#F87171; --danger-soft:#3F1D1D; --danger-line:#7F1D1D;
+  --warn:#FBBF24; --warn-soft:#3B2D0F;
+  --amber:#F59E0B;
+  --emerald:#34D399; --emerald-soft:#064E3B;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.65; font-size:15px; font-feature-settings:"palt"; -webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px; margin:0 auto; padding:2.5rem 1.5rem 4rem}
+
+header.top{border-bottom:1px solid var(--line); padding-bottom:1.5rem; margin-bottom:2.5rem}
+header.top .eyebrow{font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); margin-bottom:0.5rem}
+header.top h1{font-size:1.65rem; font-weight:500; letter-spacing:-0.015em; margin:0 0 0.6rem}
+header.top p{margin:0; color:var(--muted); font-size:0.95rem; max-width:60ch}
+
+section.screen{margin:0 0 4rem; scroll-margin-top:1rem}
+section.screen header.sh{display:flex; align-items:baseline; gap:0.75em; flex-wrap:wrap; margin-bottom:0.4rem}
+section.screen header.sh .num{
+  font-family:var(--mono); font-size:12px; color:var(--muted);
+  letter-spacing:0.05em; padding:2px 6px; border:1px solid var(--line-strong); border-radius:4px;
+}
+section.screen header.sh h2{font-size:1.15rem; font-weight:500; margin:0}
+section.screen header.sh .tag{font-size:11px; padding:2px 8px; border-radius:99px; letter-spacing:0.05em}
+section.screen header.sh .tag.staff{background:#DBEAFE; color:#1E40AF}
+section.screen header.sh .tag.boss{background:#FEF3C7; color:#92400E}
+@media (prefers-color-scheme:dark){
+  section.screen header.sh .tag.staff{background:#1E3A8A; color:#BFDBFE}
+  section.screen header.sh .tag.boss{background:#78350F; color:#FDE68A}
+}
+section.screen p.cap{margin:0 0 1.25rem; color:var(--muted); font-size:0.95rem; max-width:65ch}
+
+.stage{display:flex; gap:2rem; align-items:flex-start; flex-wrap:wrap}
+.stage.mobile{justify-content:flex-start}
+.stage.desktop{}
+.stage .note{
+  flex:1; min-width:220px; max-width:340px;
+  font-size:13px; color:var(--muted); line-height:1.75;
+  padding-top:0.4rem;
+}
+.stage .note ul{margin:0; padding-left:1.1em}
+.stage .note li{margin-bottom:0.35rem}
+.stage .note strong{color:var(--ink); font-weight:500}
+
+.phone{
+  width:360px; height:720px; background:var(--panel);
+  border:1px solid var(--line-strong); border-radius:32px;
+  overflow:hidden; position:relative; display:flex; flex-direction:column;
+  box-shadow:0 10px 30px -18px rgba(0,0,0,0.25);
+}
+.phone .notch{width:96px; height:24px; background:#0A0A0A; border-radius:0 0 12px 12px; margin:0 auto}
+@media (prefers-color-scheme:dark){.phone .notch{background:#000}}
+
+.phone-hdr{padding:14px 16px 8px; display:flex; align-items:center; justify-content:space-between; font-size:13px; border-bottom:1px solid var(--line)}
+.phone-hdr .name{color:var(--muted)}
+.phone-hdr .settings{color:var(--muted)}
+
+.tabbar{
+  position:absolute; left:0; right:0; bottom:0; height:56px;
+  border-top:1px solid var(--line); background:var(--panel);
+  display:grid; grid-template-columns:repeat(5,1fr);
+}
+.tabbar .t{display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--muted); position:relative}
+.tabbar .t.active{color:var(--ink); font-weight:500}
+.tabbar .t .bd{
+  position:absolute; top:6px; right:calc(50% - 22px);
+  min-width:18px; height:18px; padding:0 5px; border-radius:99px;
+  background:var(--danger); color:#fff; font-size:10px; line-height:18px; text-align:center; font-variant-numeric:tabular-nums;
+}
+
+.body{padding:16px; flex:1; overflow:hidden; padding-bottom:72px}
+
+/* 1. Login */
+.login-title{font-size:18px; font-weight:500; margin:12px 0 6px}
+.login-sub{color:var(--muted); font-size:13px; margin:0 0 20px}
+.user-list{display:grid; gap:10px}
+.user-row{
+  border:1px solid var(--line); border-radius:12px; padding:14px 16px;
+  display:flex; justify-content:space-between; align-items:center; font-size:15px;
+}
+.user-row.picked{border-color:var(--ink); background:var(--bg)}
+.user-row .r{color:var(--muted); font-size:12px}
+.pin-hdr{margin:20px 0 10px; display:flex; justify-content:space-between; align-items:baseline}
+.pin-hdr .u{font-weight:500}
+.pin-hdr .back{font-size:13px; color:var(--muted)}
+.pin-dots{display:flex; gap:14px; justify-content:center; margin:10px 0 18px}
+.pin-dots span{width:14px; height:14px; border-radius:50%; border:1.5px solid var(--line-strong)}
+.pin-dots span.filled{background:var(--ink); border-color:var(--ink)}
+.pin-pad{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+.pin-pad button{
+  height:56px; font-size:22px; font-weight:500; border-radius:10px;
+  background:var(--bg); border:1px solid var(--line); color:var(--ink);
+  font-family:var(--sans); cursor:default;
+}
+.pin-pad button.del{font-size:14px; color:var(--muted)}
+
+/* 2. Camera */
+.cam-wrap{height:100%; display:flex; flex-direction:column}
+.shutter-area{
+  flex:1; background:#0A0A0A; border-radius:16px; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  margin-bottom:12px; position:relative; color:#fff;
+}
+@media (prefers-color-scheme:dark){.shutter-area{background:#000; border:1px solid #262626}}
+.shutter{width:88px; height:88px; border-radius:50%; background:#fff; border:5px solid rgba(255,255,255,0.35); margin-bottom:14px}
+.shutter-hint{font-size:12px; opacity:0.7; letter-spacing:0.05em}
+.shutter-alt{
+  padding:12px; text-align:center; border:1px solid var(--line);
+  border-radius:12px; font-size:15px; margin-bottom:8px;
+}
+.queue-count{
+  padding:10px 14px; border:1px solid var(--warn); background:var(--warn-soft);
+  color:var(--amber); border-radius:8px; font-size:13px;
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;
+}
+
+/* 3. Queue */
+.queue-title{font-size:18px; font-weight:500; margin:6px 0 6px; display:flex; align-items:baseline; gap:0.5em}
+.queue-title .count{font-size:14px; color:var(--muted); font-weight:400}
+.queue-sub{color:var(--muted); font-size:12px; margin:0 0 14px}
+.q-item{
+  display:flex; gap:10px; align-items:center; padding:10px 12px;
+  border:1px solid var(--line); border-radius:10px; margin-bottom:8px;
+}
+.q-thumb{width:44px; height:44px; border-radius:6px; background:var(--line-strong); flex-shrink:0}
+.q-thumb.no{background:transparent; border:1px dashed var(--line-strong); font-size:10px; color:var(--muted); display:flex; align-items:center; justify-content:center}
+.q-info{flex:1; min-width:0}
+.q-line1{font-size:14px; font-weight:500; margin:0 0 2px}
+.q-line2{font-size:11px; color:var(--muted); margin:0}
+.q-amt{
+  font-size:14px; font-weight:500; font-variant-numeric:tabular-nums;
+  padding:3px 10px; background:var(--warn-soft); color:var(--amber); border-radius:6px;
+}
+.q-amt.suggest::before{content:"~"; margin-right:1px; opacity:0.6}
+.q-old-badge{
+  display:inline-block; font-size:10px; padding:2px 6px; margin-left:6px;
+  background:var(--danger-soft); color:var(--danger); border-radius:99px;
+}
+
+/* 4. Boss expenses table */
+.desk{
+  width:880px; max-width:100%; background:var(--panel); border:1px solid var(--line);
+  border-radius:14px; overflow:hidden;
+}
+.desk .nav{
+  padding:14px 20px; border-bottom:1px solid var(--line); background:var(--bg);
+  display:flex; align-items:center; gap:24px; font-size:13px; color:var(--muted);
+}
+.desk .nav .brand{color:var(--ink); font-weight:500; margin-right:8px}
+.desk .nav a{color:var(--muted); text-decoration:none}
+.desk .nav a.active{color:var(--ink); font-weight:500}
+.desk .nav .who{margin-left:auto; font-size:12px}
+
+.desk .content{padding:1.75rem 2rem}
+.desk h3{font-size:1.15rem; font-weight:500; margin:0 0 0.4rem}
+.desk .sub{color:var(--muted); font-size:13px; margin:0 0 1.25rem}
+
+.rev-table{width:100%; border-collapse:collapse; font-size:13px}
+.rev-table th{text-align:left; padding:8px 10px 8px 0; color:var(--muted); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; font-weight:500; border-bottom:1px solid var(--line)}
+.rev-table td{padding:12px 10px 12px 0; border-bottom:1px solid var(--line); vertical-align:middle}
+.rev-table td.amt{text-align:right; font-variant-numeric:tabular-nums; font-weight:500; padding-right:14px}
+.rev-table .r-thumb{width:64px; height:44px; border-radius:4px; background:var(--line-strong)}
+.pill{display:inline-block; font-size:11px; padding:2px 8px; border-radius:99px; letter-spacing:0.02em}
+.pill.fuel{background:#FEF3C7; color:#92400E}
+.pill.parking{background:#DBEAFE; color:#1E40AF}
+.pill.materials{background:#E9D5FF; color:#6B21A8}
+@media (prefers-color-scheme:dark){
+  .pill.fuel{background:#78350F; color:#FDE68A}
+  .pill.parking{background:#1E3A8A; color:#BFDBFE}
+  .pill.materials{background:#581C87; color:#E9D5FF}
+}
+.btn{
+  display:inline-block; font-size:12px; padding:5px 10px; border:1px solid var(--line-strong);
+  border-radius:6px; background:transparent; color:var(--ink); margin-right:4px; cursor:default;
+}
+.btn.primary{background:var(--ink); color:var(--panel); border-color:var(--ink)}
+.btn.danger{border-color:var(--danger); color:var(--danger)}
+
+/* 5. Month-close blocked */
+.close-hdr{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:1rem}
+.close-hdr .m{font-size:14px; color:var(--muted)}
+.month-picker{display:inline-flex; gap:6px; align-items:center; font-size:14px}
+.month-picker span{padding:4px 10px; border:1px solid var(--line-strong); border-radius:6px}
+.close-block{
+  border:1px solid var(--danger-line); background:var(--danger-soft);
+  color:var(--danger); border-radius:10px; padding:1rem 1.25rem; margin-bottom:1.25rem;
+  border-left-width:4px;
+}
+.close-block h4{margin:0 0 0.4rem; font-size:15px; font-weight:500; color:var(--danger)}
+.close-block ul{margin:0 0 0.25rem; padding-left:1.25em; color:var(--danger); font-size:13px}
+.close-block li{margin:0}
+.close-tot{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:1.25rem;
+}
+.stat{padding:0.9rem 1rem; background:var(--bg); border-radius:8px}
+.stat .lbl{font-size:12px; color:var(--muted); margin-bottom:0.35rem}
+.stat .val{font-size:22px; font-weight:500; font-variant-numeric:tabular-nums lining-nums}
+.stat .val.dim{color:var(--muted)}
+.stat .val.pos{color:var(--emerald)}
+
+/* 6. Ledger */
+.ledger-cards{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:1.25rem}
+@media (max-width:640px){.ledger-cards{grid-template-columns:repeat(2,1fr)}}
+.ledger-cards .stat .val{font-size:20px}
+.filter-row{display:flex; gap:8px; align-items:center; margin-bottom:1rem; flex-wrap:wrap; font-size:13px}
+.chip{padding:5px 12px; border:1px solid var(--line-strong); border-radius:99px; color:var(--muted); font-size:12px; cursor:default}
+.chip.active{background:var(--ink); color:var(--panel); border-color:var(--ink)}
+.ledger-table{width:100%; border-collapse:collapse; font-size:13px}
+.ledger-table th, .ledger-table td{padding:9px 8px; border-bottom:1px solid var(--line); text-align:left}
+.ledger-table th{color:var(--muted); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; font-weight:500}
+.ledger-table td.amt{text-align:right; font-variant-numeric:tabular-nums; font-weight:500}
+.ledger-table td.dir{width:26px; font-family:var(--mono)}
+.ledger-table td.dir.inc{color:var(--emerald)}
+.ledger-table td.dir.exp{color:var(--danger)}
+.ledger-badge{font-size:10px; padding:2px 6px; border-radius:4px; background:var(--line); color:var(--muted); letter-spacing:0.02em; margin-left:6px}
+.ledger-inv{font-size:11px; padding:1px 6px; border-radius:99px}
+.ledger-inv.issued{background:var(--emerald-soft); color:var(--emerald)}
+.ledger-inv.to_issue{background:var(--warn-soft); color:var(--amber)}
+.ledger-inv.none{color:var(--quiet)}
+.ledger-bar{display:flex; gap:10px; margin-top:1rem; flex-wrap:wrap}
+.ledger-bar .btn{font-size:13px; padding:8px 14px}
+
+footer{margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line); font-size:12px; color:var(--muted); text-align:center}
+.legend{display:flex; gap:0.5em; align-items:center; flex-wrap:wrap; margin-bottom:1.5rem; font-size:12px}
+.legend .dot{width:8px; height:8px; border-radius:99px; display:inline-block; margin-right:5px}
+.legend .staff{background:#3B82F6}
+.legend .boss{background:#F59E0B}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">聲生 SSA · 內部系統 · 畫面預覽</div>
+    <h1>Phase 1 + 2 + 4 六個核心畫面</h1>
+    <p>依照 <code>web/</code> 實作的 Tailwind 樣式與資料形狀還原成靜態頁,不需要跑 server 或連 Supabase。滑動就能看完員工端與老闆端的關鍵操作點。</p>
+    <div class="legend" style="margin-top:1rem">
+      <span><span class="dot staff"></span>員工端(手機)</span>
+      <span style="margin-left:1rem"><span class="dot boss"></span>老闆端(桌機)</span>
+    </div>
+  </header>
+
+  <section class="screen">
+    <header class="sh"><span class="num">01</span><h2>登入(4 位 PIN)</h2><span class="tag staff">員工/老闆共用</span></header>
+    <p class="cap">選姓名 → PIN pad 大按鈕。全屏 numeric pad 不叫系統鍵盤,員工單手就能點完。輸完 4 位自動送出,錯了畫面回 dots 空白 + 紅字提示。</p>
+    <div class="stage mobile">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="body">
+          <p class="login-title">聲生工作系統</p>
+          <p class="login-sub">請選擇姓名登入</p>
+          <div class="user-list">
+            <div class="user-row"><span>吳智仁</span><span class="r">老闆</span></div>
+            <div class="user-row picked"><span>許舒韶</span><span class="r">員工</span></div>
+            <div class="user-row"><span>賴泯亘</span><span class="r">員工</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="body">
+          <div class="pin-hdr"><span class="u">許舒韶</span><span class="back">← 換人</span></div>
+          <div class="pin-dots"><span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span></div>
+          <div class="pin-pad">
+            <button>1</button><button>2</button><button>3</button>
+            <button>4</button><button>5</button><button>6</button>
+            <button>7</button><button>8</button><button>9</button>
+            <button class="del">清除</button><button>0</button><button class="del">← 退</button>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        <ul>
+          <li>PIN 存 <strong>bcrypt hash</strong>,不會存明碼</li>
+          <li>session cookie 走 <strong>HMAC-SHA256</strong> 簽章,14 天 TTL</li>
+          <li>老闆 <strong>/boss/users</strong> 可幫任何人重設 PIN;員工在 <strong>/staff/settings</strong> 自改</li>
+          <li>員工全 iPhone → 加到主畫面就是 App feel</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen">
+    <header class="sh"><span class="num">02</span><h2>員工開 App = 相機(3 秒目標)</h2><span class="tag staff">員工</span></header>
+    <p class="cap">開 App 直接是相機,不需要進選單。按快門 → 上傳 → 立刻回「已收到」,員工就走。AI 抽金額品項在背景跑,員工不用等。無收據(停車、加油)有上滑快速鍵。</p>
+    <div class="stage mobile">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="phone-hdr"><span class="name">許舒韶</span><span class="settings">設定</span></div>
+        <div class="body">
+          <div class="cam-wrap">
+            <div class="shutter-area">
+              <div class="shutter"></div>
+              <p class="shutter-hint">點下拍收據</p>
+            </div>
+            <div class="shutter-alt">無收據?加油 / 停車</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="t active">相機</div>
+          <div class="t">待確認 <span class="bd">3</span></div>
+          <div class="t">工作</div>
+          <div class="t">設備</div>
+          <div class="t">打卡</div>
+        </div>
+      </div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="phone-hdr"><span class="name">許舒韶</span><span class="settings">設定</span></div>
+        <div class="body">
+          <div class="cam-wrap">
+            <div class="shutter-area" style="background:linear-gradient(180deg,#0A0A0A 0%,#0A0A0A 78%, #22222234 100%)">
+              <div class="shutter"></div>
+              <p class="shutter-hint">拍了就走</p>
+            </div>
+            <div class="queue-count"><span>離線中 · 2 筆等網路</span><span style="opacity:0.6">待上傳</span></div>
+            <div class="shutter-alt">無收據?加油 / 停車</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="t active">相機</div>
+          <div class="t">待確認 <span class="bd">5</span></div>
+          <div class="t">工作</div>
+          <div class="t">設備</div>
+          <div class="t">打卡</div>
+        </div>
+      </div>
+      <div class="note">
+        <ul>
+          <li>拍照即存,AI 抽取 <strong>不阻塞</strong>員工</li>
+          <li>案場沒訊號 → 本地佇列 + 上傳計數 loud 顯示</li>
+          <li>無收據上滑 → 加油/停車 + 數字鍵盤,三個點擊完成</li>
+          <li>底部紅點徽章 = 待確認草稿數,員工看得到未處理</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen">
+    <header class="sh"><span class="num">03</span><h2>待確認匣 — 收工後 30 秒滑一遍</h2><span class="tag staff">員工</span></header>
+    <p class="cap">草稿累著,員工收工後才進來一次確認。AI 建議金額前面加 <code>~</code> 表示未確認。放太久(&gt;72h)紅色警示 loud。</p>
+    <div class="stage mobile">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="phone-hdr"><span class="name">許舒韶</span><span class="settings">設定</span></div>
+        <div class="body">
+          <p class="queue-title">待確認 <span class="count">· 3 筆</span></p>
+          <p class="queue-sub">確認後才進老闆審核佇列</p>
+          <div class="q-item">
+            <div class="q-thumb"></div>
+            <div class="q-info"><p class="q-line1">6/25 · 變壓器</p><p class="q-line2">設備材料代墊 · 台北市</p></div>
+            <span class="q-amt suggest">99</span>
+          </div>
+          <div class="q-item">
+            <div class="q-thumb"></div>
+            <div class="q-info"><p class="q-line1">6/22 · 中油加油站</p><p class="q-line2">油錢</p></div>
+            <span class="q-amt suggest">1,318</span>
+          </div>
+          <div class="q-item">
+            <div class="q-thumb no">無</div>
+            <div class="q-info"><p class="q-line1">6/20 · 停車 <span class="q-old-badge">已放置 4 天</span></p><p class="q-line2">停車過路</p></div>
+            <span class="q-amt">120</span>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="t">相機</div>
+          <div class="t active">待確認 <span class="bd">3</span></div>
+          <div class="t">工作</div>
+          <div class="t">設備</div>
+          <div class="t">打卡</div>
+        </div>
+      </div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="phone-hdr"><span class="name">許舒韶</span><span class="settings">設定</span></div>
+        <div class="body" style="padding-bottom:16px">
+          <p class="queue-title" style="margin-bottom:8px">確認一筆</p>
+          <p class="queue-sub" style="margin-bottom:12px">6/25 · 變壓器</p>
+          <div style="margin-bottom:14px"><div style="font-size:12px; color:var(--muted); margin-bottom:4px">日期</div><div style="border:1px solid var(--line); border-radius:8px; padding:9px 12px">2026-06-25</div></div>
+          <div style="margin-bottom:14px"><div style="font-size:12px; color:var(--muted); margin-bottom:4px">分類</div><div style="display:flex; gap:6px; flex-wrap:wrap"><span class="chip">油錢</span><span class="chip">停車</span><span class="chip active">設備材料</span><span class="chip">其他</span></div></div>
+          <div style="margin-bottom:14px"><div style="font-size:12px; color:var(--muted); margin-bottom:4px">金額(元)</div><div style="border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-variant-numeric:tabular-nums; font-size:18px; font-weight:500">99</div></div>
+          <div style="margin-bottom:16px"><div style="font-size:12px; color:var(--muted); margin-bottom:4px">品項</div><div style="border:1px solid var(--line); border-radius:8px; padding:9px 12px">變壓器</div></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px"><span class="btn primary" style="text-align:center; padding:12px">送出</span><span class="btn danger" style="text-align:center; padding:12px">作廢</span></div>
+        </div>
+      </div>
+      <div class="note">
+        <ul>
+          <li>金額由員工 <strong>逐欄確認</strong>後才進 DB 的 amount_twd 欄</li>
+          <li>AI 讀不出 → 欄位空白 + 紅色橫幅要求手填,絕不猜值</li>
+          <li>放太久 badge:&gt; 72 小時就顯眼提醒</li>
+          <li>老闆的月結畫面若有這裡的草稿存在會被 <strong>擋住不能結算</strong>(見 05)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen">
+    <header class="sh"><span class="num">04</span><h2>老闆 — 零用金審核佇列</h2><span class="tag boss">老闆</span></header>
+    <p class="cap">員工送出後進老闆的桌面清單。點縮圖看原始收據,一鍵確認或退回(退回需寫理由,員工看得到)。這一步是<strong>唯一</strong>把草稿變 confirmed 的路。</p>
+    <div class="stage desktop">
+      <div class="desk">
+        <div class="nav">
+          <span class="brand">聲生工作系統</span>
+          <a href="#" class="active">零用金審核</a>
+          <a href="#">月結</a>
+          <a href="#">內帳</a>
+          <a href="#">設備</a>
+          <a href="#">工作記錄</a>
+          <a href="#">打卡</a>
+          <a href="#">案場管理</a>
+          <a href="#">使用者管理</a>
+          <span class="who">吳智仁 · 登出</span>
+        </div>
+        <div class="content">
+          <h3>零用金審核</h3>
+          <p class="sub">員工已送出 · 待審核 5 筆</p>
+          <table class="rev-table">
+            <thead><tr><th>姓名</th><th>日期</th><th>分類</th><th>品項</th><th>案場</th><th>收據</th><th style="text-align:right">金額</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>許舒韶</td><td>6/25</td><td><span class="pill materials">設備材料</span></td><td>變壓器</td><td>—</td><td><div class="r-thumb"></div></td><td class="amt">99</td><td><span class="btn primary">確認</span><span class="btn">退回</span></td></tr>
+              <tr><td>賴泯亘</td><td>6/22</td><td><span class="pill fuel">油錢</span></td><td>中油加油</td><td>斗六旌旗</td><td><div class="r-thumb"></div></td><td class="amt">1,318</td><td><span class="btn primary">確認</span><span class="btn">退回</span></td></tr>
+              <tr><td>許舒韶</td><td>6/20</td><td><span class="pill parking">停車</span></td><td>停車費</td><td>—</td><td>—</td><td class="amt">120</td><td><span class="btn primary">確認</span><span class="btn">退回</span></td></tr>
+              <tr><td>賴泯亘</td><td>6/16</td><td><span class="pill fuel">油錢</span></td><td>中油加油</td><td>THE HOPE Taipei</td><td><div class="r-thumb"></div></td><td class="amt">1,833</td><td><span class="btn primary">確認</span><span class="btn">退回</span></td></tr>
+              <tr><td>許舒韶</td><td>6/11</td><td><span class="pill fuel">油錢</span></td><td>台亞加油</td><td>磐頂長老教會</td><td><div class="r-thumb"></div></td><td class="amt">500</td><td><span class="btn primary">確認</span><span class="btn">退回</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="note">
+        <ul>
+          <li>金額一律 DB 整數存,顯示 <code>toLocaleString('zh-TW')</code> 加千分位</li>
+          <li>退回會帶原因回員工端,不是靜默丟掉</li>
+          <li>所有狀態變更都寫 <strong>audit_log</strong> — 誰、何時、改什麼</li>
+          <li>頂部 nav 也是本專案八個模組的全景</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen">
+    <header class="sh"><span class="num">05</span><h2>月結 — 有草稿就 loud 擋住</h2><span class="tag boss">老闆</span></header>
+    <p class="cap">若當月還有員工未確認的草稿,月結畫面用大紅橫幅擋住,並列出哪些人有幾筆待處理。這是憲章「無靜默失效」在 UI 層的實體化——絕不讓黑洞躲進月結。</p>
+    <div class="stage desktop">
+      <div class="desk">
+        <div class="nav">
+          <span class="brand">聲生工作系統</span>
+          <a href="#">零用金審核</a>
+          <a href="#" class="active">月結</a>
+          <a href="#">內帳</a>
+          <a href="#">設備</a>
+          <a href="#">工作記錄</a>
+          <a href="#">打卡</a>
+          <a href="#">案場管理</a>
+          <a href="#">使用者管理</a>
+          <span class="who">吳智仁 · 登出</span>
+        </div>
+        <div class="content">
+          <div class="close-hdr">
+            <div><h3 style="margin-bottom:0.1rem">月結</h3><p class="m">2026 · 07</p></div>
+            <div class="month-picker"><span>← 上月</span><span style="background:var(--ink); color:var(--panel); border-color:var(--ink)">2026-07</span><span>下月 →</span></div>
+          </div>
+
+          <div class="close-block">
+            <h4>尚有 3 筆未處理,無法結算</h4>
+            <ul>
+              <li>許舒韶 · 2 筆草稿</li>
+              <li>賴泯亘 · 1 筆待確認</li>
+            </ul>
+          </div>
+
+          <div class="close-tot">
+            <div class="stat"><div class="lbl">許舒韶 · 已確認合計</div><div class="val dim">—</div></div>
+            <div class="stat"><div class="lbl">賴泯亘 · 已確認合計</div><div class="val dim">—</div></div>
+            <div class="stat"><div class="lbl">本月合計</div><div class="val dim">—</div></div>
+          </div>
+
+          <div style="display:flex; gap:10px">
+            <span class="btn" style="opacity:0.4">產出月結 CSV</span>
+            <span class="btn" style="opacity:0.4">鎖定月結</span>
+          </div>
+          <p class="m" style="margin-top:1rem; font-size:12px">全部草稿處理完後,鎖定月結會把當月已確認的每人合計自動推進<strong>內帳</strong>(見 06)。</p>
+        </div>
+      </div>
+      <div class="note">
+        <ul>
+          <li>紅橫幅 = 每個未處理的人都點名,老闆一眼知道去催誰</li>
+          <li>CSV 匯出 UTF-8 BOM,Excel 開沒亂碼,可直接貼進他現有的內帳</li>
+          <li>鎖定後 confirmed → booked,連同 <code>booked_batch_id</code> 進歷史</li>
+          <li>Batch 一旦鎖定不可逆,要改必須走 audit 明確路徑</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen">
+    <header class="sh"><span class="num">06</span><h2>內帳月視圖(Phase 4)</h2><span class="tag boss">老闆</span></header>
+    <p class="cap">結構化替代他的 Excel。四張摘要卡的數字由 DB 直接 SUM,不由 JS 加(這就是 <code>#REF!</code> 不會再出現的原因)。「從月結匯入零用金」一鍵把 05 鎖定的批次搬進來,每人一筆,對應他 Excel 原本「舒韶代墊 X」的一行。</p>
+    <div class="stage desktop">
+      <div class="desk">
+        <div class="nav">
+          <span class="brand">聲生工作系統</span>
+          <a href="#">零用金審核</a>
+          <a href="#">月結</a>
+          <a href="#" class="active">內帳</a>
+          <a href="#">設備</a>
+          <a href="#">工作記錄</a>
+          <a href="#">打卡</a>
+          <a href="#">案場管理</a>
+          <a href="#">使用者管理</a>
+          <span class="who">吳智仁 · 登出</span>
+        </div>
+        <div class="content">
+          <div class="close-hdr">
+            <div><h3 style="margin-bottom:0.1rem">內帳</h3><p class="m">2026 · 07</p></div>
+            <div class="month-picker"><span>← 上月</span><span style="background:var(--ink); color:var(--panel); border-color:var(--ink)">2026-07</span><span>下月 →</span></div>
+          </div>
+
+          <div class="ledger-cards">
+            <div class="stat"><div class="lbl">當月收入</div><div class="val pos">853,231</div></div>
+            <div class="stat"><div class="lbl">當月支出</div><div class="val">1,421,361</div></div>
+            <div class="stat"><div class="lbl">淨額</div><div class="val" style="color:var(--danger)">-568,130</div></div>
+            <div class="stat"><div class="lbl">外帳稅額</div><div class="val" style="font-size:16px">40,632</div><div style="font-size:11px; color:var(--muted); margin-top:2px">收入 853,231 之 5%</div></div>
+          </div>
+
+          <div class="filter-row">
+            <span class="chip active">全部</span>
+            <span class="chip">內帳</span>
+            <span class="chip">外帳</span>
+            <span style="width:16px"></span>
+            <span class="chip">類別</span>
+            <span class="chip">顯示已作廢</span>
+          </div>
+
+          <table class="ledger-table">
+            <thead><tr><th>日期</th><th></th><th>類別</th><th>對象</th><th>發票</th><th>備註</th><th style="text-align:right">金額</th></tr></thead>
+            <tbody>
+              <tr><td>7/13</td><td class="dir inc">↑</td><td>案件收款</td><td>恩光堂</td><td><span class="ledger-inv issued">開立 5/07</span></td><td>燈光優化工程-6月</td><td class="amt">218,400</td></tr>
+              <tr><td>7/12</td><td class="dir inc">↑</td><td>案件收款</td><td>新竹旌旗</td><td><span class="ledger-inv issued">開立 5/07</span></td><td>喇叭維修 · 稅 1,175</td><td class="amt">24,675</td></tr>
+              <tr><td>7/10</td><td class="dir inc">↑</td><td>案件收款</td><td>北屯旌旗</td><td><span class="ledger-inv to_issue">待開立</span></td><td>音控專案 · 稅 1,225</td><td class="amt">24,990</td></tr>
+              <tr><td>7/05</td><td class="dir exp">↓</td><td>薪資</td><td>吳智仁</td><td><span class="ledger-inv none">—</span></td><td>7 月薪</td><td class="amt">65,015</td></tr>
+              <tr><td>7/05</td><td class="dir exp">↓</td><td>代墊/零用金</td><td>許舒韶</td><td><span class="ledger-inv none">—</span></td><td>6 月零用金月結 <span class="ledger-badge">零用金月結</span></td><td class="amt">4,983</td></tr>
+              <tr><td>7/05</td><td class="dir exp">↓</td><td>代墊/零用金</td><td>賴泯亘</td><td><span class="ledger-inv none">—</span></td><td>6 月零用金月結 <span class="ledger-badge">零用金月結</span></td><td class="amt">7,457</td></tr>
+              <tr><td>7/01</td><td class="dir exp">↓</td><td>租金</td><td>—</td><td><span class="ledger-inv none">—</span></td><td>辦公室租金</td><td class="amt">13,015</td></tr>
+              <tr><td>7/01</td><td class="dir exp">↓</td><td>車輛</td><td>—</td><td><span class="ledger-inv none">—</span></td><td>貨車停車場月租</td><td class="amt">2,015</td></tr>
+            </tbody>
+          </table>
+
+          <div class="ledger-bar">
+            <span class="btn primary">新增一筆</span>
+            <span class="btn">從月結匯入零用金</span>
+            <span class="btn">匯出外帳 CSV</span>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        <ul>
+          <li>「零用金月結」標記的兩行 = 05 鎖定後匯入的,金額不可改,只能補備註/發票</li>
+          <li>外帳稅額 <strong>DB 計算</strong>,不由 JS 加 · 5% = <code>round(amount/21)</code></li>
+          <li>Check constraint 擋住:<code>issued</code> 必是外帳、外帳才有稅、開立必有日期</li>
+          <li>匯出 CSV 給會計師 · UTF-8 BOM · 每兩個月一份對應他 Q14 的流程</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    這份預覽依照 <code>web/</code> 內實作的組件與資料還原;數字取自 <code>intake/聲生內部優化計劃/</code> 樣本。<br>
+    尚未展示:設備管理、使用者管理、案場管理、工作記錄 timeline、打卡月表——結構相似、細節保留給實際 dev server。
+  </footer>
+</div>

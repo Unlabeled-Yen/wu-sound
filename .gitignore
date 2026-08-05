@@ -5,3 +5,20 @@ intake/
 docs/voice-notes/
 語音轉錄/
 voice-notes/
+
+# 客戶端內部文件,不進公開 repo
+# (訪談紀錄、策略評估、老闆簡報 — 保留在本機,不追蹤)
+docs/intake-assessment-v1.md
+docs/intake-request-v1.md
+docs/strategy-assessment-v1.md
+docs/boss-onepager.html
+docs/boss-deck.html
+docs/open-questions.md
+docs/策略評估-deck/
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+*.tsbuildinfo
