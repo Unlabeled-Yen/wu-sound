@@ -74,12 +74,18 @@ async function getProjectSummary(sb: SupabaseClient, body: Json): Promise<NextRe
   if (siteErr) return dbErrorResponse(siteErr);
   if (!site || !site.active) return voiceError('PROJECT_NOT_FOUND', '找不到這個專案', 404);
 
-  const { count: openTaskCount, error: taskErr } = await sb
+  // 注意:count-only 查詢不可用 { head: true } —— PostgREST 對不存在的表在
+  // HEAD 請求下會回 204 + error:null + count:null(已實測確認),等於把「表不存在」
+  // 偽裝成「0 筆」,是活生生的靜默失效。改用一般 select 讓錯誤能正常浮現。
+  const { data: openTaskRows, count: openTaskCount, error: taskErr } = await sb
     .from('tasks')
-    .select('id', { count: 'exact', head: true })
+    .select('id', { count: 'exact' })
     .eq('site_id', projectId)
     .eq('status', 'open');
   if (taskErr) return dbErrorResponse(taskErr);
+  if (openTaskCount === null && openTaskRows === null) {
+    return voiceError('SERVICE_UNAVAILABLE', 'voice 資料表狀態異常,無法確認任務數', 503);
+  }
 
   const { data: recent, error: wlErr } = await sb
     .from('worklogs')

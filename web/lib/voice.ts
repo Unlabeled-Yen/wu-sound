@@ -42,9 +42,14 @@ export function payloadHash(obj: Record<string, unknown>): string {
   return createHash('sha256').update(canonicalJson(obj)).digest('hex');
 }
 
-/** 表不存在(migration 009 未套用)判斷:Postgres undefined_table = 42P01 */
+/**
+ * 表不存在(migration 009 未套用)判斷。
+ * 實測確認:PostgREST 對 schema cache 裡沒有的表回 PGRST205(不是原生 Postgres
+ * undefined_table 42P01——42P01 是直連 psql 才會看到的代碼,PostgREST 自己包了一層)。
+ * 兩種都收,避免哪天 PostgREST 版本行為改變又漏接。
+ */
 export function isUndefinedTableError(error: { code?: string } | null | undefined): boolean {
-  return error?.code === '42P01';
+  return error?.code === 'PGRST205' || error?.code === '42P01';
 }
 
 interface VoiceAuthOk {

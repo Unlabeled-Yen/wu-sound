@@ -43,15 +43,25 @@
 - `web/app/api/voice/tools/[tool]/route.ts`(6 工具的完整實作)
 - `web/lib/types.ts` 追加 `VoiceTask` / `WriteProposal` 型別
 - `web/.env.example` 追加 `VOICE_API_KEY` / `VOICE_ACTOR_USER_ID`
+- `web/scripts/voice-lab-probe.mjs`(查現有 active 使用者/測試 site/兩張新表是否已建)、
+  `web/scripts/voice-lab-setup.mjs`(建立 `__voice_lab_test__` 測試 site,冪等可重跑)
+- `.env.local` 本機已設好 `VOICE_API_KEY` / `VOICE_ACTOR_USER_ID`(= 老闆)/ `VOICE_TEST_SITE_ID`
 - `tsc --noEmit`、`npm run build` 全綠
-- **已實測**:缺 `VOICE_API_KEY` 時端點正確回 503(loud,非靜默放行)
+
+**驗證中抓到並修掉兩個真的 bug**(migration 套用前用本機 dev server 實測發現):
+1. `get_project_summary` 原本用 `{ count: 'exact', head: true }` 查任務數 —— 實測發現 PostgREST 對「表不存在」的 HEAD 請求會回 `204 + error:null + count:null`,等於把「查不到」偽裝成「0 筆任務」。改用一般 count 查詢讓錯誤正常浮現。
+2. `isUndefinedTableError` 原本只認 Postgres 原生代碼 `42P01`,但 PostgREST 實際回的是自己包過的 `PGRST205`,導致「表不存在」被誤判成普通 500 而非設計中的 loud 503。兩種代碼現在都收。
+
+**已實測通過**(本機 dev server + 假 site,未動任何正式資料):
+- 缺 `VOICE_API_KEY` → 503 `SERVICE_UNAVAILABLE`
+- API key 錯誤 → 401 `UNAUTHORIZED`
+- `tasks`/`write_proposals` 未建立時,`get_project_summary` / `list_tasks` / `propose_write` 三支都一致回 503「voice 資料表尚未建立」,不再有任何一支假裝成功
+- `search_projects`(只碰既有 `sites` 表)正常運作,能搜到測試 site
 
 **待 Yen 做**(見 [lab1-wu-adapter-spec-v1.md](lab1-wu-adapter-spec-v1.md) 附錄「7c 手動驗收步驟」):
-1. 套用 migration 009(貼 Supabase SQL Editor)
-2. 建一個測試專用 site(避免測試紀錄混進老闆看到的正式案場)
-3. `.env.local` 設 `VOICE_API_KEY`(自己隨機打)+ `VOICE_ACTOR_USER_ID`(指向一個真實 active 使用者)
-4. 手動走一遍 curl 流程,確認 worklogs / audit_log 真的落庫
-5. 跑 `voice-lab/contract/tests`(契約測試 12 條 + 補充測試 8 條)全綠
+1. 套用 migration 009(貼 Supabase SQL Editor)—— 這是唯一剩下、且只有你能做的手動步驟
+2. 套完後跑 `voice-lab/contract/tests`(契約測試 12 條 + 補充測試 8 條),或請我幫你跑
+3. 測完記得把 `__voice_lab_test__` 這個測試 site 停用或刪除
 
 **零改動**:既有表、既有 API 完全沒動,可用 `git diff` 稽核。
 
