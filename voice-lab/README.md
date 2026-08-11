@@ -30,11 +30,11 @@
 | Lab | 內容 | 狀態 |
 |---|---|---|
 | Lab 0 | 契約定稿(`contract/`):6 工具、伺服器簽發兩階段 token、冪等、稽核格式、可執行測試 | ✅ 已交付 |
-| Lab 1 | Mock 工具面(過契約測試)+ 假專案資料(含相似名測實體對齊) | 待做 |
+| Lab 1 | wu 後端轉接層(A 路定案,mock 降級為可選):tasks/write_proposals 新表 + 6 端點,規格見 [lab1-wu-adapter-spec-v1.md](lab1-wu-adapter-spec-v1.md) | 規格已定稿,待指示動工 |
 | Lab 2 | 文字模式 Agent:狀態機、實體對齊、確認流程 —— **此即打字系統本體,非測試工具** | 待做 |
 | Lab 3 | STT 擂台:批次轉寫為主,語料含工地噪音、中英夾雜案名、少量台語;TTS 盲測 | 待做 |
 | Lab 4 | 語音掛載:手機 PWA push-to-talk + 本地佇列 + 批次處理管線 | 待做 |
-| 接系統 | 契約對接 wu-sound-fde 既有 API(sites/worklogs)或另建 tasks 表 | 待決定 backend |
+| 接系統 | **A 路已定案**(Yen 2026-08-11):projects→sites、log_note→worklogs、tasks 新建(派工最小版) | 併入 Lab 1 |
 
 ## 契約測試用法
 
