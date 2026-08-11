@@ -52,7 +52,8 @@
 | 聲學規劃 step 4(AI 選設備↔計算器閉環驗證) | spec 完成 | 依賴 step 3 |
 | LINE bot(推播+雙向,Bot 名「聲生製作」) | 方向定案 | 等 Yen/老闆到 developers.line.biz 建 channel,拿 Channel Secret / Access Token / Bot ID |
 | 打卡↔薪資結算聯動(A 路:工時聚合+老闆手填薪水) | 方向定案 | 3 題待答:工時配對法 / 打卡不全怎麼擋 / 鎖定強度(見 open-questions.md) |
-| 派工系統 tasks(多人指派+日期時段+Realtime) | 設計討論完 | Yen 拍板「LINE bot 先」,暫緩 |
+| 派工系統 tasks(多人指派+日期時段+Realtime) | **併入 voice-lab Lab 1**(最小版:單人+日期,無 Realtime) | 見下方 voice-lab 區塊 |
+| **voice-lab**(現場語音/打字紀錄介面,`voice-lab/`) | Lab 0 契約 ✅、**Lab 1 後端轉接層程式碼已交付** | 待 Yen 套 migration 009 + 手動驗收,見 [voice-lab/README.md](../voice-lab/README.md) |
 
 ## 💡 討論過、完全未開工(AI 報價 flywheel)
 

@@ -158,10 +158,74 @@ cd voice-lab/contract/tests && BASE_URL=http://localhost:3777/api/voice API_KEY=
 
 ## 9. 交付定義(Definition of Done)
 
-- [ ] migration 009 檔案進 repo(執行由 Yen 手動)
-- [ ] 6 端點實作完成,`tsc --noEmit` + `npm run build` 乾淨
-- [ ] 7a 契約測試 12/12 綠(對本地 dev)
-- [ ] 7b 補充測試 8/8 綠
-- [ ] 7c 手動腳本寫在本文件附錄,Yen 可照做
-- [ ] progress.md 更新(voice-lab Lab 1 完成 + migration 待套提醒)
-- [ ] 全程零改動既有表與既有 API(git diff 可稽)
+- [x] migration 009 檔案進 repo(執行由 Yen 手動)
+- [x] 6 端點實作完成,`tsc --noEmit` + `npm run build` 乾淨
+- [ ] 7a 契約測試 12/12 綠(對本地 dev)—— **待 Yen 套用 migration 009 + 設 env 後執行**
+- [ ] 7b 補充測試 8/8 綠 —— 同上,且需一個「測試專用」site id(見 §7c)
+- [x] 7c 手動驗收步驟(見下)
+- [x] progress.md 更新
+- [x] 全程零改動既有表與既有 API(僅新增 `lib/voice.ts`、`app/api/voice/tools/[tool]/route.ts`、`lib/types.ts` 追加型別、`.env.example` 追加兩個變數)
+
+**已驗證**(不需 migration、不需真 Supabase 資料):缺 `VOICE_API_KEY` 時,端點正確回 503 `SERVICE_UNAVAILABLE`(loud,非靜默放行)——本機起 dev server 實測通過。
+
+---
+
+## 附錄:7c 手動驗收步驟(Yen 執行)
+
+### 準備
+
+1. **套用 migration**:複製 `supabase/migrations/009_voice_tasks_proposals.sql` 內容貼到 Supabase SQL Editor 執行,確認「Success. No rows returned」
+2. **建一個測試專用 site**(不要用正式案場,避免測試筆記混進老闆看到的工作記錄):
+   ```sql
+   insert into sites (name) values ('__voice_lab_test__') returning id;
+   ```
+   記下回傳的 id。
+3. **設定環境變數**(`.env.local` 加兩行):
+   ```
+   VOICE_API_KEY=<自己隨機打一串,例如 openssl rand -hex 16>
+   VOICE_ACTOR_USER_ID=<users 表裡任一 active=true 的使用者 id,例如老闆的 id>
+   ```
+4. 啟動 dev server:`npm run dev`
+
+### 走一遍流程(curl 或 Postman/REST client)
+
+```bash
+BASE=http://localhost:3000/api/voice
+KEY=<你剛設的 VOICE_API_KEY>
+SITE=<剛建的測試 site id>
+
+# 1. 搜尋(應該找到 __voice_lab_test__)
+curl -s -X POST $BASE/tools/search_projects \
+  -H "authorization: Bearer $KEY" -H "content-type: application/json" \
+  -d '{"query":"voice_lab"}'
+
+# 2. 提案(記下回傳的 confirmation_token)
+curl -s -X POST $BASE/tools/propose_write \
+  -H "authorization: Bearer $KEY" -H "content-type: application/json" \
+  -d "{\"action\":\"log_note\",\"payload\":{\"project_id\":\"$SITE\",\"content\":\"手動驗收:這是一筆測試紀錄\"}}"
+
+# 3. 確認寫入(把上一步的 token 貼進來)
+curl -s -X POST $BASE/tools/log_note \
+  -H "authorization: Bearer $KEY" -H "content-type: application/json" \
+  -d "{\"project_id\":\"$SITE\",\"content\":\"手動驗收:這是一筆測試紀錄\",\"confirmation_token\":\"<貼 token>\"}"
+```
+
+### 驗收點
+
+- 步驟 3 回傳 `{"note_id": "..."}`
+- 去 Supabase 後台 `worklogs` 表能看到這筆(site_id = 測試 site)
+- `audit_log` 表能看到兩筆新紀錄:`voice.propose` 和 `voice.log_note`,`diff` 欄位完整
+- **收尾**:測完把 `__voice_lab_test__` 這個 site 設 `active=false`(或整個刪掉連同關聯的測試 worklogs/tasks),避免污染案場清單
+
+### 之後才能跑自動化測試
+
+```bash
+cd voice-lab/contract/tests
+npm install
+BASE_URL=http://localhost:3000/api/voice \
+VOICE_API_KEY=<...> \
+VOICE_TEST_SITE_ID=<測試 site id> \
+NEXT_PUBLIC_SUPABASE_URL=<...同 web/.env.local> \
+SUPABASE_SERVICE_ROLE_KEY=<...同 web/.env.local> \
+npm test
+```

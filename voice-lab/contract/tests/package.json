@@ -1,9 +1,12 @@
 {
-  "name": "voice-pm-contract-tests",
+  "name": "voice-lab-tests",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
     "vitest": "^3.0.0"

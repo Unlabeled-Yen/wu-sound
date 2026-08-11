@@ -183,3 +183,9 @@ export const QUOTE_STATUS_LABEL: Record<QuoteStatus,string> = { draft:'草稿', 
 // 標配套組
 export interface BundleTemplate { id:string; name:string; applicable_to:string|null; note:string|null; active:boolean; created_at:string; updated_at:string; }
 export interface BundleLine { id:string; bundle_id:string; catalog_item_id:string|null; name:string; spec:string|null; qty:number; unit:string|null; section:QuoteLineSection; sort_order:number; created_at:string; }
+
+// voice-lab Lab 1:語音/打字介面 — 任務(派工最小版)+ 兩階段寫入提案
+export type VoiceTaskStatus = 'open' | 'done';
+export type VoiceSource = 'voice' | 'text' | 'web';
+export interface VoiceTask { id:string; site_id:string; title:string; description:string|null; due_date:string|null; status:VoiceTaskStatus; created_by:string; source:VoiceSource; created_at:string; updated_at:string; }
+export interface WriteProposal { token:string; action:'create_task'|'log_note'; payload:Record<string,unknown>; payload_hash:string; actor_id:string; source:'voice'|'text'; transcript_ref:string|null; capture_ref:string|null; created_at:string; expires_at:string; used_at:string|null; result:Record<string,unknown>|null; }
