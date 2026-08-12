@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { pushMessageBestEffort, textMessage } from '@/lib/line';
 
 interface Result {
   ok: boolean;
@@ -14,6 +15,17 @@ async function assertBoss() {
   if (!session) return { session: null, err: '未登入' };
   if (session.role !== 'boss') return { session: null, err: '權限不足' };
   return { session, err: null };
+}
+
+async function notifySubmitter(sb: ReturnType<typeof getSupabaseAdmin>, expenseId: string, text: string) {
+  const { data: expense } = await sb.from('expenses').select('user_id').eq('id', expenseId).maybeSingle();
+  if (!expense) return;
+  const { data: user } = await sb
+    .from('users')
+    .select('line_user_id')
+    .eq('id', expense.user_id)
+    .maybeSingle();
+  await pushMessageBestEffort(user?.line_user_id ?? null, [textMessage(text)]);
 }
 
 export async function confirmExpense(id: string): Promise<Result> {
@@ -37,6 +49,8 @@ export async function confirmExpense(id: string): Promise<Result> {
     target_id: id,
     diff: { before: { status: 'submitted' }, after: { status: 'confirmed' } },
   });
+
+  await notifySubmitter(sb, id, '你送出的零用金已審核通過 ✓');
 
   revalidatePath('/boss/expenses');
   return { ok: true };
@@ -71,6 +85,8 @@ export async function rejectExpense(id: string, reason: string): Promise<Result>
       after: { status: 'rejected', rejected_reason: r },
     },
   });
+
+  await notifySubmitter(sb, id, `你送出的零用金被退回,原因:${r}`);
 
   revalidatePath('/boss/expenses');
   return { ok: true };

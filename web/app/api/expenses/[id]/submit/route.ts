@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import type { ExpenseCategory } from '@/lib/types';
+import { CATEGORY_LABEL, type ExpenseCategory } from '@/lib/types';
+import { pushMessageBestEffort, textMessage } from '@/lib/line';
 
 export const runtime = 'nodejs';
 
@@ -93,6 +94,19 @@ export async function POST(
     target_id: id,
     diff: { before, after },
   });
+
+  // 推播老闆 LINE——最佳努力,失敗不影響送出本身(通知是錦上添花,不是主流程)
+  const { data: bosses } = await sb
+    .from('users')
+    .select('line_user_id')
+    .eq('role', 'boss')
+    .eq('active', true)
+    .not('line_user_id', 'is', null);
+  const amountFmt = amt.toLocaleString('zh-TW');
+  const notifyText = `${session.name} 送出一筆零用金待審\n${CATEGORY_LABEL[cat as ExpenseCategory]} · $${amountFmt}\n${item}\n\n到系統「零用金管理」審核`;
+  for (const boss of bosses ?? []) {
+    await pushMessageBestEffort(boss.line_user_id, [textMessage(notifyText)]);
+  }
 
   return NextResponse.json({ ok: true });
 }

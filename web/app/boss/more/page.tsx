@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LineBindCard } from '@/app/_shared/LineBindCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +88,8 @@ export default function BossMorePage() {
           </ul>
         </section>
       ))}
+
+      <LineBindCard />
 
       <section className="flex flex-col gap-2 pt-2">
         <div

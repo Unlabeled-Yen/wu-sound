@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
+import { LineBindCard } from '@/app/_shared/LineBindCard';
 import { changeOwnPin } from './actions';
 
 export const runtime = 'nodejs';
@@ -73,6 +74,8 @@ export default async function StaffSettingsPage() {
           陣列設計器
         </Link>
       </section>
+
+      <LineBindCard />
 
       <section className="nm-raised rounded-2xl p-4 space-y-3">
         <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>帳號</h2>
