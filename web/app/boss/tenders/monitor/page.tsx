@@ -22,6 +22,18 @@ interface Nature {
   matched: string | null;
 }
 
+// 機關競爭雷達。tier 是樣本量分級:none=無紀錄、thin=1-2 案(不給比率)、
+// range=3-9 案、stable=≥10 案。soloRate 有值時 soloCI 必定有值——後端保證,
+// 前端也絕不單獨顯示比率(區間動輒 30-50 個百分點寬,只給一個數字會誤導)。
+interface AgencyCompetition {
+  n: number;
+  tier: 'none' | 'thin' | 'range' | 'stable';
+  soloCount: number;
+  soloRate: number | null;
+  soloCI: [number, number] | null;
+  avgBidders: number | null;
+}
+
 interface TenderHit {
   id: string;
   job_number: string;
@@ -40,6 +52,7 @@ interface TenderHit {
   signals?: TenderSignal[];
   price_band?: PriceBand;
   nature?: Nature;
+  agency_competition?: AgencyCompetition | null;
 }
 
 interface LoadResult {
@@ -111,6 +124,36 @@ function daysLeft(hit: TenderHit): number | null {
   const deadline = new Date(`${hit.deadline_date}T23:59:59+08:00`);
   const diff = deadline.getTime() - Date.now();
   return Math.ceil(diff / 86_400_000);
+}
+
+// 機關競爭雷達的文案。三條鐵律:
+// 1. 有比率就一定連區間一起講——區間動輒 30-50 個百分點寬,單獨給一個
+//    百分比會讓 Wu 以為那是確定的。
+// 2. 1-2 案只講原始件數,不算比率(對 2 案講「50%」是假精確)。
+// 3. 沒有歷史就明講沒有,不留白——留白會被讀成「沒有競爭」。
+function agencyRadarText(a: AgencyCompetition): { text: string; hint: string } {
+  if (a.tier === 'none') {
+    return {
+      text: '近 3 年查無此機關的音響案紀錄,無從判斷競爭',
+      hint: '這不代表沒有競爭,只代表資料庫裡沒有這個機關的音響類決標歷史',
+    };
+  }
+  if (a.tier === 'thin') {
+    const all = a.soloCount === a.n;
+    // n=1 用「皆」不通順,單數講「該案」
+    const which = all ? (a.n === 1 ? '該案' : '皆') : `其中 ${a.soloCount} 件`;
+    return {
+      text: `近 3 年僅 ${a.n} 件音響案,${which}只有一家投標(樣本太少,不算比率)`,
+      hint: '少於 3 件不計算百分比——樣本這麼小時,任何比率都只是巧合',
+    };
+  }
+  const pct = Math.round((a.soloRate ?? 0) * 100);
+  const [lo, hi] = a.soloCI ?? [0, 1];
+  const thin = a.tier === 'range' ? ',樣本少' : '';
+  return {
+    text: `近 3 年 ${a.n} 件音響案 · ${a.soloCount} 件只有一家投標(${pct}%,真實值 ${Math.round(lo * 100)}–${Math.round(hi * 100)}%${thin})`,
+    hint: `平均每案 ${a.avgBidders?.toFixed(1)} 家投標。「真實值」是 95% 信賴區間——樣本越少區間越寬,不能只看前面那個百分比`,
+  };
 }
 
 function buildHref(params: { days: number; price: string; nature: string }): string {
@@ -233,6 +276,20 @@ function TenderCard({ hit }: { hit: TenderHit }) {
           </span>
         )}
       </div>
+
+      {hit.agency_competition && (() => {
+        const r = agencyRadarText(hit.agency_competition!);
+        const known = hit.agency_competition!.tier !== 'none';
+        return (
+          <p
+            className="mt-2 text-xs"
+            style={{ color: known ? 'var(--nm-text-secondary)' : 'var(--nm-text-muted)' }}
+            title={r.hint}
+          >
+            {r.text}
+          </p>
+        );
+      })()}
 
       <div className="mt-2 text-xs">
         {hasLink ? (
