@@ -1,0 +1,153 @@
+# Lab 2 規格 v1 — 文字模式 Agent(打字系統本體)
+
+**日期**:2026-08-13
+**狀態**:規格草案,待 Yen 確認範圍後動工
+**前置**:Lab 1 後端轉接層已完成(22/22 測試綠),6 個工具端點可用
+**定位**:這不是測試工具,是「與 LLM 對話」的正式產品——語音(Lab 3/4)只是之後多接一種輸入方式,對話品質、狀態機、實體對齊全部在這一關把關做完善。
+
+---
+
+## 1. 範圍
+
+### 做
+- **Agent runtime**:一個 server-side 對話迴圈,LLM 用 Anthropic tool-calling 呼叫 Lab 1 的 6 個工具(不是自己拼 JSON 猜格式,是原生 tool_use)
+- **對話狀態機**:對齊原始 handoff spec §4.4,文字模式簡化超時規則(不需要 15 秒語音等待,但保留「未確認絕不寫入」鐵律)
+- **實體對齊**:0/1/多筆三種情境的追問邏輯,禁止 LLM 憑記憶填 id
+- **確認流程**:複述關鍵欄位 → propose_write 拿 token → 使用者明確肯定才 commit,模糊回應視為未確認
+- **最小可用聊天 UI**:純文字對話框,给 Yen 驗證整條對話品質用(不是最終員工介面,那是 Lab 4 的事)
+- **多輪對話記憶**:同一個對話 session 內,上一句「王太太的案子」講完後,下一句「再幫我記一筆」要記得指代同一個專案(handoff spec 沒明講,這是我們自己補的體驗優化)
+
+### 不做(明確排除,避免範圍蔓延)
+- 不做語音(STT/TTS,Lab 3/4 的事)
+- 不做正式員工 UI(手機 PWA、離線佇列,Lab 4 的事)
+- 不做多動作單輪拆解以外的複雜度(「幫我記 A 也記 B」按 handoff §8 拆成多輪逐一確認,不做批次)
+- 不做新專案建立(handoff §4.3 明講不在 Phase 1)
+- 不改 Lab 1 契約或轉接層一個字
+
+---
+
+## 2. Agent Runtime 設計
+
+### 2.1 為什麼用原生 tool_use,不是 prompt 塞 JSON
+
+wu 現有的 `lib/ai-quote.ts` 是「prompt 要求回 JSON、自己 regex 解析」的做法——這在報價那種單次生成場景夠用,但 Lab 2 是**多輪、需要 LLM 自主決定呼叫哪個工具**的場景,原生 tool_use 有三個好處直接對應到我們的鐵律:
+1. **id 不會被憑空捏造**——tool_use 的參數是結構化欄位,LLM 沒辦法在自然語言裡「順便」夾帶一個假 id,只能在呼叫 `search_projects` 之後,用回傳的 id 去呼叫下一個工具
+2. **工具呼叫是可稽核的事件**,不是要從自由文字裡二次解析出「它到底想幹嘛」
+3. Claude 的 tool_use 原生支援多輪(呼叫工具 → 把結果餵回去 → 繼續推理),完全對應狀態機的 `processing → clarifying/confirming/responding` 轉移
+
+### 2.2 工具定義(把 Lab 1 的 6 個 HTTP 端點包成 Anthropic tool schema)
+
+```
+search_projects(query: string)
+get_project_summary(project_id: string)
+list_tasks(project_id: string, status?: 'open'|'done'|'all')
+propose_write(action: 'create_task'|'log_note', payload: object)
+create_task(project_id, title, description?, due_date?, confirmation_token)
+log_note(project_id, content, tags?, confirmation_token)
+```
+
+Agent 端只是把這 6 個 tool_use 呼叫轉發到 `POST /api/voice/tools/[tool]`(用 `VOICE_API_KEY`),回傳結果塞回對話歷史,不繞過契約、不直連 DB。
+
+### 2.3 System Prompt 硬規則(對齊 handoff §4.3/§5,寫死不是建議)
+
+```
+1. 絕對不能自己編造 project_id 或 confirmation_token,一律用工具回傳的值。
+2. 使用者要求「記一筆」或「新增任務」前,你必須先呼叫 search_projects 確認專案,
+   模糊(0 筆或多筆)時要追問,不能自己選一個「看起來最像」的。
+3. 寫入動作(create_task/log_note)前,你必須先呼叫 propose_write 拿到
+   confirmation_token,並用口語複述關鍵欄位(專案全名、動作、內容摘要、日期)
+   讓使用者確認。使用者明確肯定(「對」「可以」「沒錯」)才能呼叫寫入工具。
+   模糊回應(「嗯」「應該吧」)一律視為未確認,要再問一次。
+4. 今天日期是 {today},時區 Asia/Taipei——口語相對日期(「下週三」「月底前」)
+   要換算成 YYYY-MM-DD 再放進 payload。
+5. 使用者要求的操作若不在你的工具清單裡(改資料、刪除、查金額),
+   明確回覆「這個操作目前不支援,請用系統介面」,不要假裝做了。
+```
+
+第 4 條是修正原 spec 的一個已知缺口(review handoff 時提過:LLM 不知道今天幾號會亂算相對日期)——這裡直接把當下日期注入,不留給 LLM 自己猜。
+
+### 2.4 狀態機 → 文字模式簡化
+
+| Voice 版狀態 | 文字版對應 |
+|---|---|
+| `idle` / `listening` | 使用者打字送出前,不需要狀態(聊天介面天然處理輪次) |
+| `processing` | Agent 呼叫工具、推理中(UI 顯示 loading) |
+| `clarifying` | Agent 回一句追問訊息,等下一輪輸入 |
+| `confirming` | Agent 複述 + 顯示「確認 / 取消」兩顆按鈕(比純文字回覆「對/不對」更不會誤判) |
+| `executing` | 使用者按確認 → 呼叫寫入工具 |
+| `responding` | 顯示結果卡片 |
+
+**逾時規則不適用文字模式**(沒有「等 15 秒」這回事,使用者可以隔一小時再回來,對話狀態留在 UI session 裡即可)。**但「未確認絕不寫入」鐵律完全保留**——`confirming` 狀態必須是明確按鈕點擊,不是自由文字猜測是否同意。
+
+---
+
+## 3. 實體對齊 UX(對齊 handoff §4.3)
+
+| search_projects 結果 | Agent 行為 |
+|---|---|
+| 1 筆,高相似度 | 直接採用,複述時帶出完整案名(「幫你記到『磐頂長老教會』這個專案,對嗎?」)——使用者這時還有機會糾正 |
+| 2-5 筆 | 用**選項按鈕**列出候選(比純文字讓使用者打字選更不會出錯),文字上也講清楚候選有哪些 |
+| 0 筆 | 明講找不到,問要不要換個說法;明確告知「新增專案不支援語音/打字,請用系統介面」 |
+
+---
+
+## 4. 確認流程 UI(對齊 handoff §5,兩階段 token 由 Lab 1 已經做好)
+
+```
+Agent 複述:「要記到『磐頂長老教會』一筆工作記錄:『木作進場前先放樣』,對嗎?」
+  ↓ 同時背景呼叫 propose_write,token 存在對話 session 裡(不顯示給使用者)
+UI 顯示兩顆按鈕:[確認] [取消]
+  ↓ 使用者點確認 → Agent 呼叫 log_note 帶 token → 顯示「已記錄」
+  ↓ 使用者點取消 → 該筆作廢,token 過期不用管(60 秒 TTL 自然失效)
+```
+
+**Payload 若在確認前被使用者用文字修改**(例如「不是,改成放樣後才進場」)→ 整個提案作廢,重新走一次 propose_write(舊 token 用不到,契約層本來就會擋 payload mismatch)。
+
+---
+
+## 5. UI(最小可用,驗證對話品質用)
+
+- 新路由 `web/app/voice-lab-chat/page.tsx`(暫不掛進 staff/boss 導覽,Lab 4 才決定正式入口放哪)
+- 極簡聊天框:訊息列表 + 輸入框 + 送出;Agent 訊息若處於 `confirming` 狀態,額外渲染 [確認]/[取消] 按鈕
+- 用暗色玻璃 token(`.nm-raised`、`.nm-input`、`.nm-btn-solid` 等),跟全站視覺一致,不用另外設計一套
+- 認證:先簡化用 session-based(跟 `getSession()` 一樣),不用另外接 VOICE_API_KEY——**這個 UI 本身是老闆/員工登入後才看得到的內部頁面**,是 Agent 後端呼叫 Lab 1 工具時才用 VOICE_API_KEY(server-to-server),跟使用者登入是兩層
+
+## 6. 後端路由
+
+- `POST /api/voice-lab/chat`:body `{ session_id, message }` → 跑一輪 agent 迴圈(可能呼叫多個工具)→ 回傳 `{ reply, state: 'clarifying'|'confirming'|'responding', pending_confirmation?: {summary, action, payload} }`
+- 對話歷史存哪:Phase 1 先用**記憶體 Map**(session_id → messages[]),不建 DB 表——這是驗證對話品質的實驗性 UI,重啟就清空可接受。若之後要正式上線再考慮持久化。**這點主動跟 Yen 講清楚,是刻意的簡化,不是疏漏。**
+
+---
+
+## 7. 驗證計畫
+
+沒有像 Lab 1 那樣的契約測試(這裡不是接口,是對話品質),改用**腳本化對話案例**驗證,寫在 `voice-lab/lab2-conversation-cases.md`,涵蓋:
+
+1. 單一動作、專案明確 → 一輪內完成(search → propose → confirm → write)
+2. 專案名模糊,0 筆候選 → 正確追問
+3. 專案名模糊,多筆候選 → 正確列出選項、使用者選了之後接得上
+4. 使用者打「取消」→ 不寫入,token 作廢
+5. 使用者用文字回「應該吧」而非明確肯定 → Agent 不能直接當作確認(此案例驗證我們**用按鈕**而非文字語意判斷確認與否,是為了徹底防呆這個案例)
+6. 提到相對日期(「下週三」)→ 正確換算成絕對日期,且複述時講出絕對日期
+7. 要求不支援的操作(「幫我把這筆金額改一下」)→ 明確拒絕,不假裝做了
+8. 連續兩輪都指同一個專案(「再幫我記一筆」)→ 不用重新 search,沿用上一輪對齊到的 project_id
+
+---
+
+## 8. 交付定義(Definition of Done)
+
+- [ ] Agent runtime + 6 個工具轉發完成
+- [ ] 對話狀態機四態(clarifying/confirming/executing/responding)UI 正確顯示
+- [ ] 8 個腳本化對話案例手動跑過,行為符合預期
+- [ ] `tsc --noEmit` + `npm run build` 乾淨
+- [ ] 未改動 Lab 1 契約與轉接層任何程式碼
+
+---
+
+## 待你確認的 3 個範圍決定
+
+1. **LLM 供應商**:跟 wu 現有 `lib/ai-quote.ts` 一樣雙 provider(Anthropic 優先、Kimi 備援)?還是這個對話場景先只用 Anthropic(tool_use 品質比較穩,Kimi 的 tool calling 支援程度我不確定,可能要另外驗證)?
+2. **UI 入口**:先做獨立測試頁不掛導覽(如上文 §5)可以嗎?還是你想直接看到它出現在 staff 或 boss 選單裡?
+3. **對話歷史存記憶體**(重啟就消失)可以接受嗎,還是你希望 Phase 1 就存 DB(那要多一個 migration + 表)?
+
+回答這 3 題我就開工。
