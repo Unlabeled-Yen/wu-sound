@@ -113,7 +113,10 @@ export type LedgerKind =
   | 'salary' | 'bonus' | 'reimbursement' | 'goods' | 'vehicle'
   | 'rent' | 'utility' | 'credit_card' | 'tax' | 'investment' | 'health' | 'other_expense';
 export type InvoiceStatus = 'none' | 'to_issue' | 'issued';
-export type LedgerStatus = 'active' | 'voided';
+export type LedgerStatus = 'active' | 'voided' | 'draft';
+
+// 認列口徑排除業外/借款,報表營收/毛利計算用
+export const NON_OPERATING_KINDS: LedgerKind[] = ['loan', 'investment', 'health'];
 
 export interface LedgerEntry {
   id: string;
@@ -121,6 +124,7 @@ export interface LedgerEntry {
   direction: LedgerDirection;
   kind: LedgerKind;
   amount_twd: number;
+  fee_twd: number;
   party: string | null;
   memo: string | null;
   is_external: boolean;
@@ -130,10 +134,88 @@ export interface LedgerEntry {
   tax_amount_twd: number;
   status: LedgerStatus;
   voided_reason: string | null;
+  site_id: string | null;
+  receivable_id: string | null;
+  recurring_template_id: string | null;
   source_batch_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+// 帳務 v2:案件類別、應收應付、每日案場歸屬
+export interface SiteCategory {
+  id: string;
+  name: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface SiteRecord {
+  id: string;
+  name: string;
+  active: boolean;
+  category_id: string | null;
+  customer_name: string | null;
+  created_at: string;
+}
+
+export type ReceivableDirection = 'receivable' | 'payable';
+export type ReceivableStatus = 'open' | 'closed' | 'voided';
+
+export interface Receivable {
+  id: string;
+  direction: ReceivableDirection;
+  party: string;
+  site_id: string | null;
+  total_amount_twd: number;
+  memo: string | null;
+  status: ReceivableStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const RECEIVABLE_DIRECTION_LABEL: Record<ReceivableDirection, string> = {
+  receivable: '應收',
+  payable: '應付',
+};
+
+export interface RecurringTemplate {
+  id: string;
+  name: string;
+  direction: LedgerDirection;
+  kind: LedgerKind;
+  amount_twd: number;
+  fee_twd: number;
+  party: string | null;
+  is_external: boolean;
+  site_id: string | null;
+  day_of_month: number;
+  active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DaySiteAllocation {
+  id: string;
+  user_id: string;
+  worked_on: string;
+  site_id: string;
+  hours: number | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserPayProfile {
+  id: string;
+  user_id: string;
+  monthly_salary_twd: number;
+  effective_from: string;
+  created_by: string;
+  created_at: string;
 }
 
 export const LEDGER_KIND_LABEL: Record<LedgerKind, string> = {
