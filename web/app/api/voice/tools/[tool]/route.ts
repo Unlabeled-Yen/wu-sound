@@ -4,6 +4,7 @@ import {
   authenticateVoiceRequest,
   canonicalJson,
   dbErrorResponse,
+  isWellFormedUuid,
   payloadHash,
   voiceError,
   withVersion,
@@ -63,6 +64,11 @@ async function searchProjects(sb: SupabaseClient, body: Json): Promise<NextRespo
 }
 
 async function findActiveSite(sb: SupabaseClient, siteId: string) {
+  // 格式不對的 id(非 uuid)一律當「找不到」,不要讓它打進 DB 變成 22P02 500——
+  // 詳見 lib/voice.ts isWellFormedUuid 的註解
+  if (!isWellFormedUuid(siteId)) {
+    return { data: null, error: null } as const;
+  }
   return sb.from('sites').select('id, name, active').eq('id', siteId).maybeSingle();
 }
 
@@ -227,6 +233,10 @@ async function loadProposal(sb: SupabaseClient, token: unknown): Promise<
 > {
   if (typeof token !== 'string' || !token) {
     return { errorResponse: voiceError('TOKEN_REQUIRED', '缺少 confirmation_token', 401) };
+  }
+  // token 欄位是 uuid;格式不對的話直接當「查無此碼」,不要讓它打進 DB 變成 22P02 500
+  if (!isWellFormedUuid(token)) {
+    return { errorResponse: voiceError('TOKEN_INVALID', '這個確認碼格式不對', 401) };
   }
   const { data, error } = await sb.from('write_proposals').select('*').eq('token', token).maybeSingle();
   if (error) return { errorResponse: dbErrorResponse(error) };

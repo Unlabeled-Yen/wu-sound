@@ -13,12 +13,12 @@
  *      避免測試資料混進老闆看到的真實工作記錄)
  *
  * 用法:
- *   BASE_URL=http://localhost:3777/api/voice VOICE_API_KEY=... VOICE_TEST_SITE_ID=... npm test -- wu-adapter
+ *   VOICE_BASE_URL=http://localhost:3777/api/voice VOICE_API_KEY=... VOICE_TEST_SITE_ID=... npm test -- wu-adapter
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:3777/api/voice';
+const BASE = process.env.VOICE_BASE_URL ?? 'http://localhost:3777/api/voice';
 const KEY = process.env.VOICE_API_KEY ?? '';
 const SITE_ID = process.env.VOICE_TEST_SITE_ID ?? '';
 
@@ -53,13 +53,11 @@ describe('1 — log_note 真的寫進 worklogs', () => {
     const c = await call('log_note', { ...payload, confirmation_token: p.json.confirmation_token });
     expect(c.status).toBe(200);
 
-    const { data, count: after } = await sb!
-      .from('worklogs')
-      .select('id, note', { count: 'exact' })
-      .eq('id', c.json.note_id)
-      .eq('site_id', SITE_ID);
+    const { count: after } = await sb!.from('worklogs').select('id', { count: 'exact', head: true }).eq('site_id', SITE_ID);
     expect(after).toBe((before ?? 0) + 1);
-    expect(data?.[0]?.note).toContain('#測試');
+
+    const { data: row } = await sb!.from('worklogs').select('note').eq('id', c.json.note_id).single();
+    expect(row?.note).toContain('#測試');
   });
 });
 

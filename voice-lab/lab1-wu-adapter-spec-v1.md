@@ -128,7 +128,7 @@ diff         = { params, source, transcript_ref, capture_ref, proposal_token }
 
 ### 7a. 契約測試(既有 12 條,不改一字)
 ```bash
-cd voice-lab/contract/tests && BASE_URL=http://localhost:3777/api/voice API_KEY=$VOICE_API_KEY npm test
+cd voice-lab/contract/tests && VOICE_BASE_URL=http://localhost:3777/api/voice API_KEY=$VOICE_API_KEY npm test
 ```
 全綠 = 契約達成。這是主驗收。
 
@@ -158,15 +158,25 @@ cd voice-lab/contract/tests && BASE_URL=http://localhost:3777/api/voice API_KEY=
 
 ## 9. 交付定義(Definition of Done)
 
-- [x] migration 009 檔案進 repo(執行由 Yen 手動)
+- [x] migration 009 已套用(2026-08-11,Yen 於 SQL Editor 執行,與 007/008/010 一起貼)
 - [x] 6 端點實作完成,`tsc --noEmit` + `npm run build` 乾淨
-- [ ] 7a 契約測試 12/12 綠(對本地 dev)—— **待 Yen 套用 migration 009 + 設 env 後執行**
-- [ ] 7b 補充測試 8/8 綠 —— 同上,且需一個「測試專用」site id(見 §7c)
+- [x] **7a 契約測試 14/14 綠**(對本地 dev,對著 wu 真實轉接層跑,非 mock)
+- [x] **7b 補充測試 8/8 綠**(DB 落地、冪等、稽核、search 過濾 inactive、既有 API 零迴歸、缺配置 loud 全過)
 - [x] 7c 手動驗收步驟(見下)
 - [x] progress.md 更新
 - [x] 全程零改動既有表與既有 API(僅新增 `lib/voice.ts`、`app/api/voice/tools/[tool]/route.ts`、`lib/types.ts` 追加型別、`.env.example` 追加兩個變數)
 
-**已驗證**(不需 migration、不需真 Supabase 資料):缺 `VOICE_API_KEY` 時,端點正確回 503 `SERVICE_UNAVAILABLE`(loud,非靜默放行)——本機起 dev server 實測通過。
+**已驗證**:缺 `VOICE_API_KEY` 時,端點正確回 503 `SERVICE_UNAVAILABLE`(loud,非靜默放行)。
+
+### 跑完整測試套件過程中額外抓到並修掉的 3 個 bug
+
+這些是先前「本機驗證」時沒測到、要跑真正的契約/補充測試才會現形的問題——證明「跑測試」跟「手動戳兩下」是不同等級的驗證:
+
+1. **`get_project_summary` 的 count 查詢用 `head:true`**——PostgREST 對不存在的表在 HEAD 請求下回 `204+error:null+count:null`,把「查不到」偽裝成「0 筆」。已改用一般 count 查詢。
+2. **`isUndefinedTableError` 誤判錯誤代碼**——只認 Postgres 原生 `42P01`,但 PostgREST 實際回 `PGRST205`,導致該回 503 卻被判成普通 500。已補上 `PGRST205`。
+3. **格式不對的 id 打進 DB 變成 500,而非契約要求的 404/401**——`project_id` 或 `confirmation_token` 若不是合法 uuid 格式(例如測試用的 `"no-such-id"`、`"fake-token"`),Postgres 會噴 `22P02 invalid_text_representation`,被 `dbErrorResponse` 誤判成普通 500。新增 `isWellFormedUuid()`,在打 DB 之前就先擋,格式不對直接當「找不到/查無此碼」處理——對呼叫端語意上是同一件事(這個 id 用不了),不需要真的查過 DB 才知道。
+
+此外,跑測試過程中也修正了測試腳本本身的兩個問題(非產品程式碼 bug):`BASE_URL` 這個環境變數名稱跟 **Vite/Vitest 內建保留變數**撞名(Vite 會把它蓋成 `"/"`,蓋掉外部傳入值),改名 `VOICE_BASE_URL`;`contract.test.ts` 原本寫死搜尋字串 `'王'`(對應 Lab 0 的通用假想資料),對著 wu 真實資料跑會找不到東西,改成可由 `VOICE_TEST_QUERY` 覆寫。
 
 ---
 
@@ -222,7 +232,7 @@ curl -s -X POST $BASE/tools/log_note \
 ```bash
 cd voice-lab/contract/tests
 npm install
-BASE_URL=http://localhost:3000/api/voice \
+VOICE_BASE_URL=http://localhost:3000/api/voice \
 VOICE_API_KEY=<...> \
 VOICE_TEST_SITE_ID=<測試 site id> \
 NEXT_PUBLIC_SUPABASE_URL=<...同 web/.env.local> \

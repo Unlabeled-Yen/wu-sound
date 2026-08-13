@@ -47,13 +47,13 @@
 
 | 項目 | 狀態 | 卡在哪 |
 |---|---|---|
-| 聲學規劃 step 2(人話→參數,AI 只填輸入) | spec 完成 | 排程 |
-| 聲學規劃 step 3(器材聲學規格建檔) | spec 完成;migrations 007/008 在 repo | **已確認 007/008 尚未套進 Supabase**(2026-08-11 用讀查驗證)——「選喇叭帶入規格」是活的靜默失效;跟 009 一起貼 SQL Editor |
-| 聲學規劃 step 4(AI 選設備↔計算器閉環驗證) | spec 完成 | 依賴 step 3 |
-| **LINE bot**(推播+雙向,Bot 名「聲生製作」) | **後端程式碼已交付**(migration 010 + webhook + 綁定 flow + 兩個推播 hook) | 待老闆到 developers.line.biz 建 channel,拿 3 樣給 Yen 填 env,見下方 LINE bot 區塊 |
+| 聲學規劃 step 2(人話→參數,AI 只填輸入) | spec 完成;**migrations 007/008 已套用**(2026-08-11) | 排程 |
+| 聲學規劃 step 3(器材聲學規格建檔) | **migrations 007/008 已套用**,SPL 規格欄位確認存在 | 「選喇叭帶入規格」的靜默失效已解除阻塞;還缺實際規格資料(全品項 max_spl_db 等仍是 null,待建檔) |
+| 聲學規劃 step 4(AI 選設備↔計算器閉環驗證) | spec 完成 | 依賴 step 3 資料填充 |
+| **LINE bot**(推播+雙向,Bot 名「聲生製作」) | **後端程式碼已交付、migration 010 已套用** | 待老闆到 developers.line.biz 建 channel,拿 3 樣給 Yen 填 env,見下方 LINE bot 區塊 |
 | 打卡↔薪資結算聯動(A 路:工時聚合+老闆手填薪水) | 方向定案 | 3 題待答:工時配對法 / 打卡不全怎麼擋 / 鎖定強度(見 open-questions.md) |
 | 派工系統 tasks(多人指派+日期時段+Realtime) | **併入 voice-lab Lab 1**(最小版:單人+日期,無 Realtime) | 見下方 voice-lab 區塊 |
-| **voice-lab**(現場語音/打字紀錄介面,`voice-lab/`) | Lab 0 契約 ✅、**Lab 1 後端轉接層程式碼已交付**(含兩個真 bug 修復,已本機驗證) | 待 Yen 套 migration 009 + 手動驗收,見 [voice-lab/README.md](../voice-lab/README.md) |
+| **voice-lab**(現場語音/打字紀錄介面,`voice-lab/`) | Lab 0 + Lab 1 **完成,22/22 測試綠**(2026-08-11) | 下一步 Lab 2(文字 Agent),見 [voice-lab/README.md](../voice-lab/README.md) |
 
 ### LINE bot 現況(2026-08-11)
 
@@ -69,10 +69,10 @@
 - tsc + build 全綠
 
 **待做**:
-1. 老闆到 developers.line.biz 建 channel(Provider「聲生 SSA」→ Messaging API channel「聲生製作」),拿 Channel Secret / Access Token / Bot Basic ID
+1. 老闆(或 Yen 用自己帳號先測)到 developers.line.biz 建 channel(Provider「聲生 SSA」→ Messaging API channel「聲生製作」),拿 Channel Secret / Access Token / Bot Basic ID
 2. Yen 把 3 樣填進 Vercel 環境變數 + `.env.local`
-3. Webhook URL 填回 LINE channel 設定(`https://wu-sound-fde.vercel.app/api/line/webhook`)
-4. 套 migration 010(可與 007/008/009 一起貼)
+3. Webhook URL 填回 LINE channel 設定(`https://wu-sound-fde.vercel.app/api/line/webhook`,或本機測試用 cloudflared 臨時通道)
+4. ~~套 migration 010~~ ✅ 已於 2026-08-11 套用(與 007/008/009 一起)
 5. 端到端測:加好友 → 綁定 → 打卡 → 傳收據
 
 ## 💡 討論過、完全未開工(AI 報價 flywheel)
@@ -97,5 +97,6 @@
 
 ## 🐛 已知技術債 / 需驗證
 
-- **SPL 計算器「選喇叭帶入規格」疑似無作用**(四層斷:DB 欄位不存在/migration 未套/型別選用/select(*) 不噴錯)——修復第一步是確認 007/008 是否已套進 Supabase
+- ~~SPL 計算器「選喇叭帶入規格」疑似無作用~~ migrations 007/008 已於 2026-08-11 套用,欄位確認存在;功能本身待實測(目前所有品項規格值皆為 null,需先建檔才看得到帶入效果)
 - 員工拍照失敗 localStorage 離線佇列:憲章有要求,實作是否存在未驗證
+- voice-lab Lab 1 過程中發現並修正:PostgREST `head:true` count 查詢在表不存在時偽裝成功、`isUndefinedTableError` 誤判錯誤碼、格式不對的 id 打進 DB 變 500(已修正為 loud 404/401),詳見 [voice-lab/lab1-wu-adapter-spec-v1.md](../voice-lab/lab1-wu-adapter-spec-v1.md) §9

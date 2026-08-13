@@ -30,7 +30,7 @@
 | Lab | 內容 | 狀態 |
 |---|---|---|
 | Lab 0 | 契約定稿(`contract/`):6 工具、伺服器簽發兩階段 token、冪等、稽核格式、可執行測試 | ✅ 已交付 |
-| Lab 1 | wu 後端轉接層(A 路):`tasks`/`write_proposals` 新表 + 6 端點,規格見 [lab1-wu-adapter-spec-v1.md](lab1-wu-adapter-spec-v1.md) | ✅ **程式碼已交付**,⏳ 待套 migration + 手動驗收 |
+| Lab 1 | wu 後端轉接層(A 路):`tasks`/`write_proposals` 新表 + 6 端點,規格見 [lab1-wu-adapter-spec-v1.md](lab1-wu-adapter-spec-v1.md) | ✅ **完成,22/22 測試綠**(2026-08-11) |
 | Lab 2 | 文字模式 Agent:狀態機、實體對齊、確認流程 —— **此即打字系統本體,非測試工具** | 待做 |
 | Lab 3 | STT 擂台:批次轉寫為主,語料含工地噪音、中英夾雜案名、少量台語;TTS 盲測 | 待做 |
 | Lab 4 | 語音掛載:手機 PWA push-to-talk + 本地佇列 + 批次處理管線 | 待做 |
@@ -48,20 +48,17 @@
 - `.env.local` 本機已設好 `VOICE_API_KEY` / `VOICE_ACTOR_USER_ID`(= 老闆)/ `VOICE_TEST_SITE_ID`
 - `tsc --noEmit`、`npm run build` 全綠
 
-**驗證中抓到並修掉兩個真的 bug**(migration 套用前用本機 dev server 實測發現):
-1. `get_project_summary` 原本用 `{ count: 'exact', head: true }` 查任務數 —— 實測發現 PostgREST 對「表不存在」的 HEAD 請求會回 `204 + error:null + count:null`,等於把「查不到」偽裝成「0 筆任務」。改用一般 count 查詢讓錯誤正常浮現。
-2. `isUndefinedTableError` 原本只認 Postgres 原生代碼 `42P01`,但 PostgREST 實際回的是自己包過的 `PGRST205`,導致「表不存在」被誤判成普通 500 而非設計中的 loud 503。兩種代碼現在都收。
+**過程中抓到並修掉 3 個真的 bug**(逐步驗證發現,細節見 spec §9):
+1. `get_project_summary` 的 count 查詢用 `head:true`,PostgREST 對不存在的表回 `204+error:null+count:null`,把「查不到」偽裝成「0 筆」——改用一般 count 查詢。
+2. `isUndefinedTableError` 誤判錯誤代碼(只認 `42P01`,PostgREST 實際回 `PGRST205`)——導致該 503 卻變普通 500。
+3. **格式不對的 id 打進 DB 變成 500,不是契約要求的 404/401**——新增 `isWellFormedUuid()` 在打 DB 前先擋。這個是跑真正的契約測試(不是手動戳兩下)才抓到的,證明「跑測試」跟「本機驗證幾個 case」是不同等級的把關。
 
-**已實測通過**(本機 dev server + 假 site,未動任何正式資料):
-- 缺 `VOICE_API_KEY` → 503 `SERVICE_UNAVAILABLE`
-- API key 錯誤 → 401 `UNAUTHORIZED`
-- `tasks`/`write_proposals` 未建立時,`get_project_summary` / `list_tasks` / `propose_write` 三支都一致回 503「voice 資料表尚未建立」,不再有任何一支假裝成功
-- `search_projects`(只碰既有 `sites` 表)正常運作,能搜到測試 site
+**migration 009 已套用**(2026-08-11,與 007/008/010 一起貼)。
 
-**待 Yen 做**(見 [lab1-wu-adapter-spec-v1.md](lab1-wu-adapter-spec-v1.md) 附錄「7c 手動驗收步驟」):
-1. 套用 migration 009(貼 Supabase SQL Editor)—— 這是唯一剩下、且只有你能做的手動步驟
-2. 套完後跑 `voice-lab/contract/tests`(契約測試 12 條 + 補充測試 8 條),或請我幫你跑
-3. 測完記得把 `__voice_lab_test__` 這個測試 site 停用或刪除
+**最終驗證結果:22/22 測試全綠**
+- 契約測試 14/14(對著 wu 真實轉接層跑,非 mock)
+- 補充測試 8/8(DB 落地、冪等、稽核完整性、search 過濾 inactive、既有 API 零迴歸、缺配置 loud)
+- 測試用的 `__voice_lab_test__` site 已設 `active=false`,不會出現在老闆看到的正式案場清單
 
 **零改動**:既有表、既有 API 完全沒動,可用 `git diff` 稽核。
 
@@ -71,10 +68,10 @@
 cd voice-lab/contract/tests && npm install
 
 # 契約測試(12 條,只驗回傳形狀)
-BASE_URL=http://localhost:3000/api/voice VOICE_API_KEY=<...> npm test -- contract
+VOICE_BASE_URL=http://localhost:3000/api/voice VOICE_API_KEY=<...> npm test -- contract
 
 # 補充測試(8 條,驗 DB 落地、冪等、稽核;需 migration + 測試 site,見 spec 附錄)
-BASE_URL=http://localhost:3000/api/voice VOICE_API_KEY=<...> VOICE_TEST_SITE_ID=<...> \
+VOICE_BASE_URL=http://localhost:3000/api/voice VOICE_API_KEY=<...> VOICE_TEST_SITE_ID=<...> \
 NEXT_PUBLIC_SUPABASE_URL=<...> SUPABASE_SERVICE_ROLE_KEY=<...> npm test -- wu-adapter
 ```
 

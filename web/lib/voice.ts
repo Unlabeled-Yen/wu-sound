@@ -30,6 +30,18 @@ export function withVersion(res: NextResponse): NextResponse {
   return res;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * 契約要求「不存在的 project_id → 404」,但格式不對的 id(例如 "no-such-id")
+ * 直接查 uuid 欄位會讓 Postgres 噴 invalid_text_representation(22P02),
+ * 若不先擋會被誤判成 500 而非 404——對呼叫端來說兩者語意相同(都是「這個 id 用不了」),
+ * 所以在打 DB 之前就先判斷格式,格式不對直接當「找不到」處理。
+ */
+export function isWellFormedUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 /** canonical JSON:鍵排序、無空白,契約 §1.3 要求的 hash 基礎 */
 export function canonicalJson(obj: Record<string, unknown>): string {
   const sortedKeys = Object.keys(obj).sort();
