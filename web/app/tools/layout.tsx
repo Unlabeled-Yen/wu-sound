@@ -21,7 +21,7 @@ export default async function ToolsLayout({ children }: { children: React.ReactN
   );
 
   if (session.role === 'boss') {
-    return <BossShell userName={session.name}>{content}</BossShell>;
+    return <BossShell>{content}</BossShell>;
   }
 
   return (

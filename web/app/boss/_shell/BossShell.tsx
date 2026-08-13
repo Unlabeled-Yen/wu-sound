@@ -71,13 +71,7 @@ function currentMonthLabel(): string {
   return `本月 ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export function BossShell({
-  userName,
-  children,
-}: {
-  userName: string;
-  children: React.ReactNode;
-}) {
+export function BossShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '/boss';
   const active = useMemo(() => findActiveSection(pathname), [pathname]);
   const activeTab = useMemo(() => findActiveMobileTab(pathname), [pathname]);
@@ -147,10 +141,8 @@ export function BossShell({
           }}
         >
           <div className="flex items-center justify-between text-[13px] mb-[14px]" style={{ color: 'var(--nm-text-secondary)' }}>
-            <span className="flex items-center gap-2">
-              <BrandMark size={17} className="opacity-85" />
-              {userName} · 老闆
-            </span>
+            {/* 不顯示姓名/角色:登入後權限已定,使用者不需要辨識自己是誰 */}
+            <BrandMark size={17} className="opacity-85" />
             <span className="text-[12px]">{monthLabel}</span>
           </div>
           <div

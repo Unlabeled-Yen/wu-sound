@@ -41,10 +41,8 @@ export default async function StaffLayout({ children }: { children: React.ReactN
         }}
       >
         <div className="flex items-center justify-between text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
-          <span className="flex items-center gap-2">
-            <BrandMark size={17} className="opacity-85" />
-            {session.name} · 技師
-          </span>
+          {/* 不顯示姓名/角色:登入後權限已定,使用者不需要辨識自己是誰 */}
+          <BrandMark size={17} className="opacity-85" />
           <Link href="/staff/settings" className="flex items-center gap-1.5 nm-focus" aria-label="設定">
             <GearIcon />
             設定

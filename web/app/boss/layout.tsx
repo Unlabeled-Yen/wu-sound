@@ -11,5 +11,5 @@ export default async function BossLayout({ children }: { children: React.ReactNo
 
   // Note: pending count is fetched client-side by BossShell after mount
   // (was blocking every /boss/* nav with a Supabase count query — ~150-400ms).
-  return <BossShell userName={session.name}>{children}</BossShell>;
+  return <BossShell>{children}</BossShell>;
 }
