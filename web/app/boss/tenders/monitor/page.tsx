@@ -478,9 +478,14 @@ export default async function BossTendersMonitorPage({
             近 {days} 天命中 {hits.length} 件
             {isFiltered && ` · 篩選後 ${visible.length} 件`}
           </p>
-          <a href="/boss/tenders" className="mt-1 inline-block text-xs underline" style={{ color: 'var(--nm-text-faint)' }}>
-            → 資料進度板
-          </a>
+          <div className="mt-1 flex flex-wrap gap-3 text-xs">
+            <a href="/boss/tenders/agencies" className="underline" style={{ color: 'var(--nm-text-faint)' }}>
+              → 機關經營名單
+            </a>
+            <a href="/boss/tenders" className="underline" style={{ color: 'var(--nm-text-faint)' }}>
+              → 資料進度板
+            </a>
+          </div>
         </div>
         <nav className="flex gap-1 rounded-2xl nm-inset p-1 text-[13px]">
           {[1, 3, 7, 14, 30].map((d) => (
