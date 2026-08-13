@@ -139,11 +139,11 @@ export default async function BossSitesPage() {
                       defaultValue={s.category_id ?? ''}
                       className="nm-input text-xs"
                       style={{ width: 'auto', minHeight: 30, padding: '2px 8px' }}
-                      onChange={(e) => e.currentTarget.form?.requestSubmit()}
                     >
                       <option value="">未設</option>
                       {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
+                    <button type="submit" className="text-xs nm-focus" style={{ color: 'var(--nm-text-muted)' }}>存</button>
                   </form>
                 </td>
                 <td className="py-2 px-3.5 whitespace-nowrap">
