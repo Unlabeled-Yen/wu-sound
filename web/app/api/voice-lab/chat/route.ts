@@ -9,7 +9,7 @@ import {
   type AgentDeps,
   type AgentTurnResult,
 } from '@/lib/voice-agent';
-import { getOrCreateSession } from '@/lib/voice-agent-session';
+import { getOrCreateSession, withSessionLock } from '@/lib/voice-agent-session';
 import { createHttpToolClient } from '@/lib/voice-agent-tools';
 
 export const runtime = 'nodejs';
@@ -68,17 +68,17 @@ export async function POST(req: Request) {
   }
 
   // 使用者 id 併進 session key:同一個瀏覽器分頁 id 不會跨帳號共用對話
-  const { session, created } = getOrCreateSession(`${user.id}:${sessionId}`);
+  const sessionKey = `${user.id}:${sessionId}`;
+  const { session, created } = getOrCreateSession(sessionKey);
 
   let result: AgentTurnResult;
   try {
-    if (action === 'confirm') {
-      result = await confirmPending(session, deps);
-    } else if (action === 'cancel') {
-      result = cancelPending(session);
-    } else {
-      result = await runAgentTurn(session, message, deps);
-    }
+    // 同一個 session 的請求排隊跑:併發會讓訊息交錯,產生沒有主人的 tool_result
+    result = await withSessionLock(sessionKey, async () => {
+      if (action === 'confirm') return confirmPending(session, deps);
+      if (action === 'cancel') return cancelPending(session);
+      return runAgentTurn(session, message, deps);
+    });
   } catch (e) {
     if (e instanceof AgentConfigError) {
       return NextResponse.json({ error: e.message, error_code: 'SERVICE_UNAVAILABLE' }, { status: 503 });

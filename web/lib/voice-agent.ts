@@ -17,6 +17,7 @@ import {
 } from '@/lib/voice-agent-tools';
 import { createKimiLlm } from '@/lib/voice-agent-kimi';
 import { EMERGENCY_PREFIX, getEmergencyInfo, getNow, getWeather } from '@/lib/voice-agent-daily';
+import { trimMessages } from '@/lib/voice-agent-session';
 import type { AgentSession, PendingField, PendingWrite } from '@/lib/voice-agent-session';
 
 export type {
@@ -280,6 +281,8 @@ export async function runAgentTurn(
   }
 
   session.messages.push({ role: 'user', content: [{ type: 'text', text: userText }] });
+  // 修剪在推入新訊息之後、送給模型之前——這樣切割點一定落在完整的一輪邊界上
+  session.messages = trimMessages(session.messages);
   const system = buildSystemPrompt(now());
   // 這一輪有沒有查過東西。閒聊的共同特徵是「不需要查任何資料」,
   // 所以這個布林值就是「模型現在有沒有事實可講」的機械判準,不靠語意理解
