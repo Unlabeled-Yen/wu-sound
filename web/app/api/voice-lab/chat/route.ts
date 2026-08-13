@@ -5,6 +5,7 @@ import {
   cancelPending,
   confirmPending,
   createLlmClient,
+  handleVoiceCommand,
   runAgentTurn,
   type AgentDeps,
   type AgentTurnResult,
@@ -28,7 +29,7 @@ export const dynamic = 'force-dynamic';
  *   cancel  → 提案作廢
  */
 
-type Action = 'message' | 'confirm' | 'cancel';
+type Action = 'message' | 'confirm' | 'cancel' | 'voice_command';
 
 function bad(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -48,10 +49,13 @@ export async function POST(req: Request) {
   const sessionId = typeof body.session_id === 'string' ? body.session_id.trim() : '';
   if (!sessionId) return bad('缺少 session_id', 400);
   const action: Action =
-    body.action === 'confirm' || body.action === 'cancel' ? body.action : 'message';
+    body.action === 'confirm' || body.action === 'cancel' || body.action === 'voice_command'
+      ? body.action
+      : 'message';
 
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   if (action === 'message' && !message) return bad('訊息是空的', 400);
+  if (action === 'voice_command' && !message) return bad('沒有辨識到任何語音內容', 400);
 
   // 缺配置一律 loud 503,不靜默降級成「AI 剛好答不出來」
   let deps: AgentDeps;
@@ -77,6 +81,8 @@ export async function POST(req: Request) {
     result = await withSessionLock(sessionKey, async () => {
       if (action === 'confirm') return confirmPending(session, deps);
       if (action === 'cancel') return cancelPending(session);
+      // 語音口令:白名單比對在 runtime 做,不讓 LLM 判斷使用者是否同意(Lab 3 §1)
+      if (action === 'voice_command') return handleVoiceCommand(session, message, deps);
       return runAgentTurn(session, message, deps);
     });
   } catch (e) {

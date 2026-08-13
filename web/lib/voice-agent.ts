@@ -537,6 +537,57 @@ function safeRecap(text: string, pending: PendingWrite): { text: string; leaked:
   return { text, leaked: false };
 }
 
+// ---------- 語音口令確認(Lab 3 §1,雙軌的 B 軌) ----------
+
+/**
+ * 免手情境下的確認判斷。
+ *
+ * 語音沒有按鈕,但要守的鐵律不是「必須是按鈕」,而是
+ * **確認與否不由 LLM 判斷**——按鈕只是這條鐵律在螢幕上的實作。
+ * 所以這裡用白名單字串比對代替按鈕:判斷的是這個函式,不是模型。
+ *
+ * 比對規則刻意嚴格:
+ * - **整句相等**才算,不做包含比對——「不對」包含「對」、「不可以」包含「可以」,
+ *   用包含比對會把否定聽成同意,那是會寫錯資料的錯法
+ * - 只剝除語尾助詞(啊/喔/啦/呢/嘛),不做任何語意推論
+ * - 不在名單上的一律 unclear,包含「嗯」「應該吧」「大概」——
+ *   這正是 handoff §5.4 要求的「模糊回應視為未確認」
+ */
+const CONFIRM_WORDS = new Set(['確認', '確定', '對', '對的', '沒錯', '可以', '沒問題', '就這樣', '是的', '好的']);
+const CANCEL_WORDS = new Set(['取消', '不對', '不是', '不要', '算了', '不用', '錯了', '重來']);
+
+export function matchVoiceCommand(transcript: string): 'confirm' | 'cancel' | 'unclear' {
+  const cleaned = toTraditional(transcript)
+    .replace(/[\s,。,.!!??、~～]/g, '')
+    .replace(/[啊阿喔哦囉啦呢嘛耶欸]+$/u, '');
+  if (!cleaned) return 'unclear';
+  if (CONFIRM_WORDS.has(cleaned)) return 'confirm';
+  if (CANCEL_WORDS.has(cleaned)) return 'cancel';
+  return 'unclear';
+}
+
+/** 語音口令走到這裡;沒聽清楚一律不動 pending,回去再問一次 */
+export async function handleVoiceCommand(
+  session: AgentSession,
+  transcript: string,
+  deps: AgentDeps,
+): Promise<AgentTurnResult> {
+  if (!session.pending) {
+    return { reply: '目前沒有待確認的項目。', state: 'responding', toolTrace: [] };
+  }
+  const cmd = matchVoiceCommand(transcript);
+  if (cmd === 'confirm') return confirmPending(session, deps);
+  if (cmd === 'cancel') return cancelPending(session);
+
+  return {
+    reply: '我沒聽清楚。要寫入請說「確認」,不要的話請說「取消」。',
+    state: 'confirming',
+    pending: { action: session.pending.action, fields: session.pending.fields },
+    toolTrace: [],
+    warning: `聽到的是「${transcript}」,不在確認詞名單內,沒有寫入任何東西`,
+  };
+}
+
 // ---------- 確認 / 取消(結構化事件,不解讀自由文字) ----------
 
 export async function confirmPending(session: AgentSession, deps: AgentDeps): Promise<AgentTurnResult> {

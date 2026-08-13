@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { speechFor, useVoice } from './useVoice';
 
 /**
  * Lab 2 極簡聊天 UI(spec §5)。
@@ -50,8 +51,17 @@ export function ChatClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
   const nextId = useRef(1);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const stateRef = useRef<ChatMessage['state']>(undefined);
+
+  // 聽到的話怎麼處理,取決於當下狀態:
+  // 等你確認的時候走 voice_command(伺服器端白名單比對),其餘當一般訊息
+  const voice = useVoice((transcript) => {
+    if (stateRef.current === 'confirming') void send('voice_command', transcript);
+    else void send('message', transcript);
+  });
 
   // session_id 在 client 端產生:server render 時產生會造成 hydration 不一致
   useEffect(() => {
@@ -68,15 +78,18 @@ export function ChatClient() {
   const pendingMessage =
     lastMessage?.role === 'agent' && lastMessage.state === 'confirming' ? lastMessage : undefined;
   const awaitingConfirm = Boolean(pendingMessage) && !busy;
+  stateRef.current = lastMessage?.role === 'agent' ? lastMessage.state : undefined;
 
   function push(msg: Omit<ChatMessage, 'id'>) {
     setMessages((prev) => [...prev, { ...msg, id: nextId.current++ }]);
   }
 
-  async function send(action: 'message' | 'confirm' | 'cancel', text?: string) {
+  async function send(action: 'message' | 'confirm' | 'cancel' | 'voice_command', text?: string) {
     if (busy || !sessionId) return;
     setBusy(true);
-    if (action === 'message' && text) push({ role: 'user', text });
+    if ((action === 'message' || action === 'voice_command') && text) {
+      push({ role: 'user', text: action === 'voice_command' ? `🎤 ${text}` : text });
+    }
     if (action === 'confirm') push({ role: 'user', text: '✓ 確認' });
     if (action === 'cancel') push({ role: 'user', text: '✕ 取消' });
 
@@ -98,16 +111,24 @@ export function ChatClient() {
       if (data.session_reset) {
         push({ role: 'error', text: '對話狀態已重置(伺服器重啟或閒置過久),剛才的提案沒有寫入,請重講一次。' });
       }
+      const state = data.state as ChatMessage['state'];
+      const pending = (data.pending as Pending | undefined) ?? undefined;
       push({
         role: 'agent',
         text: String(data.reply ?? ''),
-        state: data.state as ChatMessage['state'],
+        state,
         options: Array.isArray(data.options) ? (data.options as Option[]) : undefined,
-        pending: (data.pending as Pending | undefined) ?? undefined,
+        pending,
         warning: typeof data.warning === 'string' ? data.warning : undefined,
         provider: typeof data.provider === 'string' ? data.provider : undefined,
         toolTrace: Array.isArray(data.tool_trace) ? (data.tool_trace as ToolTraceEntry[]) : undefined,
       });
+
+      if (voiceMode) {
+        voice.speak(speechFor(String(data.reply ?? ''), state, pending));
+        // 等你確認的時候自動再開麥克風,免手情境才不用一直碰螢幕
+        if (state === 'confirming') setTimeout(() => voice.start(), 600);
+      }
     } catch (e) {
       push({ role: 'error', text: `連線失敗: ${e instanceof Error ? e.message : String(e)}` });
     } finally {
@@ -223,7 +244,28 @@ export function ChatClient() {
         <div ref={bottomRef} />
       </div>
 
+      {voice.error && (
+        <p className="text-[12px]" style={{ color: '#ff8f8f' }}>
+          🎤 {voice.error}
+        </p>
+      )}
+      {voice.listening && (
+        <p className="text-[13px]" style={{ color: 'var(--nm-accent)' }}>
+          🎤 聽你說…{voice.interim && <span style={{ color: 'var(--nm-text-muted)' }}> {voice.interim}</span>}
+        </p>
+      )}
+
       <form onSubmit={submit} className="flex gap-2">
+        <button
+          type="button"
+          className="nm-btn text-[16px] px-3"
+          aria-label={voice.listening ? '停止錄音' : '開始說話'}
+          title={voice.supported ? '按一下開始說話' : '這個瀏覽器不支援語音輸入'}
+          disabled={busy || !sessionId || !voice.supported}
+          onClick={() => (voice.listening ? voice.stop() : voice.start())}
+        >
+          {voice.listening ? '⏹' : '🎤'}
+        </button>
         <input
           className="nm-input flex-1 text-[14px]"
           placeholder={awaitingConfirm ? '要修改內容就直接打字(原提案會作廢)' : '講一件要記的事…'}
@@ -235,6 +277,21 @@ export function ChatClient() {
           送出
         </button>
       </form>
+
+      <label className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--nm-text-faint)' }}>
+        <input
+          type="checkbox"
+          className="nm-focus"
+          checked={voiceMode}
+          disabled={!voice.supported}
+          onChange={(e) => {
+            setVoiceMode(e.target.checked);
+            if (!e.target.checked) voice.cancelSpeech();
+          }}
+        />
+        免手模式:唸出回覆,等你確認時自動開麥克風,說「確認」或「取消」
+        {!voice.supported && '(這個瀏覽器不支援,iPhone 的 Safari 目前沒有語音辨識)'}
+      </label>
     </div>
   );
 }

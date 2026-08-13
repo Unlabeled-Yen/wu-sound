@@ -3,6 +3,8 @@ import {
   cancelPending,
   confirmPending,
   formatDueDate,
+  handleVoiceCommand,
+  matchVoiceCommand,
   toTraditional,
   runAgentTurn,
   todayInTaipei,
@@ -475,6 +477,81 @@ describe('把 agent 約束在正軌上', () => {
     const llm = fakeLlm([[{ type: 'tool_use', id: 't1', name: 'decline', input: { reason: 'chitchat' } }]]);
     await runAgentTurn(session(), '你好', deps(llm.client, fakeTools({}).client));
     expect(llm.seen[0].toolChoice).toBe('any');
+  });
+});
+
+describe('語音口令確認(Lab 3 雙軌的 B 軌)', () => {
+  it('名單內的明確肯定才算確認', () => {
+    for (const w of ['確認', '確定', '對', '沒錯', '可以', '沒問題', '就這樣']) {
+      expect(matchVoiceCommand(w), w).toBe('confirm');
+    }
+  });
+
+  it('否定詞絕對不能被當成同意——「不對」包含「對」、「不可以」包含「可以」', () => {
+    // 這是整個口令設計最危險的地方:用包含比對就會把否定聽成同意
+    expect(matchVoiceCommand('不對')).toBe('cancel');
+    expect(matchVoiceCommand('不是')).toBe('cancel');
+    expect(matchVoiceCommand('不可以')).toBe('unclear'); // 不在任一名單 → 不動作,再問一次
+    expect(matchVoiceCommand('不要')).toBe('cancel');
+  });
+
+  it('模糊回應一律 unclear(handoff §5.4)', () => {
+    for (const w of ['嗯', '應該吧', '大概', '好像可以吧', '我想想']) {
+      expect(matchVoiceCommand(w), w).toBe('unclear');
+    }
+  });
+
+  it('剝語尾助詞,但不做語意推論', () => {
+    expect(matchVoiceCommand('對啊')).toBe('confirm');
+    expect(matchVoiceCommand('可以啦')).toBe('confirm');
+    expect(matchVoiceCommand('取消啦')).toBe('cancel');
+    expect(matchVoiceCommand('應該吧')).toBe('unclear'); // 「吧」不剝,剝了也不在名單
+  });
+
+  it('STT 送來簡體字也認得', () => {
+    expect(matchVoiceCommand('确认')).toBe('confirm');
+    expect(matchVoiceCommand('没错')).toBe('confirm');
+  });
+
+  it('聽不清楚時不動 pending,狀態留在 confirming 讓使用者再講一次', async () => {
+    const llm = fakeLlm([
+      [{ type: 'tool_use', id: 't1', name: 'propose_log_note', input: { project_id: SITE_ID, content: '放樣' } }],
+      [{ type: 'text', text: '確認?' }],
+    ]);
+    const tools = fakeTools({
+      propose_write: okPropose,
+      get_project_summary: () => ({ ok: true, data: { name: '磐頂長老教會' } }),
+      log_note: () => ({ ok: true, data: { note_id: 'n1' } }),
+    });
+    const s = session();
+    await runAgentTurn(s, '記一筆', deps(llm.client, tools.client));
+    tools.calls.length = 0;
+
+    const r = await handleVoiceCommand(s, '應該吧', deps(llm.client, tools.client));
+    expect(r.state).toBe('confirming');
+    expect(s.pending).not.toBeNull();
+    expect(tools.calls).toHaveLength(0);
+    expect(r.warning).toContain('應該吧');
+  });
+
+  it('說「確認」才真的寫入', async () => {
+    const llm = fakeLlm([
+      [{ type: 'tool_use', id: 't1', name: 'propose_log_note', input: { project_id: SITE_ID, content: '放樣' } }],
+      [{ type: 'text', text: '確認?' }],
+    ]);
+    const tools = fakeTools({
+      propose_write: okPropose,
+      get_project_summary: () => ({ ok: true, data: { name: '磐頂長老教會' } }),
+      log_note: () => ({ ok: true, data: { note_id: 'n1' } }),
+    });
+    const s = session();
+    await runAgentTurn(s, '記一筆', deps(llm.client, tools.client));
+    tools.calls.length = 0;
+
+    const r = await handleVoiceCommand(s, '確認', deps(llm.client, tools.client));
+    expect(r.reply).toContain('已記錄');
+    expect(tools.calls.map((c) => c.tool)).toEqual(['log_note']);
+    expect(s.pending).toBeNull();
   });
 });
 
