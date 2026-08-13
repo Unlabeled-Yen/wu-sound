@@ -48,7 +48,7 @@
 | 項目 | 狀態 | 卡在哪 |
 |---|---|---|
 | 聲學規劃 step 2(人話→參數,AI 只填輸入) | spec 完成;**migrations 007/008 已套用**(2026-08-11) | 排程 |
-| 聲學規劃 step 3(器材聲學規格建檔) | **migrations 007/008 已套用**,SPL 規格欄位確認存在 | 「選喇叭帶入規格」的靜默失效已解除阻塞;還缺實際規格資料(全品項 max_spl_db 等仍是 null,待建檔) |
+| 聲學規劃 step 3(器材聲學規格建檔) | **12 個 CODA/YAMAHA 喇叭/擴大機規格已從原廠 datasheet 匯入**(2026-08-13);另新增 migration 011(speaker_impedance_ohm/amp_power_mode) | 「選喇叭帶入規格」可實測;3 項待老闆核對實體銘牌型號(見 catalog note 欄位);其餘 101 個非喇叭/擴大機品項本來就不需要規格 |
 | 聲學規劃 step 4(AI 選設備↔計算器閉環驗證) | spec 完成 | 依賴 step 3 資料填充 |
 | **LINE bot**(推播+雙向,Bot 名「聲生製作」) | **後端程式碼已交付、migration 010 已套用** | 待老闆到 developers.line.biz 建 channel,拿 3 樣給 Yen 填 env,見下方 LINE bot 區塊 |
 | 打卡↔薪資結算聯動(A 路:工時聚合+老闆手填薪水) | 方向定案 | 3 題待答:工時配對法 / 打卡不全怎麼擋 / 鎖定強度(見 open-questions.md) |
@@ -97,6 +97,6 @@
 
 ## 🐛 已知技術債 / 需驗證
 
-- ~~SPL 計算器「選喇叭帶入規格」疑似無作用~~ migrations 007/008 已於 2026-08-11 套用,欄位確認存在;功能本身待實測(目前所有品項規格值皆為 null,需先建檔才看得到帶入效果)
+- ~~SPL 計算器「選喇叭帶入規格」疑似無作用~~ migrations 007/008 已套用;**12 個 CODA/YAMAHA 喇叭/擴大機規格已從原廠 datasheet 匯入**(2026-08-13,見 [catalog-spec-audit-round1.md](catalog-spec-audit-round1.md)),功能可實測。3 項待老闆核對實體銘牌(G308i、Linus6.4i 型號命名疑慮,寫在各品項 note 欄位);YAMAHA HS5(監聽喇叭)刻意保留 null,原廠不公布 max SPL
 - 員工拍照失敗 localStorage 離線佇列:憲章有要求,實作是否存在未驗證
 - voice-lab Lab 1 過程中發現並修正:PostgREST `head:true` count 查詢在表不存在時偽裝成功、`isUndefinedTableError` 誤判錯誤碼、格式不對的 id 打進 DB 變 500(已修正為 loud 404/401),詳見 [voice-lab/lab1-wu-adapter-spec-v1.md](../voice-lab/lab1-wu-adapter-spec-v1.md) §9

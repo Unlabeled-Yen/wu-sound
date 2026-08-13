@@ -175,7 +175,8 @@ export function suggestTax(amountTwd: number): number {
 // Phase 3: 品項庫 + 報價單
 export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost';
 export type QuoteLineSection = '器材' | '安裝';
-export interface CatalogItem { id:string; brand:string|null; name:string; item_type:string|null; unit:string; cost_price_twd:number|null; sell_price_twd:number|null; category:string|null; note:string|null; active:boolean; created_at:string; updated_at:string; max_spl_db?:number|null; spl_ref_distance_m?:number|null; sensitivity_db_1w1m?:number|null; amp_power_w?:number|null; }
+export type AmpPowerMode = 'rms' | 'burst';
+export interface CatalogItem { id:string; brand:string|null; name:string; item_type:string|null; unit:string; cost_price_twd:number|null; sell_price_twd:number|null; category:string|null; note:string|null; active:boolean; created_at:string; updated_at:string; max_spl_db?:number|null; spl_ref_distance_m?:number|null; sensitivity_db_1w1m?:number|null; amp_power_w?:number|null; speaker_impedance_ohm?:number|null; amp_power_mode?:AmpPowerMode|null; }
 export interface Quote { id:string; client_name:string; project_name:string|null; status:QuoteStatus; need_text:string|null; ai_rationale:string|null; note:string|null; tax_rate:number; created_by:string; created_at:string; updated_at:string; }
 export interface QuoteLine { id:string; quote_id:string; catalog_item_id:string|null; name:string; spec:string|null; qty:number; unit:string|null; unit_price_twd:number|null; section:QuoteLineSection; is_ai_suggested:boolean; sort_order:number; created_at:string; }
 export const QUOTE_STATUS_LABEL: Record<QuoteStatus,string> = { draft:'草稿', sent:'已送出', won:'成交', lost:'未成交' };
