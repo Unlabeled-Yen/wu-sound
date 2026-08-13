@@ -4,7 +4,9 @@ import * as OpenCC from 'opencc-js';
 import {
   AGENT_TOOLS,
   AgentConfigError,
+  DECLINE_TEXT,
   PROPOSE_ACTION,
+  READ_TOOLS,
   TERMINAL_TOOLS,
   type LlmClient,
   type LlmContentBlock,
@@ -107,7 +109,14 @@ export function buildSystemPrompt(now: number): string {
 11. 只要你的回覆裡要問「對嗎?」「可以嗎?」這種請求確認的話,就表示你正在請求確認,
    那你**一定要先呼叫 propose_create_task 或 propose_log_note**。沒有呼叫就問「對嗎」,
    使用者根本看不到確認按鈕,等於這件事永遠不會發生。
-12. 全程使用繁體中文。標籤、任務標題、內容一律不可以出現簡體字。`;
+12. 全程使用繁體中文。標籤、任務標題、內容一律不可以出現簡體字。
+13. 你不能直接講話,只能透過工具:要回答用 respond,要追問用 ask_clarification,
+   要拒絕用 decline,要寫入用 propose_*。
+14. 你不是通用聊天助理。跟工作無關的話題(你喜歡什麼、天氣、笑話、你是誰)
+   一律 decline(reason='chitchat'),不要陪聊、不要反問使用者興趣。
+   跟工作有關但你沒有工具能做的(改金額、刪資料、建新專案)用
+   decline(reason='unsupported_action')。
+15. respond 只能講你這一輪從工具拿到的東西。沒查過就不要講——要查就先呼叫查詢工具。`;
 }
 
 // ---------- 工具執行 ----------
@@ -266,16 +275,27 @@ export async function runAgentTurn(
 
   session.messages.push({ role: 'user', content: [{ type: 'text', text: userText }] });
   const system = buildSystemPrompt(now());
+  // 這一輪有沒有查過東西。閒聊的共同特徵是「不需要查任何資料」,
+  // 所以這個布林值就是「模型現在有沒有事實可講」的機械判準,不靠語意理解
+  let didRead = false;
 
   for (let step = 0; step < MAX_STEPS; step += 1) {
-    const res = await deps.llm.createMessage({ system, messages: session.messages, tools: AGENT_TOOLS });
+    const res = await deps.llm.createMessage({
+      system,
+      messages: session.messages,
+      tools: AGENT_TOOLS,
+      toolChoice: 'any',
+    });
     session.messages.push({ role: 'assistant', content: res.content });
 
     const toolUses = res.content.filter(
       (b): b is Extract<LlmContentBlock, { type: 'tool_use' }> => b.type === 'tool_use',
     );
     if (toolUses.length === 0) {
-      return { reply: textOf(res.content), state: 'responding', toolTrace: trace, warning };
+      // 已經強制 tool_choice 了還是回自由文字(模型不理會設定時會發生)——
+      // 一樣要過閘門,沒查過東西就不讓它講
+      const gated = gateFreeText(textOf(res.content), didRead);
+      return { reply: gated.text, state: 'responding', toolTrace: trace, warning: gated.warning ?? warning };
     }
 
     const resultBlocks: LlmContentBlock[] = [];
@@ -293,9 +313,9 @@ export async function runAgentTurn(
         continue;
       }
 
-      if (use.name === 'ask_clarification') {
+      if (use.name === 'ask_clarification' || use.name === 'respond' || use.name === 'decline') {
         trace.push({ name: use.name, ok: true });
-        resultBlocks.push({ type: 'tool_result', tool_use_id: use.id, content: '已向使用者提問,等待回覆。' });
+        resultBlocks.push({ type: 'tool_result', tool_use_id: use.id, content: '已回覆使用者,等待下一句。' });
         terminal = { use, result: null };
         continue;
       }
@@ -319,6 +339,7 @@ export async function runAgentTurn(
         ok: result.ok,
         ...(result.ok ? {} : { error_code: result.error_code }),
       });
+      if (READ_TOOLS.has(use.name)) didRead = true;
       if (use.name === 'search_projects') rememberProjects(session, result);
       resultBlocks.push({
         type: 'tool_result',
@@ -332,6 +353,27 @@ export async function runAgentTurn(
     }
 
     session.messages.push({ role: 'user', content: resultBlocks });
+
+    if (terminal && terminal.use.name === 'decline') {
+      const reason = String(terminal.use.input.reason ?? 'out_of_scope');
+      // 拒絕的話由系統講,模型只給分類——不讓它自己造句順便又聊起來
+      return {
+        reply: DECLINE_TEXT[reason] ?? DECLINE_TEXT.out_of_scope,
+        state: 'responding',
+        toolTrace: trace,
+        warning,
+      };
+    }
+
+    if (terminal && terminal.use.name === 'respond') {
+      const gated = gateFreeText(String(terminal.use.input.text ?? ''), didRead);
+      return {
+        reply: gated.text,
+        state: 'responding',
+        toolTrace: trace,
+        warning: gated.warning ?? warning,
+      };
+    }
 
     if (terminal && terminal.use.name === 'ask_clarification') {
       const input = terminal.use.input;
@@ -394,6 +436,28 @@ export async function runAgentTurn(
     state: 'responding',
     toolTrace: trace,
     warning: `已達工具呼叫上限(${MAX_STEPS} 步)`,
+  };
+}
+
+/**
+ * 自由文字的閘門——這是「把 agent 約束在正軌上」的主力。
+ *
+ * 觀察:閒聊(貓派狗派、你是誰、今天天氣)的共同特徵是**不需要查任何資料**;
+ * 而合法的回答一定查過東西——要講未完成任務數就得先 list_tasks,
+ * 要講專案近況就得先 get_project_summary。
+ *
+ * 所以規則是機械的:這一輪沒呼叫過任何讀取工具,就沒有事實可講,不准講。
+ * 不依賴語意判斷、不依賴模型自律,跟「LLM 沒有寫入工具」是同一招。
+ *
+ * 已知取捨:使用者打「你好」也會收到這句固定文案,不會有寒暄。
+ * 這是刻意的——現場工具是拿來記事情的,不是拿來聊天的。
+ */
+function gateFreeText(text: string, didRead: boolean): { text: string; warning?: string } {
+  const trimmed = text.trim();
+  if (didRead && trimmed) return { text: trimmed };
+  return {
+    text: DECLINE_TEXT.chitchat,
+    warning: '這一輪沒有查詢任何資料,回覆已改用固定文案(防止模型自由發揮)',
   };
 }
 
@@ -562,6 +626,7 @@ export function createAnthropicLlm(): LlmClient {
         system: req.system,
         messages: req.messages as unknown as Anthropic.MessageParam[],
         ...(req.tools ? { tools: req.tools as unknown as Anthropic.Tool[] } : {}),
+        ...(req.tools && req.toolChoice === 'any' ? { tool_choice: { type: 'any' as const } } : {}),
       });
       const content: LlmContentBlock[] = [];
       for (const block of res.content) {

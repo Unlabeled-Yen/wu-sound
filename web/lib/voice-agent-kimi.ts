@@ -107,7 +107,13 @@ export function createKimiLlm(): LlmClient {
           model,
           max_tokens: MAX_TOKENS,
           messages: toOpenAiMessages(req.system, req.messages),
-          ...(req.tools ? { tools: toOpenAiTools(req.tools), tool_choice: 'auto' } : {}),
+          ...(req.tools
+            ? {
+                tools: toOpenAiTools(req.tools),
+                // OpenAI 相容介面用 'required' 表達「一定要選一個工具」
+                tool_choice: req.toolChoice === 'any' ? 'required' : 'auto',
+              }
+            : {}),
         }),
       });
 

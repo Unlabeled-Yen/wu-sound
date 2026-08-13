@@ -35,6 +35,12 @@ export interface LlmRequest {
   messages: LlmMessage[];
   /** 省略 tools = 這一輪禁止呼叫工具(用在「複述確認」那一步,保證拿到純文字) */
   tools?: ToolSchema[];
+  /**
+   * 'any' = 強迫模型一定要選一個工具,不能直接回自由文字。
+   * 這是把「模型隨口聊天」這個出口關掉的第一步——它只能透過 respond/decline 說話,
+   * 而那兩條路都有 runtime 的閘門把關。
+   */
+  toolChoice?: 'auto' | 'any';
 }
 
 export interface LlmClient {
@@ -54,7 +60,23 @@ export interface ToolSchema {
 }
 
 /** 呼叫後這一輪對話就結束(等使用者下一個動作),不再讓 LLM 繼續推理 */
-export const TERMINAL_TOOLS = new Set(['ask_clarification', 'propose_create_task', 'propose_log_note']);
+export const TERMINAL_TOOLS = new Set([
+  'ask_clarification',
+  'propose_create_task',
+  'propose_log_note',
+  'respond',
+  'decline',
+]);
+
+/** 讀取工具。「這一輪有沒有查過東西」是判斷閒聊的機械依據,見 voice-agent.ts 的 respond 閘門 */
+export const READ_TOOLS = new Set(['search_projects', 'get_project_summary', 'list_tasks']);
+
+/** decline 的固定文案。理由分類由模型給,話由系統講——不讓模型自己造拒絕句 */
+export const DECLINE_TEXT: Record<string, string> = {
+  unsupported_action: '這個操作目前不支援,請用系統介面。',
+  out_of_scope: '我只能幫你查專案狀況、記工作記錄、新增任務。這件事請用系統介面處理。',
+  chitchat: '我是現場記錄助理,只處理專案查詢、工作記錄和任務。有什麼要記的嗎?',
+};
 
 export const AGENT_TOOLS: ToolSchema[] = [
   {
@@ -107,6 +129,33 @@ export const AGENT_TOOLS: ToolSchema[] = [
         },
       },
       required: ['question'],
+    },
+  },
+  {
+    name: 'respond',
+    description:
+      '把最終回覆講給使用者聽。只能陳述你從工具拿到的事實,不可以憑印象講數字或狀態。注意:這一輪如果你沒有呼叫過任何查詢工具,系統會擋掉這個回覆——沒查過就沒有事實可講。',
+    input_schema: {
+      type: 'object',
+      properties: { text: { type: 'string', description: '要對使用者說的話(口語、繁體中文)' } },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'decline',
+    description:
+      '使用者的要求超出你能做的範圍時呼叫。實際回覆文案由系統產生,你只要選對分類。閒聊、問你是誰、問天氣、跟工作無關的話題一律用 chitchat。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        reason: {
+          type: 'string',
+          enum: ['unsupported_action', 'out_of_scope', 'chitchat'],
+          description:
+            'unsupported_action=要求改資料/刪除/查金額等系統支援但你沒有工具的操作;out_of_scope=工作相關但不在職責內;chitchat=與工作無關的閒聊',
+        },
+      },
+      required: ['reason'],
     },
   },
   {

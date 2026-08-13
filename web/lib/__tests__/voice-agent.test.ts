@@ -412,6 +412,51 @@ describe('確認流程', () => {
   });
 });
 
+describe('把 agent 約束在正軌上', () => {
+  it('沒查過任何東西就想講話 → 換成固定文案,不讓它自由發揮', async () => {
+    const llm = fakeLlm([
+      [{ type: 'tool_use', id: 't1', name: 'respond', input: { text: '哈哈,貓跟狗都很棒!你是貓派還是狗派?' } }],
+    ]);
+    const tools = fakeTools({});
+    const r = await runAgentTurn(session(), '貓跟狗你喜歡誰', deps(llm.client, tools.client));
+
+    expect(r.reply).not.toContain('貓派');
+    expect(r.reply).toContain('現場記錄助理');
+    expect(r.warning).toContain('沒有查詢任何資料');
+  });
+
+  it('查過東西才准講,而且講的是模型那句話', async () => {
+    const llm = fakeLlm([
+      [{ type: 'tool_use', id: 't1', name: 'list_tasks', input: { project_id: SITE_ID } }],
+      [{ type: 'tool_use', id: 't2', name: 'respond', input: { text: '磐頂長老教會目前有 2 個未完成任務。' } }],
+    ]);
+    const tools = fakeTools({ list_tasks: () => ({ ok: true, data: { tasks: [], total: 2 } }) });
+    const r = await runAgentTurn(session(), '磐頂還有幾個任務沒做', deps(llm.client, tools.client));
+
+    expect(r.reply).toBe('磐頂長老教會目前有 2 個未完成任務。');
+    expect(r.warning).toBeUndefined();
+  });
+
+  it('decline 的話是系統講的,模型只給分類', async () => {
+    const llm = fakeLlm([[{ type: 'tool_use', id: 't1', name: 'decline', input: { reason: 'unsupported_action' } }]]);
+    const r = await runAgentTurn(session(), '幫我把金額改成三萬', deps(llm.client, fakeTools({}).client));
+    expect(r.reply).toBe('這個操作目前不支援,請用系統介面。');
+  });
+
+  it('模型不理會 tool_choice、直接回自由文字時,一樣過閘門', async () => {
+    const llm = fakeLlm([[{ type: 'text', text: '我覺得狗比較忠心耶' }]]);
+    const r = await runAgentTurn(session(), '你喜歡狗嗎', deps(llm.client, fakeTools({}).client));
+    expect(r.reply).not.toContain('忠心');
+    expect(r.warning).toContain('沒有查詢任何資料');
+  });
+
+  it('每一輪都強制模型只能透過工具說話', async () => {
+    const llm = fakeLlm([[{ type: 'tool_use', id: 't1', name: 'decline', input: { reason: 'chitchat' } }]]);
+    await runAgentTurn(session(), '你好', deps(llm.client, fakeTools({}).client));
+    expect(llm.seen[0].toolChoice).toBe('any');
+  });
+});
+
 describe('收斂保護', () => {
   it('LLM 一直呼叫工具不收斂 → 停下來明講,不假裝有結論', async () => {
     const loop: LlmContentBlock[][] = Array.from({ length: 12 }, (_, i) => [

@@ -85,14 +85,16 @@ describe('訊息結構轉換', () => {
 });
 
 describe('工具定義轉換', () => {
-  it('6 個工具都轉成 function 格式,input_schema 原樣當 parameters', () => {
+  it('8 個工具都轉成 function 格式,input_schema 原樣當 parameters', () => {
     const tools = toOpenAiTools(AGENT_TOOLS);
-    expect(tools).toHaveLength(6);
+    expect(tools).toHaveLength(8);
     expect(tools.map((t) => t.function.name)).toEqual([
       'search_projects',
       'get_project_summary',
       'list_tasks',
       'ask_clarification',
+      'respond',
+      'decline',
       'propose_create_task',
       'propose_log_note',
     ]);
