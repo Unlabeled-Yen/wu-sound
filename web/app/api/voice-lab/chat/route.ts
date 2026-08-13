@@ -1,0 +1,108 @@
+import { NextResponse } from 'next/server';
+import { getSession } from '@/lib/session';
+import {
+  AgentConfigError,
+  cancelPending,
+  confirmPending,
+  createLlmClient,
+  runAgentTurn,
+  type AgentDeps,
+  type AgentTurnResult,
+} from '@/lib/voice-agent';
+import { getOrCreateSession } from '@/lib/voice-agent-session';
+import { createHttpToolClient } from '@/lib/voice-agent-tools';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/**
+ * voice-lab Lab 2 對話端點(spec §6)。
+ *
+ * 認證是兩層(spec §5):
+ * - 這一層用登入 session(老闆/員工看得到的內部頁面)
+ * - agent 後端打 Lab 1 工具端點時才用 VOICE_API_KEY(server-to-server)
+ *
+ * action 是**結構化欄位**,不是從文字猜的:
+ *   message → 跑一輪 agent 迴圈
+ *   confirm → 使用者按下 [確認],伺服器端直接寫入(LLM 不參與這個判斷)
+ *   cancel  → 提案作廢
+ */
+
+type Action = 'message' | 'confirm' | 'cancel';
+
+function bad(message: string, status: number) {
+  return NextResponse.json({ error: message }, { status });
+}
+
+export async function POST(req: Request) {
+  const user = await getSession();
+  if (!user) return bad('未登入', 401);
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return bad('請求格式不是有效的 JSON', 400);
+  }
+
+  const sessionId = typeof body.session_id === 'string' ? body.session_id.trim() : '';
+  if (!sessionId) return bad('缺少 session_id', 400);
+  const action: Action =
+    body.action === 'confirm' || body.action === 'cancel' ? body.action : 'message';
+
+  const message = typeof body.message === 'string' ? body.message.trim() : '';
+  if (action === 'message' && !message) return bad('訊息是空的', 400);
+
+  // 缺配置一律 loud 503,不靜默降級成「AI 剛好答不出來」
+  let deps: AgentDeps;
+  let provider: 'anthropic' | 'kimi';
+  try {
+    const picked = createLlmClient();
+    provider = picked.provider;
+    deps = { llm: picked.llm, tools: createHttpToolClient(new URL(req.url).origin) };
+  } catch (e) {
+    if (e instanceof AgentConfigError) {
+      return NextResponse.json({ error: e.message, error_code: 'SERVICE_UNAVAILABLE' }, { status: 503 });
+    }
+    throw e;
+  }
+
+  // 使用者 id 併進 session key:同一個瀏覽器分頁 id 不會跨帳號共用對話
+  const { session, created } = getOrCreateSession(`${user.id}:${sessionId}`);
+
+  let result: AgentTurnResult;
+  try {
+    if (action === 'confirm') {
+      result = await confirmPending(session, deps);
+    } else if (action === 'cancel') {
+      result = cancelPending(session);
+    } else {
+      result = await runAgentTurn(session, message, deps);
+    }
+  } catch (e) {
+    if (e instanceof AgentConfigError) {
+      return NextResponse.json({ error: e.message, error_code: 'SERVICE_UNAVAILABLE' }, { status: 503 });
+    }
+    // 對話跑爆了就明講,不回一句假裝正常的話
+    return NextResponse.json(
+      { error: `對話處理失敗: ${e instanceof Error ? e.message : String(e)}` },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    reply: result.reply,
+    state: result.state,
+    // 現在是誰在講話——驗證對話品質時,換供應商的差異要看得見,不能猜
+    provider,
+    ...(result.options ? { options: result.options } : {}),
+    ...(result.pending ? { pending: result.pending } : {}),
+    ...(result.warning ? { warning: result.warning } : {}),
+    tool_trace: result.toolTrace,
+    // 記憶體 session 被重啟或掃除清掉時,讓 UI 有機會告訴使用者「對話已重置」,
+    // 而不是靜默失憶後莫名其妙聽不懂上一句在講什麼(spec §6 的已知簡化)
+    ...(created && action !== 'message' ? { session_reset: true } : {}),
+    ...(created && action === 'message' ? { session_started: true } : {}),
+  });
+}
