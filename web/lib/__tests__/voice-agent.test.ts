@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import {
   cancelPending,
   confirmPending,
+  formatDueDate,
   runAgentTurn,
   todayInTaipei,
   type AgentDeps,
@@ -84,6 +85,18 @@ describe('system prompt', () => {
   });
 });
 
+describe('期限欄位的星期幾', () => {
+  it('由 runtime 自己算,模型算錯一天就會在卡片上現形', () => {
+    // 實測 Kimi 把「下週三」算成 08-20;08-20 是週四,08-19 才是週三
+    expect(formatDueDate('2026-08-19')).toBe('2026-08-19(週三)');
+    expect(formatDueDate('2026-08-20')).toBe('2026-08-20(週四)');
+  });
+
+  it('格式不是 YYYY-MM-DD 就原樣顯示,不自作聰明', () => {
+    expect(formatDueDate('下週三')).toBe('下週三');
+  });
+});
+
 describe('提案流程', () => {
   it('search → propose 成功後停在 confirming,而且沒有呼叫任何寫入工具', async () => {
     const llm = fakeLlm([
@@ -112,6 +125,8 @@ describe('提案流程', () => {
     ]);
     expect(tools.calls.map((c) => c.tool)).toEqual(['search_projects', 'propose_write']);
     expect(tools.calls.some((c) => c.tool === 'log_note' || c.tool === 'create_task')).toBe(false);
+    // LLM 就算複述成「已經記好了」,runtime 也會在前面補一句不說謊的話
+    expect(r.reply.startsWith('⏳ 還沒寫入,請確認:')).toBe(true);
     // 複述那一步不給工具,保證是純文字
     expect(llm.seen[2].tools).toBeUndefined();
   });
@@ -128,7 +143,7 @@ describe('提案流程', () => {
 
     const r = await runAgentTurn(session(), '記一筆', deps(llm.client, tools.client));
     expect(r.reply).not.toContain(TOKEN);
-    expect(r.reply).toContain('請確認');
+    expect(r.reply).toContain('還沒寫入');
     expect(r.reply).toContain('磐頂長老教會');
     expect(r.warning).toContain('系統識別碼');
   });

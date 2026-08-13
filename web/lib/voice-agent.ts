@@ -95,11 +95,18 @@ export function buildSystemPrompt(now: number): string {
    但使用者提到不同專案名稱時要重新 search_projects。
 7. 使用者一次講兩件事,一次只處理一件,先完成第一件的確認流程,再處理第二件。
 8. 呼叫 propose_* 之後,那筆東西**還沒有寫進系統**。複述時的措辭必須是「要不要記…?」
-   「幫你記到…,對嗎?」這種待確認語氣,絕對不可以講成「已經記了」「已經新增了」。
-   也不可以提到確認碼、token、有效期限或任何系統內部識別碼——使用者只該看到
+   「幫你記到…,對嗎?」這種待確認語氣,絕對不可以用「已經」開頭,
+   也不可以講成「已經記了」「已經新增了」「已經幫你開好」。
+   不可以提到確認碼、token、有效期限或任何系統內部識別碼——使用者只該看到
    專案全名、動作、內容、日期。
 9. 需要使用者補資訊或做選擇時,一定要呼叫 ask_clarification,不要只回一段文字問問題。
-10. 換算日期後自己覆核一次星期幾對不對再講出來,寧可講「你是指 X 月 X 日嗎」也不要算錯。`;
+10. 遇到口語相對日期:自己換算成 YYYY-MM-DD 之後**直接發提案**,不要為了確認日期
+   而停下來反問——系統顯示的確認卡片會把日期連同星期幾一起列出來給使用者核對,
+   使用者本來就有機會在按確認前糾正你。複述時把日期講清楚(例如「8 月 19 日」)。
+11. 只要你的回覆裡要問「對嗎?」「可以嗎?」這種請求確認的話,就表示你正在請求確認,
+   那你**一定要先呼叫 propose_create_task 或 propose_log_note**。沒有呼叫就問「對嗎」,
+   使用者根本看不到確認按鈕,等於這件事永遠不會發生。
+12. 全程使用繁體中文。標籤、任務標題、內容一律不可以出現簡體字。`;
 }
 
 // ---------- 工具執行 ----------
@@ -154,6 +161,19 @@ async function resolveProjectName(
   };
 }
 
+const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];
+
+/**
+ * 期限欄位補上星期幾。這個星期幾是 runtime 自己從日期算的,不是 LLM 講的——
+ * 模型換算相對日期時算錯一天是實測會發生的事(Kimi 把「下週三」算成 08-20,
+ * 那天其實是星期四),把星期幾秀在卡片上,使用者一眼就看得出對不對。
+ */
+export function formatDueDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const day = new Date(`${value}T12:00:00+08:00`).getDay();
+  return `${value}(週${WEEKDAY[day]})`;
+}
+
 function buildFields(
   action: 'create_task' | 'log_note',
   payload: Record<string, unknown>,
@@ -166,7 +186,10 @@ function buildFields(
   if (action === 'create_task') {
     fields.push({ label: '任務', value: String(payload.title ?? '') });
     if (payload.description) fields.push({ label: '說明', value: String(payload.description) });
-    fields.push({ label: '期限', value: payload.due_date ? String(payload.due_date) : '未指定' });
+    fields.push({
+      label: '期限',
+      value: payload.due_date ? formatDueDate(String(payload.due_date)) : '未指定',
+    });
   } else {
     fields.push({ label: '內容', value: String(payload.content ?? '') });
     if (Array.isArray(payload.tags) && payload.tags.length > 0) {
@@ -315,7 +338,7 @@ export async function runAgentTurn(
       if (safe.leaked) warning = 'AI 的複述夾帶了系統識別碼,已改用系統產生的說明(實測 Kimi 會唸出確認碼)';
 
       return {
-        reply: safe.text,
+        reply: `${PENDING_PREFIX}\n${safe.text}`,
         state: 'confirming',
         pending: { action: pending.action, fields: pending.fields },
         toolTrace: trace,
@@ -347,9 +370,18 @@ function parseOptions(raw: unknown): AgentOption[] {
   return out;
 }
 
+/**
+ * 待確認的提示前綴。
+ *
+ * 為什麼要寫死一句:實測 Kimi 有一定比例會複述成「已經幫你記了一筆」,
+ * 但那當下根本還沒寫入。使用者若當真,就不會去按確認,這件事等於沒發生
+ * ——而且他以為做完了。prompt 規則擋不住(加了規則仍會犯),
+ * 所以由 runtime 補一句不會說謊的話,模型那句放在後面當口語補充。
+ */
+const PENDING_PREFIX = '⏳ 還沒寫入,請確認:';
+
 function buildFallbackRecap(pending: PendingWrite): string {
-  const lines = pending.fields.map((f) => `${f.label}:${f.value}`).join(';');
-  return `請確認:${lines}。`;
+  return pending.fields.map((f) => `${f.label}:${f.value}`).join(';');
 }
 
 const ANY_UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
