@@ -29,8 +29,8 @@ const DEFAULT_BASE = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-4o-transcribe';
 
 export type SttResult =
-  | { ok: true; text: string; model: string }
-  | { ok: false; error_code: string; message_zh: string };
+  | { ok: true; text: string; model: string; attempts: number }
+  | { ok: false; error_code: string; message_zh: string; attempts: number };
 
 export interface SttClient {
   transcribe(audio: Blob, filename: string, prompt?: string): Promise<SttResult>;
@@ -65,26 +65,35 @@ export function createSttClient(): SttClient {
       };
 
       let res: Response;
+      let attempts = 0;
       try {
-        res = await send();
         /**
-         * 重試一次的理由(實測):剛調整過 project 模型白名單時,同一個檔案連打 5 次
-         * 會有 3 次回 403「沒有存取權」、2 次成功——OpenAI 端的權限傳播不是即時一致的。
-         * 現場員工按了麥克風卻隨機失敗、還要重錄一次,是很糟的體驗。
+         * 重試的理由(實測數據,不是預防性寫法):剛調整過 project 模型白名單之後,
+         * 同一個音檔連打 8 次會有 3 次回 403「沒有存取權」、5 次成功——
+         * OpenAI 端的權限傳播不是即時一致的,而且失敗是隨機的。
          *
-         * 只重試一次,而且真的沒權限時第二次一樣會失敗、照樣報錯——
-         * 這不是把錯誤吞掉,是抵銷對方的短暫不一致。
-         * 400(檔案格式錯)和 401(key 錯)不重試,那些重試一百次也一樣。
+         * 單次失敗率約 37%,重試到三次可壓到約 5%。現場員工按了麥克風卻隨機失敗、
+         * 還要整段重錄,是不能接受的體驗。
+         *
+         * 這不是把錯誤吞掉:真的沒權限時三次都會失敗、照樣回報,
+         * 而且重試過幾次會回傳給呼叫端(attempts),持續需要重試代表對方還沒穩,
+         * 那是要被看見的資訊。
+         * 400(檔案格式錯)、401(key 錯)、413(檔案太大)不重試——那些重試一百次也一樣。
          */
-        if (!res.ok && res.status !== 400 && res.status !== 401 && res.status !== 413) {
-          await new Promise((r) => setTimeout(r, 900));
+        const MAX_ATTEMPTS = 3;
+        for (;;) {
+          attempts += 1;
           res = await send();
+          const retriable = !res.ok && res.status !== 400 && res.status !== 401 && res.status !== 413;
+          if (!retriable || attempts >= MAX_ATTEMPTS) break;
+          await new Promise((r) => setTimeout(r, 700 * attempts));
         }
       } catch (e) {
         return {
           ok: false,
           error_code: 'STT_UNREACHABLE',
           message_zh: `辨識服務連不上:${e instanceof Error ? e.message : String(e)}`,
+          attempts,
         };
       }
 
@@ -94,6 +103,7 @@ export function createSttClient(): SttClient {
           ok: false,
           error_code: `STT_HTTP_${res.status}`,
           message_zh: `辨識失敗(HTTP ${res.status}):${body.slice(0, 200)}`,
+          attempts,
         };
       }
 
@@ -101,9 +111,9 @@ export function createSttClient(): SttClient {
       const text = toTw((data.text ?? '').trim());
       if (!text) {
         // 空白轉寫不能當成「使用者沒講話所以沒事」——要讓上層明確回「沒聽清楚」(handoff §8)
-        return { ok: false, error_code: 'STT_EMPTY', message_zh: '沒有辨識到內容,請再說一次' };
+        return { ok: false, error_code: 'STT_EMPTY', message_zh: '沒有辨識到內容,請再說一次', attempts };
       }
-      return { ok: true, text, model };
+      return { ok: true, text, model, attempts };
     },
   };
 }

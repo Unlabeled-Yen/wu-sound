@@ -68,6 +68,8 @@ export async function POST(req: Request) {
     ok: true,
     text: result.text,
     model: result.model,
+    // 重試過幾次要看得見:持續 >1 代表辨識服務端還不穩,不該讓它靜靜地慢下去
+    attempts: result.attempts,
     // 熱詞狀態要看得見:0 筆代表熱詞沒生效(可能 DB 讀失敗),辨錯專有名詞時才知道往哪查
     hotwords: { site_count: hotwords.siteCount, truncated: hotwords.truncated },
   });
