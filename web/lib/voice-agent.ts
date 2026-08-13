@@ -1,5 +1,6 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
+import * as OpenCC from 'opencc-js';
 import {
   AGENT_TOOLS,
   AgentConfigError,
@@ -116,15 +117,50 @@ function toolResultText(result: ToolResult): string {
   return JSON.stringify({ error_code: result.error_code, message_zh: result.message_zh });
 }
 
-function normalizePayload(input: Record<string, unknown>): Record<string, unknown> {
+/**
+ * 簡→繁轉換。用 `to: 'tw'`(只轉字形)而不是 `'twp'`(連詞彙一起換,
+ * 例如「调试」→「除錯」)——換詞等於改寫使用者講的話,那不是我們該做的事;
+ * 我們要處理的只是「模型寫出簡體字」這一件事。
+ *
+ * 為什麼需要:實測 Kimi 會把「水電」寫成「水电」存進 tags,而 wu 是全繁體系統。
+ * prompt 交代過不准用簡體(規則 12),它照犯——所以改在寫入路徑上轉。
+ */
+const toTw = OpenCC.Converter({ from: 'cn', to: 'tw' });
+
+export function toTraditional(value: string): string {
+  return toTw(value);
+}
+
+function normalizePayload(input: Record<string, unknown>): {
+  payload: Record<string, unknown>;
+  converted: boolean;
+} {
   const out: Record<string, unknown> = {};
+  let converted = false;
+
   for (const [k, v] of Object.entries(input)) {
     if (v === undefined || v === null) continue;
-    if (typeof v === 'string' && v.trim() === '') continue;
-    if (Array.isArray(v) && v.length === 0) continue;
+    if (typeof v === 'string') {
+      if (v.trim() === '') continue;
+      const tw = toTraditional(v);
+      if (tw !== v) converted = true;
+      out[k] = tw;
+      continue;
+    }
+    if (Array.isArray(v)) {
+      if (v.length === 0) continue;
+      out[k] = v.map((item) => {
+        if (typeof item !== 'string') return item;
+        const tw = toTraditional(item);
+        if (tw !== item) converted = true;
+        return tw;
+      });
+      continue;
+    }
     out[k] = v;
   }
-  return out;
+
+  return { payload: out, converted };
 }
 
 /** 記住 search 結果的 id→名稱,複述與結果卡片才不用再多打一次 API */
@@ -265,13 +301,18 @@ export async function runAgentTurn(
       }
 
       const proposeAction = PROPOSE_ACTION[use.name];
-      const result = proposeAction
-        ? await deps.tools.call('propose_write', {
-            action: proposeAction,
-            payload: normalizePayload(use.input),
-            source: 'text',
-          })
-        : await deps.tools.call(use.name, use.input);
+      let result: ToolResult;
+      if (proposeAction) {
+        const normalized = normalizePayload(use.input);
+        if (normalized.converted) warning = '模型產生了簡體字,已自動轉成繁體';
+        result = await deps.tools.call('propose_write', {
+          action: proposeAction,
+          payload: normalized.payload,
+          source: 'text',
+        });
+      } else {
+        result = await deps.tools.call(use.name, use.input);
+      }
 
       trace.push({
         name: use.name,

@@ -3,6 +3,7 @@ import {
   cancelPending,
   confirmPending,
   formatDueDate,
+  toTraditional,
   runAgentTurn,
   todayInTaipei,
   type AgentDeps,
@@ -94,6 +95,60 @@ describe('期限欄位的星期幾', () => {
 
   it('格式不是 YYYY-MM-DD 就原樣顯示,不自作聰明', () => {
     expect(formatDueDate('下週三')).toBe('下週三');
+  });
+});
+
+describe('簡體字轉換', () => {
+  it('模型寫出的簡體字在送去提案前就轉成繁體,並跳警告', async () => {
+    const llm = fakeLlm([
+      [
+        {
+          type: 'tool_use',
+          id: 't1',
+          name: 'propose_log_note',
+          input: { project_id: SITE_ID, content: '水电明天进场', tags: ['水电', '进场'] },
+        },
+      ],
+      [{ type: 'text', text: '確認?' }],
+    ]);
+    const tools = fakeTools({
+      propose_write: okPropose,
+      get_project_summary: () => ({ ok: true, data: { name: '磐頂長老教會' } }),
+    });
+
+    const r = await runAgentTurn(session(), '記一筆', deps(llm.client, tools.client));
+    const sent = tools.calls.find((c) => c.tool === 'propose_write')!.body.payload as Record<string, unknown>;
+    expect(sent.content).toBe('水電明天進場');
+    expect(sent.tags).toEqual(['水電', '進場']);
+    expect(r.warning).toContain('簡體字');
+  });
+
+  it('本來就是繁體就原樣不動,也不會跳警告', async () => {
+    const llm = fakeLlm([
+      [
+        {
+          type: 'tool_use',
+          id: 't1',
+          name: 'propose_log_note',
+          input: { project_id: SITE_ID, content: '木作進場前先放樣' },
+        },
+      ],
+      [{ type: 'text', text: '確認?' }],
+    ]);
+    const tools = fakeTools({
+      propose_write: okPropose,
+      get_project_summary: () => ({ ok: true, data: { name: '磐頂長老教會' } }),
+    });
+
+    const r = await runAgentTurn(session(), '記一筆', deps(llm.client, tools.client));
+    const sent = tools.calls.find((c) => c.tool === 'propose_write')!.body.payload as Record<string, unknown>;
+    expect(sent.content).toBe('木作進場前先放樣');
+    expect(r.warning).toBeUndefined();
+  });
+
+  it('只轉字形不換詞彙:「调试」不會被改寫成「除錯」', () => {
+    expect(toTraditional('调试')).toBe('調試');
+    expect(toTraditional('软件')).toBe('軟件');
   });
 });
 
