@@ -34,7 +34,10 @@ const GROUPS: Group[] = [
   },
   {
     title: '標案',
-    items: [{ href: '/boss/tenders', label: '標案監測' }],
+    items: [
+      { href: '/boss/tenders', label: '資料進度板' },
+      { href: '/boss/tenders/monitor', label: '標案監測' },
+    ],
   },
   {
     title: '工具',

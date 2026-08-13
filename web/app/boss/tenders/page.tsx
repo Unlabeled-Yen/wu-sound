@@ -4,180 +4,235 @@ import { getSession } from '@/lib/session';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type FieldStatus = 'value' | 'withheld' | 'unfetched' | 'fetch_failed';
+// 這個頁面是純渲染器——項目清單、說明、狀態、程式碼連結全部來自
+// tender-radar 的 /api/meta/bid-plan。wu-sound 是公開 repo,不得在這裡
+// 寫死任何策略性文字(項目名稱、BidOS 術語、引擎說明)。
 
-interface TenderSignal {
-  code: string;
-  label: string;
+type ItemStatus =
+  | 'done'
+  | 'backfilling'
+  | 'parser_missing'
+  | 'bug'
+  | 'needs_docs'
+  | 'internal'
+  | 'not_started'
+  | 'partial';
+
+interface Coverage {
+  value: number;
+  unfetched: number;
+  withheld: number;
+  fetch_failed: number;
 }
 
-interface TenderHit {
-  id: string;
+interface CodeLink {
+  label: string;
+  url: string;
+}
+
+interface BidPlanSample {
   job_number: string;
+  value: unknown;
+}
+
+interface BidPlanItem {
+  key: string;
   title: string;
-  unit_id: string | null;
-  unit_name: string | null;
-  category: string | null;
-  notice_type: string;
-  publish_date: string;
-  deadline_date: string | null;
-  deadline_status: FieldStatus;
-  budget: number | null;
-  budget_status: FieldStatus;
-  source_url: string;
-  is_retender: number;
-  signals?: TenderSignal[];
+  status: ItemStatus;
+  note: string | null;
+  coverage: Coverage | null;
+  samples: BidPlanSample[];
+  code_links: CodeLink[];
+}
+
+interface BidPlanDatabase {
+  key: string;
+  title: string;
+  bidos_ref: string;
+  items: BidPlanItem[];
+}
+
+interface BidPlanResponse {
+  generated_at: string;
+  config_reviewed_at: string;
+  databases: BidPlanDatabase[];
 }
 
 interface LoadResult {
-  hits: TenderHit[];
+  plan: BidPlanResponse | null;
   error: string | null;
 }
 
-async function loadRecentTenders(days: number): Promise<LoadResult> {
+async function loadBidPlan(): Promise<LoadResult> {
   const base = process.env.TENDER_RADAR_API_URL;
   const token = process.env.TENDER_RADAR_API_TOKEN;
   if (!base || !token) {
-    return { hits: [], error: '標案雷達連線尚未設定(缺 TENDER_RADAR_API_URL/TOKEN)' };
+    return { plan: null, error: '標案雷達連線尚未設定(缺 TENDER_RADAR_API_URL/TOKEN)' };
   }
 
   try {
-    const res = await fetch(`${base}/api/tenders/recent?days=${days}`, {
+    const res = await fetch(`${base}/api/meta/bid-plan`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     });
     if (!res.ok) {
-      return { hits: [], error: `標案雷達回應異常:HTTP ${res.status}` };
+      return { plan: null, error: `標案雷達回應異常:HTTP ${res.status}` };
     }
-    const json = (await res.json()) as { hits: TenderHit[] };
-    return { hits: json.hits, error: null };
+    const json = (await res.json()) as BidPlanResponse;
+    return { plan: json, error: null };
   } catch (err) {
-    return { hits: [], error: `連線標案雷達失敗:${err instanceof Error ? err.message : String(err)}` };
+    return { plan: null, error: `連線標案雷達失敗:${err instanceof Error ? err.message : String(err)}` };
   }
 }
 
-function formatBudget(hit: TenderHit): string {
-  switch (hit.budget_status) {
-    case 'value': {
-      if (hit.budget === null) return '資料異常';
-      const yuan = hit.budget / 100;
-      if (yuan >= 10000) return `$${(yuan / 10000).toLocaleString('zh-TW')} 萬`;
-      return `$${yuan.toLocaleString('zh-TW')}`;
-    }
-    case 'withheld':
-      return '預算不公開';
-    case 'unfetched':
-      return '預算未查詢';
-    case 'fetch_failed':
-      return '⚠️ 預算查詢失敗';
-  }
-}
+const STATUS_LABEL: Record<ItemStatus, string> = {
+  done: '已就緒',
+  backfilling: '回填中',
+  parser_missing: '解析未寫',
+  bug: '已知 bug',
+  needs_docs: '待招標文件',
+  internal: '內部建檔',
+  not_started: '未開始',
+  partial: '部分完成',
+};
 
-function formatDeadline(hit: TenderHit): string {
-  switch (hit.deadline_status) {
-    case 'value':
-      return hit.deadline_date ? `截止 ${hit.deadline_date}` : '截止日資料異常';
-    case 'withheld':
-      return '截止日不公開';
-    case 'unfetched':
-      return '截止日未查詢';
-    case 'fetch_failed':
-      return '⚠️ 截止日查詢失敗';
-  }
-}
+// 沿用現有 nm-* 設計系統的三色語意,不另起爐灶(--nm-success/--nm-warning/
+// --nm-danger 定義在 app/globals.css)。parser_missing/not_started/internal
+// 用跟「標案監測」頁 notice_type 徽章相同的中性灰。
+const STATUS_STYLE: Record<ItemStatus, { bg: string; fg: string }> = {
+  done: { bg: 'rgba(126, 207, 157, 0.16)', fg: 'var(--nm-success-glass-text)' },
+  backfilling: { bg: 'rgba(217, 181, 107, 0.16)', fg: 'var(--nm-warning-glass-text)' },
+  partial: { bg: 'rgba(217, 181, 107, 0.16)', fg: 'var(--nm-warning-glass-text)' },
+  needs_docs: { bg: 'rgba(217, 181, 107, 0.16)', fg: 'var(--nm-warning-glass-text)' },
+  bug: { bg: 'rgba(224, 122, 122, 0.16)', fg: 'var(--nm-danger-glass-text)' },
+  parser_missing: { bg: 'rgba(156,146,147,0.14)', fg: 'var(--nm-text-secondary)' },
+  not_started: { bg: 'rgba(156,146,147,0.14)', fg: 'var(--nm-text-secondary)' },
+  internal: { bg: 'rgba(156,146,147,0.14)', fg: 'var(--nm-text-secondary)' },
+};
 
-function TenderCard({ hit }: { hit: TenderHit }) {
-  const hasLink = hit.source_url.length > 0;
-  const signals = hit.signals ?? [];
-  // is_retender 是「歷史上出現過無法決標公告」的粗判斷；signals 裡的
-  // retender_round 是從招標公告本身的「招標狀態」欄位算出的精確輪次——
-  // 兩個訊號重疊時只顯示精確的那個,不要同一件事講兩次
-  const hasRetenderSignal = signals.some((s) => s.code === 'retender_round');
+function StatusBadge({ status }: { status: ItemStatus }) {
+  const style = STATUS_STYLE[status];
   return (
-    <li className="rounded-2xl nm-raised p-4">
-      <div className="mb-1 flex flex-wrap items-baseline gap-2 text-[13px]">
-        <span className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-          {hit.unit_name || hit.unit_id || '未知機關'}
+    <span
+      className="rounded-full px-2 py-0.5 text-xs shrink-0"
+      style={{ background: style.bg, color: style.fg }}
+    >
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+function CoverageBar({ coverage }: { coverage: Coverage }) {
+  const total = coverage.value + coverage.unfetched + coverage.withheld + coverage.fetch_failed;
+  if (total === 0) {
+    return <span className="text-xs" style={{ color: 'var(--nm-text-faint)' }}>尚無資料</span>;
+  }
+  const pct = Math.round((coverage.value / total) * 100);
+  return (
+    <span className="tabular-nums text-xs" style={{ color: 'var(--nm-text-secondary)' }}>
+      {coverage.value.toLocaleString('zh-TW')} / {total.toLocaleString('zh-TW')}({pct}%)
+    </span>
+  );
+}
+
+function ItemRow({ item }: { item: BidPlanItem }) {
+  const canExpand = item.coverage !== null || item.samples.length > 0 || item.code_links.length > 0;
+
+  const header = (
+    <div className="flex flex-wrap items-center gap-2 py-2">
+      <span className="text-[13px]" style={{ color: 'var(--nm-text-body)' }}>{item.title}</span>
+      <StatusBadge status={item.status} />
+      {item.coverage && (
+        <span className="ml-auto">
+          <CoverageBar coverage={item.coverage} />
         </span>
-        <span
-          className="rounded-full px-2 py-0.5 text-xs"
-          style={{ background: 'rgba(156,146,147,0.14)', color: 'var(--nm-text-secondary)' }}
-        >
-          {hit.notice_type}
-        </span>
-        {hit.is_retender === 1 && !hasRetenderSignal && (
-          <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'rgba(224,179,80,0.14)', color: '#c99a3a' }}>
-            ⚠️ 流標重招
-          </span>
-        )}
-        {signals.map((s) => (
-          <span
-            key={s.code}
-            className="rounded-full px-2 py-0.5 text-xs"
-            style={{ background: 'rgba(224,179,80,0.14)', color: '#c99a3a' }}
-          >
-            {s.label}
-          </span>
-        ))}
-        <span className="ml-auto text-xs" style={{ color: 'var(--nm-text-faint)' }}>
-          公告 {hit.publish_date}
-        </span>
-      </div>
-      <p className="mb-2 text-[13px]" style={{ color: 'var(--nm-text-body)' }}>{hit.title}</p>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
-        <span className="tabular-nums">{formatBudget(hit)}</span>
-        <span>{formatDeadline(hit)}</span>
-      </div>
-      <div className="mt-2 text-xs">
-        {hasLink ? (
-          <a href={hit.source_url} target="_blank" rel="noreferrer" style={{ color: 'var(--nm-text-secondary)' }} className="underline">
-            查看標案詳情 →
-          </a>
-        ) : (
-          <span style={{ color: 'var(--nm-text-muted)' }}>
-            ⚠️ 詳情連結未取得,請至政府採購網搜尋案號 {hit.job_number}
-          </span>
-        )}
-      </div>
+      )}
+    </div>
+  );
+
+  if (!canExpand) {
+    return <li className="border-b last:border-b-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>{header}</li>;
+  }
+
+  return (
+    <li className="border-b last:border-b-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+      <details className="group">
+        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">{header}</summary>
+        <div className="pb-3 pl-1 text-xs space-y-2" style={{ color: 'var(--nm-text-secondary)' }}>
+          {item.note && <p>{item.note}</p>}
+          {item.coverage && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
+              <span>value {item.coverage.value.toLocaleString('zh-TW')}</span>
+              <span>unfetched {item.coverage.unfetched.toLocaleString('zh-TW')}</span>
+              <span>withheld {item.coverage.withheld.toLocaleString('zh-TW')}</span>
+              <span>fetch_failed {item.coverage.fetch_failed.toLocaleString('zh-TW')}</span>
+            </div>
+          )}
+          {item.samples.length > 0 && (
+            <ul className="space-y-0.5">
+              {item.samples.map((s, i) => (
+                <li key={i} className="tabular-nums">
+                  {s.job_number}{s.value !== null && s.value !== undefined ? `:${String(s.value)}` : ''}
+                </li>
+              ))}
+            </ul>
+          )}
+          {item.code_links.length > 0 && (
+            <div className="flex flex-wrap gap-x-3">
+              {item.code_links.map((link) => (
+                <a
+                  key={link.url}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                  style={{ color: 'var(--nm-text-faint)' }}
+                >
+                  {link.label}(需 GitHub 權限) →
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </details>
     </li>
   );
 }
 
-export default async function BossTendersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ days?: string }>;
-}) {
+function DatabaseSection({ database }: { database: BidPlanDatabase }) {
+  return (
+    <section className="rounded-2xl nm-raised p-4">
+      <h2 className="mb-1 text-base font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
+        {database.title}
+      </h2>
+      <ul>
+        {database.items.map((item) => (
+          <ItemRow key={item.key} item={item} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export default async function BossBidPlanPage() {
   const session = await getSession();
   if (!session) redirect('/login');
   if (session.role !== 'boss') redirect('/staff');
 
-  const sp = await searchParams;
-  const days = [1, 3, 7, 14, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
-
-  const { hits, error } = await loadRecentTenders(days);
+  const { plan, error } = await loadBidPlan();
 
   return (
     <div>
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>標案監測</h1>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>資料進度板</h1>
           <p className="mt-0.5 text-sm" style={{ color: 'var(--nm-text-secondary)' }}>
-            近 {days} 天命中 {hits.length} 件
+            {plan ? `最後盤點 ${plan.config_reviewed_at}` : '給開發者看的資料工程進度'}
           </p>
         </div>
-        <nav className="flex gap-1 rounded-2xl nm-inset p-1 text-[13px]">
-          {[1, 3, 7, 14, 30].map((d) => (
-            <a
-              key={d}
-              href={`/boss/tenders?days=${d}`}
-              className={d === days ? 'nm-btn-solid' : 'nm-btn'}
-              style={{ padding: '6px 14px', minHeight: 'auto' }}
-            >
-              {d} 天
-            </a>
-          ))}
-        </nav>
+        <a href="/boss/tenders/monitor" className="text-xs underline" style={{ color: 'var(--nm-text-faint)' }}>
+          → 標案監測
+        </a>
       </header>
 
       {error && (
@@ -193,16 +248,12 @@ export default async function BossTendersPage({
         </div>
       )}
 
-      {hits.length === 0 && !error && (
-        <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>近 {days} 天沒有命中的標案</p>
-      )}
-
-      {hits.length > 0 && (
-        <ul className="space-y-3">
-          {hits.map((hit) => (
-            <TenderCard key={hit.id} hit={hit} />
+      {plan && (
+        <div className="space-y-4">
+          {plan.databases.map((database) => (
+            <DatabaseSection key={database.key} database={database} />
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

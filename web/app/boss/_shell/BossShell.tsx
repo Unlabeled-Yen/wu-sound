@@ -92,7 +92,13 @@ const SECTIONS: NavSection[] = [
     key: 'tenders',
     label: '標案',
     icon: <DocIcon />,
-    items: [{ href: '/boss/tenders', label: '標案監測' }],
+    // 順序重要:findActiveSection/desktopActiveLabel 用 startsWith 比對,
+    // 較長的路徑要排前面,不然 /boss/tenders/monitor 會被 /boss/tenders
+    // 那條 startsWith 規則搶先比中,顯示錯的 label。
+    items: [
+      { href: '/boss/tenders/monitor', label: '標案監測' },
+      { href: '/boss/tenders', label: '資料進度板' },
+    ],
   },
 ];
 
