@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/session';
 import type { UserRole } from '@/lib/types';
 import LoginForm from './LoginForm';
+import { BrandLockup } from '@/app/_shared/BrandLogo';
 
 interface ActiveUser {
   id: string;
@@ -31,9 +32,14 @@ export default async function LoginPage() {
   const users: ActiveUser[] = (data ?? []) as ActiveUser[];
 
   return (
-    <main className="flex-1 flex flex-col items-center justify-center px-6 py-10 bg-neutral-50 dark:bg-neutral-950">
+    <main className="relative z-[1] flex-1 flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-semibold mb-6 text-center">聲生工作系統</h1>
+        <div className="flex flex-col items-center gap-3 mb-7">
+          <BrandLockup width={188} />
+          <h1 className="text-[15px] tracking-[0.02em]" style={{ color: 'var(--nm-text-secondary)' }}>
+            聲生工作系統
+          </h1>
+        </div>
         <LoginForm users={users} />
       </div>
     </main>

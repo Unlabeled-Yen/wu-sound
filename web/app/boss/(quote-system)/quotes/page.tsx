@@ -45,7 +45,7 @@ export default async function QuotesPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>報價單</h1>
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>報價系統</h1>
         <Link
           href="/boss/quotes/new"
           className="ml-auto nm-btn-solid text-[13px]"

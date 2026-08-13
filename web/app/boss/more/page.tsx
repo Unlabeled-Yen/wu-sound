@@ -22,11 +22,12 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    title: '案件管理',
-    items: [
-      { href: '/boss/equipment', label: '設備庫存' },
-      { href: '/boss/sites', label: '專案' },
-    ],
+    title: '設備庫存',
+    items: [{ href: '/boss/equipment', label: '設備庫存' }],
+  },
+  {
+    title: '專案管理',
+    items: [{ href: '/boss/sites', label: '專案管理' }],
   },
   {
     title: '現場',
@@ -40,7 +41,7 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    title: '工具',
+    title: '聲學計算',
     items: [
       { href: '/tools/spl-calculator', label: 'SPL 預算計算器' },
       { href: '/tools/array-designer', label: '陣列設計器' },

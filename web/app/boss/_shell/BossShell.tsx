@@ -4,6 +4,17 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ToastProvider } from './Toast';
+import { BrandLockup, BrandMark } from '@/app/_shared/BrandLogo';
+import {
+  NAV_SECTIONS,
+  SETTINGS_SECTION,
+  findActiveItemLabel,
+  findActiveMobileTab,
+  findActiveSection,
+  findMobileTitle,
+  visibleItems,
+  type NavSection,
+} from '@/lib/nav';
 
 // Hot routes prefetched on mount so first-click nav is instant
 // 陣列設計器頁面較重(畫布互動),不預抓,避免拖慢一般導覽
@@ -31,82 +42,18 @@ function useBossShellData() {
   return pendingCount;
 }
 
-type NavItem = { href: string; label: string };
-type NavSection = { key: string; label: string; icon: React.ReactNode; items: NavItem[] };
-
-const SECTIONS: NavSection[] = [
-  {
-    key: 'overview',
-    label: '總覽',
-    icon: <HomeIcon />,
-    items: [{ href: '/boss', label: 'Dashboard' }],
-  },
-  {
-    key: 'finance',
-    label: '財務',
-    icon: <WalletIcon />,
-    items: [
-      { href: '/boss/expenses', label: '零用金管理' },
-      { href: '/boss/close', label: '薪資結算' },
-      { href: '/boss/ledger', label: '帳務管理' },
-    ],
-  },
-  {
-    key: 'acoustic',
-    label: '聲學規劃',
-    icon: <WaveIcon />,
-    items: [
-      { href: '/tools/spl-calculator', label: 'SPL 預算計算器' },
-      { href: '/tools/array-designer', label: '陣列設計器' },
-    ],
-  },
-  {
-    key: 'quotes',
-    label: '報價系統',
-    icon: <DocIcon />,
-    items: [
-      { href: '/boss/quotes', label: '報價單' },
-      { href: '/boss/bundles', label: '標配套組' },
-      { href: '/boss/catalog', label: '價目表' },
-    ],
-  },
-  {
-    key: 'catalog',
-    label: '案件管理',
-    icon: <BoxIcon />,
-    items: [
-      { href: '/boss/equipment', label: '設備庫存' },
-      { href: '/boss/sites', label: '專案' },
-    ],
-  },
-  {
-    key: 'ops',
-    label: '現場',
-    icon: <UsersIcon />,
-    items: [
-      { href: '/boss/worklogs', label: '工作記錄' },
-      { href: '/boss/clockins', label: '打卡' },
-    ],
-  },
-  {
-    key: 'tenders',
-    label: '標案',
-    icon: <DocIcon />,
-    // 順序重要:findActiveSection/desktopActiveLabel 用 startsWith 比對,
-    // 較長的路徑要排前面,不然 /boss/tenders/monitor 會被 /boss/tenders
-    // 那條 startsWith 規則搶先比中,顯示錯的 label。
-    items: [
-      { href: '/boss/tenders/monitor', label: '標案監測' },
-      { href: '/boss/tenders', label: '資料進度板' },
-    ],
-  },
-];
-
-const SETTINGS_SECTION: NavSection = {
-  key: 'settings',
-  label: '設定',
-  icon: <GearIcon />,
-  items: [{ href: '/boss/users', label: '使用者管理' }],
+// 導覽結構在 lib/nav.ts(側欄、標題列、手機分頁共用同一份,並有單元測試釘住)。
+// 這裡只補「圖示」——圖示是視覺,不放進純邏輯模組。
+const SECTION_ICONS: Record<string, React.ReactNode> = {
+  overview: <HomeIcon />,
+  finance: <WalletIcon />,
+  acoustic: <WaveIcon />,
+  quotes: <DocIcon />,
+  equipment: <BoxIcon />,
+  sites: <PinIcon />,
+  ops: <UsersIcon />,
+  tenders: <DocIcon />,
+  settings: <GearIcon />,
 };
 
 // Mobile bottom-nav tabs (5 slots)
@@ -119,63 +66,9 @@ const MOBILE_TABS: MobileTab[] = [
   { key: 'more', href: '/boss/more', label: '更多', icon: MobileMoreIcon },
 ];
 
-function findActiveSection(pathname: string): NavSection {
-  const all = [...SECTIONS, SETTINGS_SECTION];
-  const matches = all
-    .map((s) => ({
-      section: s,
-      score: Math.max(
-        ...s.items.map((i) => (pathname === i.href ? 1000 : pathname.startsWith(i.href + '/') ? i.href.length : 0)),
-        pathname === '/boss' && s.key === 'overview' ? 1000 : 0
-      ),
-    }))
-    .sort((a, b) => b.score - a.score);
-  return matches[0].score > 0 ? matches[0].section : SECTIONS[0];
-}
-
-function findActiveMobileTab(pathname: string): string {
-  // /boss/more takes precedence
-  if (pathname === '/boss/more' || pathname.startsWith('/boss/more/')) return 'more';
-  if (pathname === '/boss') return 'overview';
-  // pages tied to a specific tab
-  if (pathname.startsWith('/boss/expenses')) return 'review';
-  if (pathname.startsWith('/boss/quotes')) return 'quotes';
-  if (pathname.startsWith('/boss/worklogs') || pathname.startsWith('/boss/clockins')) return 'ops';
-  // everything else lives under 更多
-  return 'more';
-}
-
 function currentMonthLabel(): string {
   const d = new Date();
   return `本月 ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-const MOBILE_TITLES: Record<string, { title: string; subtitle?: string }> = {
-  '/boss': { title: '總覽', subtitle: '今天需要你處理的事' },
-  '/boss/expenses': { title: '零用金審核', subtitle: '每筆須人工確認才生效' },
-  '/boss/quotes': { title: '報價', subtitle: '進行中的報價單' },
-  '/boss/worklogs': { title: '現場', subtitle: '工作記錄' },
-  '/boss/clockins': { title: '打卡', subtitle: '出勤記錄' },
-  '/boss/more': { title: '更多', subtitle: '其他管理與設定' },
-  '/boss/ledger': { title: '帳務管理' },
-  '/boss/close': { title: '薪資結算' },
-  '/boss/bundles': { title: '標配套組' },
-  '/boss/catalog': { title: '價目表' },
-  '/boss/equipment': { title: '設備庫存' },
-  '/boss/sites': { title: '專案' },
-  '/boss/users': { title: '使用者管理' },
-  '/tools/spl-calculator': { title: 'SPL 預算計算器', subtitle: '聲學規劃' },
-  '/tools/array-designer': { title: '陣列設計器', subtitle: '聲學規劃' },
-};
-
-function findMobileTitle(pathname: string): { title: string; subtitle?: string } {
-  // exact match
-  if (MOBILE_TITLES[pathname]) return MOBILE_TITLES[pathname];
-  // longest prefix match
-  const candidates = Object.keys(MOBILE_TITLES)
-    .filter((p) => pathname === p || pathname.startsWith(p + '/'))
-    .sort((a, b) => b.length - a.length);
-  return candidates[0] ? MOBILE_TITLES[candidates[0]] : { title: '' };
 }
 
 export function BossShell({
@@ -192,10 +85,10 @@ export function BossShell({
   const monthLabel = useMemo(() => currentMonthLabel(), []);
   const pendingCount = useBossShellData();
 
-  const desktopActiveLabel =
-    active.items.find(
-      (i) => pathname === i.href || pathname.startsWith(i.href + '/')
-    )?.label ?? active.items[0].label;
+  const desktopActiveLabel = useMemo(() => findActiveItemLabel(pathname), [pathname]);
+  // 區塊名和頁面名相同時(例如報價系統首頁)不重複顯示,不然標題列會變成
+  // 「報價系統 › 報價系統」
+  const showEyebrow = active.label !== desktopActiveLabel;
 
   return (
     <ToastProvider>
@@ -205,34 +98,14 @@ export function BossShell({
       >
         {/* ===== Desktop sidebar (≥lg only) ===== */}
         <aside className="hidden lg:flex shrink-0 w-[232px] rounded-[20px] nm-raised-lg flex-col overflow-hidden">
-          <div className="px-4 pt-[18px] pb-3.5" style={{ borderBottom: '1px solid var(--nm-border-hair)' }}>
-            <div className="flex items-center gap-2.5">
-              <div
-                className="w-[38px] h-[38px] rounded-xl flex items-center justify-center text-[15px] font-medium shrink-0"
-                style={{ background: '#242429', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)', color: 'var(--nm-text-body)' }}
-                aria-hidden
-              >
-                {userName.slice(0, 1)}
-              </div>
-              <div className="min-w-0">
-                <div
-                  className="text-sm font-medium truncate leading-tight"
-                  style={{ color: 'var(--nm-text-body)' }}
-                >
-                  {userName}
-                </div>
-                <div
-                  className="text-[11.5px] truncate tracking-wide"
-                  style={{ color: 'var(--nm-text-muted)' }}
-                >
-                  聲生 SSA · 老闆
-                </div>
-              </div>
-            </div>
+          <div className="px-4 pt-[22px] pb-4" style={{ borderBottom: '1px solid var(--nm-border-hair)' }}>
+            <Link href="/boss" className="flex justify-center nm-focus rounded-lg" aria-label="聲生 SSA 工作系統">
+              <BrandLockup width={140} />
+            </Link>
           </div>
 
           <nav className="flex-1 px-3 py-3.5 overflow-y-auto flex flex-col gap-[22px]">
-            {SECTIONS.map((section) => (
+            {NAV_SECTIONS.map((section) => (
               <SectionGroup
                 key={section.key}
                 section={section}
@@ -274,7 +147,10 @@ export function BossShell({
           }}
         >
           <div className="flex items-center justify-between text-[13px] mb-[14px]" style={{ color: 'var(--nm-text-secondary)' }}>
-            <span>{userName} · 老闆</span>
+            <span className="flex items-center gap-2">
+              <BrandMark size={17} className="opacity-85" />
+              {userName} · 老闆
+            </span>
             <span className="text-[12px]">{monthLabel}</span>
           </div>
           <div
@@ -300,12 +176,14 @@ export function BossShell({
             style={{ borderBottom: '1px solid var(--nm-border-hair)' }}
           >
             <div>
-              <div
-                className="text-[11px] uppercase tracking-[0.16em] mb-1.5"
-                style={{ color: 'var(--nm-text-muted)' }}
-              >
-                {active.label}
-              </div>
+              {showEyebrow && (
+                <div
+                  className="text-[11px] uppercase tracking-[0.16em] mb-1.5"
+                  style={{ color: 'var(--nm-text-muted)' }}
+                >
+                  {active.label}
+                </div>
+              )}
               <div
                 className="text-[22px] font-semibold tracking-[-0.01em]"
                 style={{ color: 'var(--nm-text-primary)' }}
@@ -384,9 +262,17 @@ function SectionGroup({
   section: NavSection;
   pathname: string;
 }) {
+  // hidden 的項目(靠頁內分頁進入的子頁)不畫在側欄,但仍讓整個區塊高亮——
+  // 人在價目表時,側欄該亮的是「報價系統」那一列。
+  const items = visibleItems(section);
+  const multi = items.length > 1;
+  const sectionActive = section.items.some(
+    (i) => pathname === i.href || pathname.startsWith(i.href + '/'),
+  );
+
   return (
     <div className="flex flex-col gap-[3px]">
-      {section.items.length > 1 && (
+      {multi && (
         <div
           className="px-[11px] pt-1.5 pb-1.5 text-[10.5px] uppercase tracking-[0.18em]"
           style={{ color: 'var(--nm-text-faint)' }}
@@ -395,26 +281,27 @@ function SectionGroup({
         </div>
       )}
       <ul className="flex flex-col gap-[3px]">
-        {section.items.map((item, idx) => {
-          const isActive =
-            pathname === item.href || pathname.startsWith(item.href + '/');
-          const isGroupLead = section.items.length > 1 && idx === 0;
+        {items.map((item, idx) => {
+          const isActive = multi
+            ? pathname === item.href || pathname.startsWith(item.href + '/')
+            : sectionActive;
+          const isGroupLead = multi && idx === 0;
           return (
             <li key={item.href}>
               <Link
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={`flex items-center gap-2.5 rounded-[11px] text-[13.5px] nm-focus ${
-                  isGroupLead ? 'px-[11px] py-2.5' : section.items.length > 1 ? 'py-2 pl-10 pr-[11px] text-[13px]' : 'px-[11px] py-2.5'
+                  isGroupLead ? 'px-[11px] py-2.5' : multi ? 'py-2 pl-10 pr-[11px] text-[13px]' : 'px-[11px] py-2.5'
                 } ${isActive ? 'nm-inset-sm' : 'nm-lift'}`}
                 style={{
                   color: isActive ? 'var(--nm-text-primary)' : '#8a8b90',
                 }}
               >
-                {isGroupLead && <span className="shrink-0 opacity-85">{section.icon}</span>}
-                <span className="truncate">
-                  {section.items.length === 1 ? section.label : item.label}
-                </span>
+                {(isGroupLead || !multi) && (
+                  <span className="shrink-0 opacity-85">{SECTION_ICONS[section.key]}</span>
+                )}
+                <span className="truncate">{multi ? item.label : section.label}</span>
               </Link>
             </li>
           );
@@ -470,6 +357,14 @@ function BoxIcon() {
       <path d="M21 8 12 3 3 8v8l9 5 9-5V8z" />
       <path d="M3 8l9 5 9-5" />
       <path d="M12 13v8" />
+    </svg>
+  );
+}
+function PinIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
     </svg>
   );
 }

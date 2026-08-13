@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { BrandMark } from '@/app/_shared/BrandLogo';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,10 @@ export default async function StaffLayout({ children }: { children: React.ReactN
         }}
       >
         <div className="flex items-center justify-between text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
-          <span>{session.name} · 技師</span>
+          <span className="flex items-center gap-2">
+            <BrandMark size={17} className="opacity-85" />
+            {session.name} · 技師
+          </span>
           <Link href="/staff/settings" className="flex items-center gap-1.5 nm-focus" aria-label="設定">
             <GearIcon />
             設定

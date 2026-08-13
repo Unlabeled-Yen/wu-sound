@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getSession } from '@/lib/session';
 import { BossShell } from '@/app/boss/_shell/BossShell';
+import PageTabs from '@/app/_shared/PageTabs';
+import { ACOUSTIC_TABS } from '@/lib/nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +15,7 @@ export default async function ToolsLayout({ children }: { children: React.ReactN
 
   const content = (
     <div className="relative z-[1] flex-1 flex flex-col min-h-full max-w-[640px] lg:max-w-[1040px] w-full mx-auto px-[22px] py-6 lg:px-0 lg:py-0">
+      <PageTabs tabs={ACOUSTIC_TABS} />
       <main className="flex-1">{children}</main>
     </div>
   );
@@ -28,6 +31,7 @@ export default async function ToolsLayout({ children }: { children: React.ReactN
           ← 返回
         </Link>
       </div>
+      <PageTabs tabs={ACOUSTIC_TABS} />
       <main className="flex-1">{children}</main>
     </div>
   );

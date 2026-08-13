@@ -2,7 +2,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import type { CatalogItem } from '@/lib/types';
 import CategoryCarousel, { type CarouselPanel } from './CategoryCarousel';
 import NewItemButton from './NewItemButton';
-import ViewportLock from './ViewportLock';
+import ViewportLock from '@/app/_shared/ViewportLock';
 
 export const dynamic = 'force-dynamic';
 
