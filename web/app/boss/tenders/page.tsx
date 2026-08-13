@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 // 這個頁面是純渲染器——項目清單、說明、狀態、程式碼連結全部來自
 // tender-radar 的 /api/meta/bid-plan。wu-sound 是公開 repo,不得在這裡
-// 寫死任何策略性文字(項目名稱、BidOS 術語、引擎說明)。
+// 寫死任何策略性文字(項目名稱、內部代號、引擎說明)。
 
 type ItemStatus =
   | 'done'
@@ -48,7 +48,6 @@ interface BidPlanItem {
 interface BidPlanDatabase {
   key: string;
   title: string;
-  bidos_ref: string;
   items: BidPlanItem[];
 }
 
