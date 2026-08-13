@@ -48,7 +48,7 @@
 | 項目 | 狀態 | 卡在哪 |
 |---|---|---|
 | 聲學規劃 step 2(人話→參數,AI 只填輸入) | spec 完成;**migrations 007/008 已套用**(2026-08-11) | 排程 |
-| 聲學規劃 step 3(器材聲學規格建檔) | **12 個 CODA/YAMAHA 喇叭/擴大機規格已從原廠 datasheet 匯入**(2026-08-13);另新增 migration 011(speaker_impedance_ohm/amp_power_mode) | 「選喇叭帶入規格」可實測;3 項待老闆核對實體銘牌型號(見 catalog note 欄位);其餘 101 個非喇叭/擴大機品項本來就不需要規格 |
+| 聲學規劃 step 3(器材聲學規格建檔) | **12 個 CODA/YAMAHA 喇叭/擴大機規格 + 7 項覆蓋角已從原廠 datasheet 匯入**(2026-08-13);migration 011(speaker_impedance_ohm/amp_power_mode)+ 012(coverage_h_deg/coverage_v_deg) | SPL 計算器「選喇叭帶入規格」+ **陣列設計器「選喇叭帶入覆蓋角」皆已實測可用**;3 項待老闆核對實體銘牌型號(見 catalog note 欄位);其餘 101 個非喇叭/擴大機品項本來就不需要規格 |
 | 聲學規劃 step 4(AI 選設備↔計算器閉環驗證) | spec 完成 | 依賴 step 3 資料填充 |
 | **LINE bot**(推播+雙向,Bot 名「聲生製作」) | **後端程式碼已交付、migration 010 已套用** | 待老闆到 developers.line.biz 建 channel,拿 3 樣給 Yen 填 env,見下方 LINE bot 區塊 |
 | 打卡↔薪資結算聯動(A 路:工時聚合+老闆手填薪水) | 方向定案 | 3 題待答:工時配對法 / 打卡不全怎麼擋 / 鎖定強度(見 open-questions.md) |

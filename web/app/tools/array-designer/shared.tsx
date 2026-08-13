@@ -192,8 +192,9 @@ export function ResultPanel({
   );
 }
 
-// 「喇叭規格」共用區塊:5 個分頁都要填 Speaker Cov(phi),可選從價目表帶入型號
-// (catalog_items 目前沒有覆蓋角欄位,選了也只能提醒手動輸入,行為同 spl-calculator)。
+// 「喇叭規格」共用區塊:5 個分頁都要填 Speaker Cov(phi),可選從價目表帶入型號。
+// 選到的品項若已建檔 coverage_h_deg(見 migration 012)就直接帶入覆蓋角;
+// 沒建檔的維持原行為——手動輸入 + loud 提示「請查廠商 datasheet」。
 export function useSpeakerCov(defaultDeg: string, speakers: CatalogItem[]) {
   const [speakerId, setSpeakerId] = useState('');
   const [coverageDeg, setCoverageDeg] = useState(defaultDeg);
@@ -201,6 +202,10 @@ export function useSpeakerCov(defaultDeg: string, speakers: CatalogItem[]) {
 
   function onSpeakerChange(id: string) {
     setSpeakerId(id);
+    const speaker = speakers.find((s) => s.id === id);
+    if (speaker?.coverage_h_deg != null) {
+      setCoverageDeg(String(speaker.coverage_h_deg));
+    }
   }
 
   function reset() {
@@ -252,11 +257,16 @@ export function SpeakerCovSection({
           </select>
         </label>
       )}
-      {selectedSpeaker && (
+      {selectedSpeaker && selectedSpeaker.coverage_h_deg == null && (
         <ValidationNote message="此品項尚未建檔覆蓋角規格,請查廠商 datasheet 手動輸入。" />
       )}
+      {selectedSpeaker && selectedSpeaker.coverage_h_deg != null && (
+        <p className="text-[12px]" style={{ color: 'var(--nm-success-glass-text)' }}>
+          已從價目表帶入 {selectedSpeaker.name} 的覆蓋角,可再手動微調。
+        </p>
+      )}
       <NumberField
-        label={`水平覆蓋角(deg,-6dB 名義值${selectedSpeaker ? `,${selectedSpeaker.name} 規格未建檔` : ''})`}
+        label={`水平覆蓋角(deg,-6dB 名義值${selectedSpeaker && selectedSpeaker.coverage_h_deg == null ? `,${selectedSpeaker.name} 規格未建檔` : ''})`}
         value={coverageDeg}
         onChange={setCoverageDeg}
         tip="單支喇叭在 -6dB(音量減半處)的水平擴散角,由喇叭型號決定——換喇叭就要換這個值。這個角度是整份計算的起點,喇叭與喇叭的縫隙、重疊全部由它推出來。"

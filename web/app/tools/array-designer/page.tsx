@@ -4,9 +4,8 @@ import ArrayDesignerForm from './ArrayDesignerForm';
 
 export const dynamic = 'force-dynamic';
 
-// catalog_items 目前沒有覆蓋角欄位(coverage_deg),喇叭選好後一律要手動輸入覆蓋角,
-// 跟 spl-calculator 對「缺值就手動輸入」的處理方式一致(見 007_catalog_spl_spec.sql
-// 的「缺值 loud 原則,不強迫立刻補全」註解)。
+// catalog_items 的 coverage_h_deg(migration 012)有值就自動帶入覆蓋角,
+// 沒建檔的品項維持手動輸入 + loud 提示(見 shared.tsx useSpeakerCov)。
 export default async function ArrayDesignerPage() {
   const sb = getSupabaseAdmin();
   const { data } = await sb
