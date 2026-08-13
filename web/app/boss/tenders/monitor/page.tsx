@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
+import ViewportLock from '@/app/_shared/ViewportLock';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -156,11 +157,32 @@ function agencyRadarText(a: AgencyCompetition): { text: string; hint: string } {
   };
 }
 
-function buildHref(params: { days: number; price: string; nature: string }): string {
+interface ViewParams {
+  days: number;
+  price: string;
+  nature: string;
+  pool: string;
+}
+
+function buildHref(params: ViewParams): string {
   const q = new URLSearchParams({ days: String(params.days) });
   if (params.price !== 'all') q.set('price', params.price);
   if (params.nature !== 'all') q.set('nature', params.nature);
+  if (params.pool !== 'all') q.set('pool', params.pool);
   return `/boss/tenders/monitor?${q.toString()}`;
+}
+
+// 流標重招池:第一次沒決標成功、重新招標的案。單獨看是因為它的決策情境
+// 跟新案不一樣——不是跟一群人搶新機會,而是在看一件別人已經放掉一次的事。
+// 說明文字兩面都講:採購法 48 條第 2 項讓第二次招標可以不受三家限制、
+// 等標期也得縮短,所以競爭確實通常較少;但沒人接也可能是預算不合理或
+// 條件太苛,那是風險不是機會。系統不替 Wu 判斷是哪一種。
+const RETENDER_NOTE =
+  '這些案第一次沒決標成功。採購法允許第二次招標不受三家廠商限制、等標期也可縮短,所以競爭通常較少;' +
+  '但上次沒人接也可能是預算不合理或條件太苛。值得看,但要先弄清楚為什麼上次沒成。';
+
+function isRetender(h: TenderHit): boolean {
+  return h.is_retender === 1 || (h.signals ?? []).some((s) => s.code === 'retender_round');
 }
 
 // 分佈矩陣:價格帶 × 案件性質。每個數字都是連結——格子套兩軸,邊際的
@@ -172,25 +194,31 @@ function buildHref(params: { days: number; price: string; nature: string }): str
 // 2. 每格的數字就是點下去會看到的件數(兩軸都套用),不會出現「顯示 5 件、
 //    點進去 0 件」。邊際合計同理。
 function DistributionMatrix({
-  hits,
+  allHits,
+  poolHits,
   days,
   price,
   nature,
+  pool,
 }: {
-  hits: TenderHit[];
+  /** 決定矩陣有哪些行列——固定用全部命中案,結構才不會隨篩選變形 */
+  allHits: TenderHit[];
+  /** 決定每格數字——已套用池子篩選,格子數字才等於點下去看到的件數 */
+  poolHits: TenderHit[];
   days: number;
   price: string;
   nature: string;
+  pool: string;
 }) {
-  const rows = PRICE_ORDER.filter((k) => hits.some((h) => h.price_band?.key === k));
-  const cols = NATURE_ORDER.filter((k) => hits.some((h) => h.nature?.key === k));
+  const rows = PRICE_ORDER.filter((k) => allHits.some((h) => h.price_band?.key === k));
+  const cols = NATURE_ORDER.filter((k) => allHits.some((h) => h.nature?.key === k));
   if (rows.length === 0 || cols.length === 0) return null;
 
-  const priceLabel = (k: string) => hits.find((h) => h.price_band?.key === k)?.price_band?.label ?? k;
-  const natureLabel = (k: string) => hits.find((h) => h.nature?.key === k)?.nature?.label ?? k;
+  const priceLabel = (k: string) => allHits.find((h) => h.price_band?.key === k)?.price_band?.label ?? k;
+  const natureLabel = (k: string) => allHits.find((h) => h.nature?.key === k)?.nature?.label ?? k;
 
   const count = (p: string, n: string) =>
-    hits.filter(
+    poolHits.filter(
       (h) => (p === 'all' || h.price_band?.key === p) && (n === 'all' || h.nature?.key === n),
     ).length;
 
@@ -209,7 +237,7 @@ function DistributionMatrix({
     return (
       <td className="p-0.5 text-center">
         <a
-          href={buildHref({ days, price: p, nature: n })}
+          href={buildHref({ days, price: p, nature: n, pool })}
           className="block rounded-lg tabular-nums"
           style={{
             padding: '5px 2px',
@@ -372,7 +400,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
 export default async function BossTendersMonitorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string; price?: string; nature?: string }>;
+  searchParams: Promise<{ days?: string; price?: string; nature?: string; pool?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -382,6 +410,7 @@ export default async function BossTendersMonitorPage({
   const days = [1, 3, 7, 14, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const price = PRICE_ORDER.includes(sp.price as (typeof PRICE_ORDER)[number]) ? sp.price! : 'all';
   const nature = NATURE_ORDER.includes(sp.nature as (typeof NATURE_ORDER)[number]) ? sp.nature! : 'all';
+  const pool = sp.pool === 'retender' ? 'retender' : 'all';
 
   const { hits, error } = await loadRecentTenders(days);
 
@@ -389,22 +418,60 @@ export default async function BossTendersMonitorPage({
   // 那時不要假裝有分類,直接把篩選列藏起來,免得顯示「每類都 0 件」誤導。
   const hasClassification = hits.length > 0 && hits.every((h) => h.price_band && h.nature);
 
-  // 計數一律以「另一軸已套用的篩選」為基準,這樣點下去的數字就是點完
-  // 會看到的件數,不會出現「顯示 5 件、點進去 0 件」。
-  const byNatureFiltered = nature === 'all' ? hits : hits.filter((h) => h.nature?.key === nature);
-  const byPriceFiltered = price === 'all' ? hits : hits.filter((h) => h.price_band?.key === price);
+  const retenderCount = hits.filter(isRetender).length;
+  const poolHits = pool === 'retender' ? hits.filter(isRetender) : hits;
 
-  const visible = hits.filter(
+  const visible = poolHits.filter(
     (h) =>
       (price === 'all' || h.price_band?.key === price) &&
       (nature === 'all' || h.nature?.key === nature),
   );
 
-  const isFiltered = price !== 'all' || nature !== 'all';
+  const isFiltered = price !== 'all' || nature !== 'all' || pool !== 'all';
+
+  const filterPanel = hasClassification ? (
+    <div className="rounded-2xl nm-inset p-3">
+      {retenderCount > 0 && (
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          {[
+            { key: 'all', label: '全部', n: hits.length },
+            { key: 'retender', label: '流標重招', n: retenderCount },
+          ].map((o) => (
+            <a
+              key={o.key}
+              href={buildHref({ days, price, nature, pool: o.key })}
+              className={pool === o.key ? 'nm-btn-solid' : 'nm-btn'}
+              style={{ padding: '4px 12px', minHeight: 'auto', fontSize: '12px' }}
+            >
+              {o.label}
+              <span className="ml-1 tabular-nums" style={{ opacity: 0.62 }}>{o.n}</span>
+            </a>
+          ))}
+        </div>
+      )}
+
+      <DistributionMatrix
+        allHits={hits}
+        poolHits={poolHits}
+        days={days}
+        price={price}
+        nature={nature}
+        pool={pool}
+      />
+
+      {isFiltered && (
+        <p className="mt-2 text-center text-xs">
+          <a href={buildHref({ days, price: 'all', nature: 'all', pool: 'all' })} className="underline" style={{ color: 'var(--nm-text-faint)' }}>
+            清除篩選
+          </a>
+        </p>
+      )}
+    </div>
+  ) : null;
 
   return (
-    <div>
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <ViewportLock>
+      <header className="shrink-0 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>標案監測</h1>
           <p className="mt-0.5 text-sm" style={{ color: 'var(--nm-text-secondary)' }}>
@@ -419,7 +486,7 @@ export default async function BossTendersMonitorPage({
           {[1, 3, 7, 14, 30].map((d) => (
             <a
               key={d}
-              href={buildHref({ days: d, price, nature })}
+              href={buildHref({ days: d, price, nature, pool })}
               className={d === days ? 'nm-btn-solid' : 'nm-btn'}
               style={{ padding: '6px 14px', minHeight: 'auto' }}
             >
@@ -429,22 +496,22 @@ export default async function BossTendersMonitorPage({
         </nav>
       </header>
 
-      {hasClassification && (
-        <div className="mb-4 rounded-2xl nm-inset p-3">
-          <DistributionMatrix hits={hits} days={days} price={price} nature={nature} />
-          {isFiltered && (
-            <p className="mt-2 text-center text-xs">
-              <a href={buildHref({ days, price: 'all', nature: 'all' })} className="underline" style={{ color: 'var(--nm-text-faint)' }}>
-                清除篩選
-              </a>
-            </p>
-          )}
-        </div>
+      {/* 桌機:分佈矩陣固定在上方(地圖不該跟著捲走);手機螢幕不夠高,
+          矩陣跟著清單一起捲,不然清單只剩不到一張卡的高度 */}
+      <div className="hidden lg:block shrink-0">{filterPanel}</div>
+
+      {pool === 'retender' && (
+        <p
+          className="shrink-0 rounded-xl p-3 text-xs leading-relaxed"
+          style={{ background: 'rgba(224,179,80,0.08)', color: 'var(--nm-text-secondary)' }}
+        >
+          {RETENDER_NOTE}
+        </p>
       )}
 
       {error && (
         <div
-          className="mb-4 rounded-xl p-3 text-[13px]"
+          className="shrink-0 rounded-xl p-3 text-[13px]"
           style={{
             background: 'rgba(224, 122, 122, 0.08)',
             border: '1px solid rgba(224, 122, 122, 0.34)',
@@ -462,17 +529,30 @@ export default async function BossTendersMonitorPage({
       {hits.length > 0 && visible.length === 0 && (
         <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
           此分類組合沒有案件,
-          <a href={buildHref({ days, price: 'all', nature: 'all' })} className="underline">回到全部</a>
+          <a href={buildHref({ days, price: 'all', nature: 'all', pool })} className="underline">回到全部</a>
         </p>
       )}
 
+      {/* 卡片清單是唯一會捲動的區域——標題、篩選、分佈矩陣固定在上面,
+          頁面總高度不隨命中件數改變。底部漸層是「下面還有」的訊號。 */}
       {visible.length > 0 && (
-        <ul className="space-y-3">
-          {visible.map((hit) => (
-            <TenderCard key={hit.id} hit={hit} />
-          ))}
-        </ul>
+        <div className="relative min-h-0 flex-1">
+          <div className="h-full space-y-3 overflow-y-auto pr-1 pb-6">
+            {/* 手機版的分佈矩陣在捲動區裡面(桌機版在上面固定那份) */}
+            <div className="lg:hidden">{filterPanel}</div>
+            <ul className="space-y-3">
+              {visible.map((hit) => (
+                <TenderCard key={hit.id} hit={hit} />
+              ))}
+            </ul>
+          </div>
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
+            style={{ background: 'linear-gradient(to top, var(--nm-bg-deep), transparent)' }}
+            aria-hidden
+          />
+        </div>
       )}
-    </div>
+    </ViewportLock>
   );
 }
