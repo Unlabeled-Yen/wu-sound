@@ -3,133 +3,146 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * Lab 3a 語音層:直接用瀏覽器內建的辨識與朗讀,後端不動。
+ * Lab 3b 語音層:瀏覽器只負責錄音與朗讀,辨識在我們自己的後端做。
  * 規格:voice-lab/lab3-voice-spec-v1.md §2
  *
- * 這一層刻意只做「輸入法」與「朗讀」,不含任何判斷:
- * 「使用者有沒有同意」是伺服器端白名單比對的事(§1),前端只負責把聽到的字送過去。
+ * 為什麼不是用瀏覽器內建的 SpeechRecognition(3a 試過,已證實不可行):
+ * - 那個 API 是外包給 Google 的雲端服務,不是原廠 Chrome 就直接 network error(實測撞到)
+ * - iOS Safari 根本沒有這個 API
+ * - 不吃熱詞表,專有名詞必錯
  *
- * 已知限制(不假裝沒有):只有 Chrome 系瀏覽器支援;iOS Safari 沒有 SpeechRecognition,
- * 那種情況要明確告訴使用者「你的瀏覽器不支援語音輸入」,不能靜默給一顆按不動的按鈕。
+ * MediaRecorder 則是所有現代瀏覽器都有(含 iOS Safari 14.3+),
+ * 而且辨識在後端做,才能把專案名當熱詞餵進去。
+ *
+ * 這一層不含任何判斷:「使用者有沒有同意」是伺服器端白名單比對的事(§1),
+ * 這裡只負責把聽到的字送過去。
  */
-
-interface SpeechRecognitionResultLike {
-  isFinal: boolean;
-  0: { transcript: string; confidence: number };
-}
-interface SpeechRecognitionEventLike {
-  resultIndex: number;
-  results: { length: number; [i: number]: SpeechRecognitionResultLike };
-}
-interface SpeechRecognitionLike {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  maxAlternatives: number;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((e: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-}
-
-type RecognitionCtor = new () => SpeechRecognitionLike;
-
-function getRecognitionCtor(): RecognitionCtor | null {
-  if (typeof window === 'undefined') return null;
-  const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
-
-const ERROR_TEXT: Record<string, string> = {
-  'not-allowed': '麥克風權限被拒絕,請在瀏覽器設定裡允許',
-  'service-not-allowed': '麥克風權限被拒絕,請在瀏覽器設定裡允許',
-  'no-speech': '沒有聽到聲音,再試一次',
-  'audio-capture': '找不到麥克風',
-  network: '語音辨識服務連不上',
-  aborted: '',
-};
 
 export interface VoiceState {
   supported: boolean;
-  listening: boolean;
-  interim: string;
+  recording: boolean;
+  transcribing: boolean;
   error: string | null;
-  start: () => void;
+  start: () => Promise<void>;
   stop: () => void;
   speak: (text: string) => void;
   cancelSpeech: () => void;
+  clearError: () => void;
 }
 
-export function useVoice(onFinal: (transcript: string, confidence: number) => void): VoiceState {
+/** 錄音長度上限。超過自動停止,避免使用者按了忘記放,傳一個巨大的檔案上去 */
+const MAX_RECORD_MS = 60_000;
+
+function pickMimeType(): string | undefined {
+  if (typeof MediaRecorder === 'undefined') return undefined;
+  // Safari 只吃 mp4/aac,Chrome/Firefox 走 webm;讓瀏覽器挑它支援的那個
+  for (const t of ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']) {
+    if (MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return undefined;
+}
+
+export function useVoice(onTranscript: (text: string) => void): VoiceState {
   const [supported, setSupported] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [interim, setInterim] = useState('');
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const recRef = useRef<SpeechRecognitionLike | null>(null);
-  const onFinalRef = useRef(onFinal);
-  onFinalRef.current = onFinal;
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onTranscriptRef = useRef(onTranscript);
+  onTranscriptRef.current = onTranscript;
 
   useEffect(() => {
-    setSupported(getRecognitionCtor() !== null && typeof window.speechSynthesis !== 'undefined');
+    setSupported(
+      typeof navigator !== 'undefined' &&
+        Boolean(navigator.mediaDevices?.getUserMedia) &&
+        typeof MediaRecorder !== 'undefined',
+    );
   }, []);
 
-  const start = useCallback(() => {
-    const Ctor = getRecognitionCtor();
-    if (!Ctor) {
-      setError('這個瀏覽器不支援語音輸入(iPhone 的 Safari 目前沒有),請改用打字');
-      return;
-    }
-    if (recRef.current) return;
+  const upload = useCallback(async (blob: Blob, mime: string) => {
+    setTranscribing(true);
+    try {
+      const ext = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : 'webm';
+      const form = new FormData();
+      form.append('audio', blob, `speech.${ext}`);
+      form.append('filename', `speech.${ext}`);
 
-    // 講話前先把朗讀停掉,不然會辨識到自己的聲音
+      const res = await fetch('/api/voice-lab/transcribe', { method: 'POST', body: form });
+      const data = (await res.json()) as Record<string, unknown>;
+      if (!res.ok) {
+        setError(String(data.error ?? `辨識失敗(HTTP ${res.status})`));
+        return;
+      }
+      const text = String(data.text ?? '').trim();
+      if (!text) {
+        setError('沒有辨識到內容,請再說一次');
+        return;
+      }
+      onTranscriptRef.current(text);
+    } catch (e) {
+      setError(`辨識連線失敗:${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setTranscribing(false);
+    }
+  }, []);
+
+  const start = useCallback(async () => {
+    if (recorderRef.current) return;
+    setError(null);
+    // 開始錄音前先把朗讀停掉,不然會錄到自己的聲音
     window.speechSynthesis?.cancel();
 
-    const rec = new Ctor();
-    rec.lang = 'zh-TW';
-    rec.interimResults = true;
-    rec.continuous = false;
-    rec.maxAlternatives = 1;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      const name = e instanceof DOMException ? e.name : '';
+      setError(
+        name === 'NotAllowedError'
+          ? '麥克風權限被拒絕,請在瀏覽器設定裡允許'
+          : name === 'NotFoundError'
+            ? '找不到麥克風'
+            : `無法開啟麥克風:${e instanceof Error ? e.message : String(e)}`,
+      );
+      return;
+    }
 
-    rec.onresult = (e) => {
-      let finalText = '';
-      let finalConfidence = 0;
-      let interimText = '';
-      for (let i = e.resultIndex; i < e.results.length; i += 1) {
-        const r = e.results[i];
-        if (r.isFinal) {
-          finalText += r[0].transcript;
-          finalConfidence = r[0].confidence;
-        } else {
-          interimText += r[0].transcript;
-        }
-      }
-      setInterim(interimText);
-      if (finalText.trim()) {
-        setInterim('');
-        onFinalRef.current(finalText.trim(), finalConfidence);
-      }
+    const mime = pickMimeType();
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    chunksRef.current = [];
+
+    rec.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
     };
-    rec.onerror = (e) => {
-      const text = ERROR_TEXT[e.error];
-      // aborted 是我們自己叫停的,不是錯誤;其餘一律講出來,不靜默
-      if (text !== '') setError(text ?? `語音辨識錯誤:${e.error}`);
-    };
-    rec.onend = () => {
-      recRef.current = null;
-      setListening(false);
-      setInterim('');
+    rec.onstop = () => {
+      // 麥克風用完就關,不要讓瀏覽器一直亮著錄音指示燈
+      stream.getTracks().forEach((t) => t.stop());
+      recorderRef.current = null;
+      setRecording(false);
+      if (timerRef.current) clearTimeout(timerRef.current);
+
+      const type = rec.mimeType || mime || 'audio/webm';
+      const blob = new Blob(chunksRef.current, { type });
+      chunksRef.current = [];
+      if (blob.size < 1000) {
+        setError('錄到的聲音太短,請按住講完再放開');
+        return;
+      }
+      void upload(blob, type);
     };
 
-    setError(null);
-    recRef.current = rec;
-    setListening(true);
+    recorderRef.current = rec;
+    setRecording(true);
     rec.start();
-  }, []);
+    timerRef.current = setTimeout(() => {
+      if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+    }, MAX_RECORD_MS);
+  }, [upload]);
 
   const stop = useCallback(() => {
-    recRef.current?.stop();
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
   }, []);
 
   const speak = useCallback((text: string) => {
@@ -141,24 +154,24 @@ export function useVoice(onFinal: (transcript: string, confidence: number) => vo
     window.speechSynthesis.speak(u);
   }, []);
 
-  const cancelSpeech = useCallback(() => {
-    window.speechSynthesis?.cancel();
-  }, []);
+  const cancelSpeech = useCallback(() => window.speechSynthesis?.cancel(), []);
+  const clearError = useCallback(() => setError(null), []);
 
   useEffect(() => {
     return () => {
-      recRef.current?.abort();
+      if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+      if (timerRef.current) clearTimeout(timerRef.current);
       window.speechSynthesis?.cancel();
     };
   }, []);
 
-  return { supported, listening, interim, error, start, stop, speak, cancelSpeech };
+  return { supported, recording, transcribing, error, start, stop, speak, cancelSpeech, clearError };
 }
 
 /**
  * 語音要唸出來的內容。
  *
- * confirming 狀態**唸結構化欄位而不是模型那句話**——這是 Lab 3 §1 的第三道硬化:
+ * confirming 狀態**唸結構化欄位而不是模型那句話**(Lab 3 §1 第三道硬化):
  * 使用者在語音情境下看不到卡片,唸錯欄位他就不可能發現。
  * 欄位是 runtime 從 canonical payload 生的,不會說謊。
  */

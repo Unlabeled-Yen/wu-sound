@@ -249,9 +249,14 @@ export function ChatClient() {
           🎤 {voice.error}
         </p>
       )}
-      {voice.listening && (
+      {voice.recording && (
         <p className="text-[13px]" style={{ color: 'var(--nm-accent)' }}>
-          🎤 聽你說…{voice.interim && <span style={{ color: 'var(--nm-text-muted)' }}> {voice.interim}</span>}
+          🔴 錄音中…講完按一下停止
+        </p>
+      )}
+      {voice.transcribing && (
+        <p className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>
+          辨識中…
         </p>
       )}
 
@@ -259,12 +264,12 @@ export function ChatClient() {
         <button
           type="button"
           className="nm-btn text-[16px] px-3"
-          aria-label={voice.listening ? '停止錄音' : '開始說話'}
-          title={voice.supported ? '按一下開始說話' : '這個瀏覽器不支援語音輸入'}
-          disabled={busy || !sessionId || !voice.supported}
-          onClick={() => (voice.listening ? voice.stop() : voice.start())}
+          aria-label={voice.recording ? '停止錄音' : '開始說話'}
+          title={voice.supported ? '按一下開始講,講完再按一下' : '這個瀏覽器不支援錄音'}
+          disabled={busy || !sessionId || !voice.supported || voice.transcribing}
+          onClick={() => (voice.recording ? voice.stop() : void voice.start())}
         >
-          {voice.listening ? '⏹' : '🎤'}
+          {voice.recording ? '⏹' : '🎤'}
         </button>
         <input
           className="nm-input flex-1 text-[14px]"
@@ -289,8 +294,8 @@ export function ChatClient() {
             if (!e.target.checked) voice.cancelSpeech();
           }}
         />
-        免手模式:唸出回覆,等你確認時自動開麥克風,說「確認」或「取消」
-        {!voice.supported && '(這個瀏覽器不支援,iPhone 的 Safari 目前沒有語音辨識)'}
+        免手模式:唸出回覆,等你確認時自動開始錄音,說「確認」或「取消」
+        {!voice.supported && '(這個瀏覽器不支援錄音)'}
       </label>
     </div>
   );
