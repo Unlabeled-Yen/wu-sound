@@ -15,8 +15,13 @@ alter table sites
 
 create index sites_category_idx on sites (category_id);
 
--- ledger_entries 追加:專案歸屬、應收應付連結、手續費、draft 狀態(定期帳範本用)。
-alter table ledger_status add value if not exists 'draft';
+-- ledger_entries 追加:專案歸屬、應收應付連結、手續費。
+-- 注意:原本這裡有一條 `alter type ledger_status add value 'draft'`(給定期帳範本
+-- 產出的草稿用),已移除。原因:(1) 這輪 UI 沒有真的用到 draft 狀態(定期帳範本 UI
+-- 屬於「刻意延後」);(2) 未來實作定期帳範本 UI 時,ADD VALUE 建議獨立成一個
+-- migration 單獨執行,避免和其他 DDL 混在同一個 transaction 引發相容性問題。
+-- 之前這條寫成 `alter table` 而非 `alter type`,是造成 2026-08-14 首次套用整批
+-- rollback 的原因。
 
 alter table ledger_entries
   add column site_id uuid references sites(id),
@@ -77,8 +82,11 @@ before update on recurring_templates for each row execute function bump_updated_
 alter table ledger_entries
   add column recurring_template_id uuid references recurring_templates(id);
 
+-- 明確 cast 到 timestamp(不是 timestamptz),才會走 IMMUTABLE 的 date_trunc overload。
+-- 若不 cast,PostgreSQL 對 date 會隱式轉 timestamptz(STABLE),索引會拒收
+-- 並拋 42P17: functions in index expression must be marked IMMUTABLE。
 create unique index ledger_recurring_month_uidx
-  on ledger_entries (recurring_template_id, date_trunc('month', occurred_on))
+  on ledger_entries (recurring_template_id, date_trunc('month', occurred_on::timestamp))
   where recurring_template_id is not null;
 
 -- 每日案場歸屬(下班打卡時記錄;老闆可事後改)

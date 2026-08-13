@@ -160,7 +160,9 @@ create type ledger_kind as enum (
   'rent', 'utility', 'credit_card', 'tax', 'investment', 'health', 'other_expense'
 );
 create type invoice_status as enum ('none', 'to_issue', 'issued');
-create type ledger_status as enum ('active', 'voided', 'draft');
+create type ledger_status as enum ('active', 'voided');
+-- 'draft' 保留給未來定期帳範本 UI 用,屆時獨立一個 migration 執行
+-- `alter type ledger_status add value 'draft';`,不要混在其他 DDL 的 transaction 裡。
 create type receivable_direction as enum ('receivable', 'payable');
 create type receivable_status as enum ('open', 'closed', 'voided');
 
@@ -247,7 +249,7 @@ create unique index ledger_batch_party_uidx
   on ledger_entries (source_batch_id, party)
   where source_batch_id is not null;
 create unique index ledger_recurring_month_uidx
-  on ledger_entries (recurring_template_id, date_trunc('month', occurred_on))
+  on ledger_entries (recurring_template_id, date_trunc('month', occurred_on::timestamp))
   where recurring_template_id is not null;
 
 create trigger ledger_bump_updated
