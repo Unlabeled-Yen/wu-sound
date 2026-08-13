@@ -17,6 +17,7 @@ export async function GET(req: Request) {
   const kind = searchParams.get('kind') as LedgerKind | null;
   const isExtRaw = searchParams.get('is_external');
   const statusParam = (searchParams.get('status') as LedgerStatus | null) ?? 'active';
+  const siteId = searchParams.get('site_id');
 
   const sb = getSupabaseAdmin();
   let q = sb.from('ledger_entries').select('*').eq('status', statusParam);
@@ -33,6 +34,7 @@ export async function GET(req: Request) {
   if (kind) q = q.eq('kind', kind);
   if (isExtRaw === 'true') q = q.eq('is_external', true);
   else if (isExtRaw === 'false') q = q.eq('is_external', false);
+  if (siteId) q = q.eq('site_id', siteId);
 
   q = q.order('occurred_on', { ascending: true }).order('created_at', { ascending: true });
 
@@ -58,6 +60,7 @@ export async function POST(req: Request) {
     direction: body.direction as LedgerDirection,
     kind: body.kind as LedgerKind,
     amount_twd: Number(body.amount_twd),
+    fee_twd: Number(body.fee_twd ?? 0),
     party: body.party ? String(body.party).trim() || null : null,
     memo: body.memo ? String(body.memo).trim() || null : null,
     is_external: Boolean(body.is_external),
@@ -65,6 +68,8 @@ export async function POST(req: Request) {
     invoice_no: body.invoice_no ? String(body.invoice_no).trim() || null : null,
     invoice_date: body.invoice_date ? String(body.invoice_date) : null,
     tax_amount_twd: Number(body.tax_amount_twd ?? 0),
+    site_id: body.site_id ? String(body.site_id) : null,
+    receivable_id: body.receivable_id ? String(body.receivable_id) : null,
   };
 
   const err = validateLedger(input);
@@ -78,6 +83,7 @@ export async function POST(req: Request) {
       direction: input.direction,
       kind: input.kind,
       amount_twd: input.amount_twd,
+      fee_twd: input.fee_twd,
       party: input.party,
       memo: input.memo,
       is_external: input.is_external,
@@ -85,6 +91,8 @@ export async function POST(req: Request) {
       invoice_no: input.invoice_no,
       invoice_date: input.invoice_date,
       tax_amount_twd: input.tax_amount_twd,
+      site_id: input.site_id,
+      receivable_id: input.receivable_id,
       created_by: session.id,
     })
     .select('*')

@@ -41,6 +41,7 @@ interface SP {
   direction?: string;
   kind?: string;
   status?: string;
+  site_id?: string;
 }
 
 function buildHref(base: SP, overrides: Partial<SP>): string {
@@ -51,6 +52,7 @@ function buildHref(base: SP, overrides: Partial<SP>): string {
   if (merged.direction) p.set('direction', merged.direction);
   if (merged.kind) p.set('kind', merged.kind);
   if (merged.status && merged.status !== 'active') p.set('status', merged.status);
+  if (merged.site_id) p.set('site_id', merged.site_id);
   const q = p.toString();
   return q ? `/boss/ledger?${q}` : '/boss/ledger';
 }
@@ -64,13 +66,14 @@ export default async function LedgerPage(
   const direction = (sp.direction as LedgerDirection | undefined);
   const kind = (sp.kind as LedgerKind | undefined);
   const statusVal: LedgerStatus = sp.status === 'voided' ? 'voided' : 'active';
+  const siteId = sp.site_id;
 
   const { from, to } = monthRange(month);
   const sb = getSupabaseAdmin();
 
   let q = sb
     .from('ledger_entries')
-    .select('*')
+    .select('*, sites(name)')
     .gte('occurred_on', from)
     .lte('occurred_on', to)
     .eq('status', statusVal);
@@ -78,19 +81,22 @@ export default async function LedgerPage(
   if (filter === 'external') q = q.eq('is_external', true);
   if (direction === 'income' || direction === 'expense') q = q.eq('direction', direction);
   if (kind) q = q.eq('kind', kind);
+  if (siteId) q = q.eq('site_id', siteId);
   q = q.order('occurred_on', { ascending: true }).order('created_at', { ascending: true });
   const { data, error } = await q;
-  const rows: LedgerEntry[] = (data ?? []) as LedgerEntry[];
+  type LedgerRowWithSite = LedgerEntry & { sites?: { name: string } | null };
+  const rows: LedgerRowWithSite[] = (data ?? []) as LedgerRowWithSite[];
+  const siteName = siteId ? (rows.find((r) => r.site_id === siteId)?.sites?.name ?? null) : null;
 
   // 合計(只算 active,不論 filter 顯示 voided 或否,摘要都以 active 為準)
   const sumQ = await sb
     .from('ledger_entries')
-    .select('direction, amount_twd, is_external, tax_amount_twd')
+    .select('direction, amount_twd, fee_twd, is_external, tax_amount_twd')
     .gte('occurred_on', from)
     .lte('occurred_on', to)
     .eq('status', 'active');
-  const sums = (sumQ.data ?? []) as Array<Pick<LedgerEntry, 'direction' | 'amount_twd' | 'is_external' | 'tax_amount_twd'>>;
-  let income = 0, expense = 0, extIncome = 0, extTax = 0;
+  const sums = (sumQ.data ?? []) as Array<Pick<LedgerEntry, 'direction' | 'amount_twd' | 'fee_twd' | 'is_external' | 'tax_amount_twd'>>;
+  let income = 0, expense = 0, extIncome = 0, extTax = 0, feeTotal = 0;
   for (const r of sums) {
     if (r.direction === 'income') income += r.amount_twd;
     else expense += r.amount_twd;
@@ -98,6 +104,7 @@ export default async function LedgerPage(
       if (r.direction === 'income') extIncome += r.amount_twd;
       extTax += r.tax_amount_twd;
     }
+    feeTotal += r.fee_twd ?? 0;
   }
   const net = income - expense;
 
@@ -107,7 +114,7 @@ export default async function LedgerPage(
 
   const fmt = (n: number) => n.toLocaleString('zh-TW');
 
-  const base: SP = { month, filter, direction, kind, status: statusVal };
+  const base: SP = { month, filter, direction, kind, status: statusVal, site_id: siteId };
 
   return (
     <div className="space-y-4">
@@ -184,6 +191,16 @@ export default async function LedgerPage(
         </Link>
       </div>
 
+      {siteId && (
+        <div
+          className="rounded-xl px-3 py-2 text-[13px] flex items-center gap-2"
+          style={{ background: 'rgba(126,207,157,0.08)', border: '1px solid rgba(126,207,157,0.26)', color: 'var(--nm-success-glass-text)' }}
+        >
+          篩選中:{siteName ? `專案「${siteName}」` : '此專案本月無資料'}
+          <Link href={buildHref(base, { site_id: undefined })} className="underline ml-auto" style={{ color: 'var(--nm-text-muted)' }}>清除篩選</Link>
+        </div>
+      )}
+
       {/* 摘要卡 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <SummaryCard label="當月收入合計" value={`$${fmt(income)}`} tone="income" />
@@ -193,6 +210,10 @@ export default async function LedgerPage(
           <div style={{ color: 'var(--nm-text-secondary)' }}>外帳彙總</div>
           <div className="mt-1" style={{ color: 'var(--nm-text-body)' }}>收入合計 <span className="font-semibold">${fmt(extIncome)}</span></div>
           <div style={{ color: 'var(--nm-text-body)' }}>稅額合計 <span className="font-semibold">${fmt(extTax)}</span></div>
+        </div>
+        <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
+          <div style={{ color: 'var(--nm-text-secondary)' }}>轉帳手續費合計</div>
+          <div className="mt-1 text-lg font-semibold" style={{ color: 'var(--nm-text-body)' }}>${fmt(feeTotal)}</div>
         </div>
       </div>
 
@@ -205,6 +226,7 @@ export default async function LedgerPage(
               <th className="text-left px-3 py-2 font-normal whitespace-nowrap">方向</th>
               <th className="text-left px-3 py-2 font-normal whitespace-nowrap">類別</th>
               <th className="text-left px-3 py-2 font-normal whitespace-nowrap">對象</th>
+              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">案場</th>
               <th className="text-right px-3 py-2 font-normal whitespace-nowrap">金額</th>
               <th className="text-left px-3 py-2 font-normal whitespace-nowrap">內外帳</th>
               <th className="text-left px-3 py-2 font-normal whitespace-nowrap">發票</th>
@@ -214,10 +236,10 @@ export default async function LedgerPage(
           </thead>
           <tbody>
             {error && (
-              <tr><td colSpan={9} className="px-3 py-4 whitespace-nowrap" style={{ color: 'var(--nm-danger)' }}>查詢失敗: {error.message}</td></tr>
+              <tr><td colSpan={10} className="px-3 py-4 whitespace-nowrap" style={{ color: 'var(--nm-danger)' }}>查詢失敗: {error.message}</td></tr>
             )}
             {!error && rows.length === 0 && (
-              <tr><td colSpan={9} className="px-3 py-6 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>本月沒有紀錄</td></tr>
+              <tr><td colSpan={10} className="px-3 py-6 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>本月沒有紀錄</td></tr>
             )}
             {rows.map((r) => {
               const voided = r.status === 'voided';
@@ -239,6 +261,9 @@ export default async function LedgerPage(
                     )}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.party ?? '—'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>
+                    {r.sites?.name ?? <span style={{ color: 'var(--nm-text-faint)' }}>—</span>}
+                  </td>
                   <td className={`px-3 py-2 text-right font-mono tabular whitespace-nowrap ${voided ? 'line-through' : ''}`} style={{ color: 'var(--nm-text-body)' }}>
                     ${fmt(r.amount_twd)}
                   </td>
@@ -298,6 +323,8 @@ export default async function LedgerPage(
         >新增一筆</Link>
         <ImportBatchDialog />
         <ExportCsvDialog defaultMonth={month} />
+        <Link href="/boss/ledger/receivables" className="nm-btn text-[13px]">應收應付</Link>
+        <Link href="/boss/report" className="nm-btn text-[13px]">報表中心</Link>
       </div>
     </div>
   );

@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { pairClockinsByDay } from '@/lib/hours';
+import AllocationEditor from './AllocationEditor';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,7 +51,12 @@ export default async function BossClockinsPage({
   const daysInMonth = new Date(y, m, 0).getDate();
 
   const supabase = getSupabaseAdmin();
-  const [{ data: usersData, error: usersErr }, { data: clockData, error: ciErr }] = await Promise.all([
+  const [
+    { data: usersData, error: usersErr },
+    { data: clockData, error: ciErr },
+    { data: sitesData },
+    { data: allocData },
+  ] = await Promise.all([
     supabase.from('users').select('id, name, role, active').eq('role', 'staff').order('name'),
     supabase
       .from('clockins')
@@ -57,11 +64,18 @@ export default async function BossClockinsPage({
       .gte('ts', start.toISOString())
       .lt('ts', end.toISOString())
       .order('ts', { ascending: true }),
+    supabase.from('sites').select('id, name').eq('active', true).order('name'),
+    supabase
+      .from('day_site_allocations')
+      .select('user_id, worked_on, site_id')
+      .gte('worked_on', `${ym}-01`)
+      .lt('worked_on', end.toISOString().slice(0, 10)),
   ]);
 
   const error = usersErr?.message || ciErr?.message || null;
   const users = (usersData || []) as { id: string; name: string }[];
   const rows = (clockData || []) as unknown as ClockinRow[];
+  const activeSites = (sitesData || []) as { id: string; name: string }[];
 
   // group: user_id -> day -> entries
   const byUser = new Map<string, Map<number, ClockinRow[]>>();
@@ -80,6 +94,29 @@ export default async function BossClockinsPage({
   }
   const prev = shift(-1);
   const next = shift(1);
+
+  // 每人每日工時(供案場歸屬編輯器顯示;口徑見 lib/hours.ts,尚未經老闆正式拍板)
+  const userName = new Map(users.map((u) => [u.id, u.name]));
+  const allocationRows: Array<{ user_id: string; user_name: string; worked_on: string; hours: number | null }> = [];
+  for (const [userId, dayMap] of byUser) {
+    const clockinsForUser = Array.from(dayMap.values()).flat().map((c) => ({ ts: c.ts, type: c.type }));
+    const days = pairClockinsByDay(clockinsForUser);
+    for (const d of days) {
+      allocationRows.push({
+        user_id: userId,
+        user_name: userName.get(userId) ?? '?',
+        worked_on: d.dateKey,
+        hours: d.pairs.length > 0 ? d.totalHours : null,
+      });
+    }
+  }
+  allocationRows.sort((a, b) => a.worked_on.localeCompare(b.worked_on) || a.user_name.localeCompare(b.user_name));
+
+  const initialAllocations: Record<string, string[]> = {};
+  for (const a of (allocData || []) as Array<{ user_id: string; worked_on: string; site_id: string }>) {
+    const key = `${a.user_id}:${a.worked_on}`;
+    (initialAllocations[key] ??= []).push(a.site_id);
+  }
 
   return (
     <div>
@@ -205,6 +242,14 @@ export default async function BossClockinsPage({
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--nm-text-primary)' }}>案場歸屬</h2>
+        <p className="text-[13px] mb-3" style={{ color: 'var(--nm-text-secondary)' }}>
+          工時口徑為每對上下班配對相加(暫定,未經正式拍板);未分攤的日子會在專案損益報表列為「內勤/庫房」,不會硬塞進任何專案。
+        </p>
+        <AllocationEditor sites={activeSites} rows={allocationRows} initial={initialAllocations} />
       </div>
     </div>
   );

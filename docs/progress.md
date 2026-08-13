@@ -1,6 +1,34 @@
-# wu-sound-fde 進度總表(2026-08-11)
+# wu-sound-fde 進度總表(2026-08-14 更新)
 
 單一真相來源:本檔記錄「什麼做完了 / 什麼還沒」。規格細節見各 spec,待決策事項見 [open-questions.md](open-questions.md)。
+
+---
+
+## 🚧 帳務 v2 批次一(2026-08-14 動工,程式碼完成、尚未上線)
+
+對應規格 [ledger-v2-spec-v1.md](ledger-v2-spec-v1.md)。本輪聚焦 Yen 這次對話最在意的兩件事——**打卡時數計入專案支出**、**多維度報表(專案/類別/年季)**——連同它們的資料地基。tsc + vitest(4056 個測試)+ production build 全綠,但**尚未上正式站**,原因見下方「上線前待辦」。
+
+**已完成(程式碼)**:
+- migration `013_ledger_v2.sql` + 同步進 `schema.sql`:`site_categories`、`sites` 加類別/客戶欄、`ledger_entries` 加 `site_id`/`receivable_id`/`fee_twd`/draft 狀態、`receivables`、`recurring_templates`(僅骨架,UI 未做)、`day_site_allocations`、`user_pay_profiles`(骨架,第二批用)、`monthly_cost_rates`(骨架)、`quotes.site_id`
+- `lib/hours.ts` 工時配對引擎(open-questions Q1 暫定口徑,10 個單元測試涵蓋正常配對/未配對/跨日/連續 in)——**尚未經老闆正式拍板**,UI 上已標註「暫定」
+- site_id 地基:`/boss/sites` 加案件類別管理(老闆自訂清單)+ 客戶欄;`/boss/ledger` 表單/列表加案場選填 + 手續費獨立欄
+- `day_site_allocations`:員工下班打卡後可選「今天去了哪個案場」(可多選/可跳過);`/boss/clockins` 新增案場歸屬編輯器,顯示每日配對工時,老闆可事後改
+- 應收應付:`/boss/ledger/receivables` 列表(未結金額 server 端算,超收 loud 標示)+ 結清/作廢;ledger 表單可選填掛既有約定
+- 報表中心 `/boss/report`:期間(月/季/年)× 維度(總覽/案件類別/專案/客戶),營收自動排除借款/業外,每維度有殘差行(未歸類另計)並自證「各分項+未歸類=帳目總額」,常駐顯示在手應收/應付(不受期間篩選)
+
+**這輪刻意延後(第一批範圍內,未做)**:
+- 定期帳範本(`recurring_templates`)的產生/確認 UI——資料表已建,lazy 產生邏輯未接進 `/boss/ledger`
+- 待開發票獨立清單頁(逾期變色)——目前只能在 ledger 列表用發票狀態篩
+- 銀行對帳單月末核對(期初/期末餘額鏈 + 差額 loud)
+- `/boss/sites/[id]` 整案期損益頁(專案軸完整生命週期毛利,report 中心的「專案」維度目前只呈現當期活動金額,已在頁面上註明不是完整損益)
+
+**第二批(明確等老闆給每人月薪數字才動工,不是忘記做)**:人力分攤金額化、專案毛利頁、報價預估 vs 實際毛利對照、`monthly_cost_rates` 月結凍結快照
+
+**上線前待辦(卡在人,不在系統)**:
+1. **Yen 手動在 Supabase SQL editor 執行 `supabase/migrations/013_ledger_v2.sql`**(專案慣例:migration 不自動套用,見 [deploy.md](deploy.md));套用前正式庫沒有這些新表/新欄,所有新頁面會查詢失敗
+2. open-questions.md 的 Q1(工時配對口徑)/Q2(打卡不全擋不擋)/Q3(鎖定強度)請老闆過目——目前 UI 用暫定口徑上場,已標註
+3. 案件類別清單目前是空的,需要老闆用他自己的說法建(固定安裝工程/活動/維修保養…),否則案件類別報表全部落在殘差行
+4. 因為 1 尚未執行,這輪改動**未做瀏覽器實測**——測過也是全部 500(資料表不存在),不具意義;請 migration 套用後我再補真實環境驗證
 
 ---
 

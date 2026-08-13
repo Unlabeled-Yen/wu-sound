@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   INCOME_KINDS,
   EXPENSE_KINDS,
@@ -30,6 +30,11 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
   const [direction, setDirection] = useState<LedgerDirection>(initial?.direction ?? 'expense');
   const [kind, setKind] = useState<LedgerKind>(initial?.kind ?? 'reimbursement');
   const [amount, setAmount] = useState<string>(initial?.amount_twd ? String(initial.amount_twd) : '');
+  const [fee, setFee] = useState<string>(initial?.fee_twd ? String(initial.fee_twd) : '0');
+  const [siteId, setSiteId] = useState<string>(initial?.site_id ?? '');
+  const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
+  const [receivableId, setReceivableId] = useState<string>(initial?.receivable_id ?? '');
+  const [receivables, setReceivables] = useState<Array<{ id: string; party: string; remaining_twd: number }>>([]);
   const [party, setParty] = useState<string>(initial?.party ?? '');
   const [memo, setMemo] = useState<string>(initial?.memo ?? '');
   const [isExternal, setIsExternal] = useState<boolean>(initial?.is_external ?? false);
@@ -48,6 +53,23 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
     () => (direction === 'income' ? INCOME_KINDS : EXPENSE_KINDS),
     [direction],
   );
+
+  useEffect(() => {
+    fetch('/api/sites?active=1', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => setSites(j.sites ?? []))
+      .catch(() => {});
+  }, []);
+
+  // 應收(direction=income)/應付(direction=expense)對應的未結約定,供選填掛帳
+  useEffect(() => {
+    const wanted = direction === 'income' ? 'receivable' : 'payable';
+    fetch(`/api/receivables?status=open&direction=${wanted}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => setReceivables(j.rows ?? []))
+      .catch(() => setReceivables([]));
+    setReceivableId((cur) => (initial?.receivable_id && initial.direction === direction ? cur : ''));
+  }, [direction, initial?.receivable_id, initial?.direction]);
 
   function onDirectionChange(next: LedgerDirection) {
     if (locked) return;
@@ -87,6 +109,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       direction,
       kind,
       amount_twd: Number(amount),
+      fee_twd: Number(fee || 0),
       party: party.trim() || null,
       memo: memo.trim() || null,
       is_external: isExternal,
@@ -94,6 +117,8 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       invoice_no: invoiceNo.trim() || null,
       invoice_date: invoiceDate || null,
       tax_amount_twd: isExternal ? Number(tax || 0) : 0,
+      site_id: siteId || null,
+      receivable_id: receivableId || null,
     };
     const err = validateLedger(input);
     if (err) { setError(err); return; }
@@ -203,6 +228,50 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
           required
         />
       </div>
+
+      <div>
+        <label className={labelCls} style={labelStyle}>手續費(元)· 轉帳費另計,不混進金額</label>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          value={fee}
+          onChange={(e) => setFee(e.target.value)}
+          disabled={locked}
+          className={inputCls}
+        />
+      </div>
+
+      <div>
+        <label className={labelCls} style={labelStyle}>案場/專案(選填)</label>
+        <select
+          value={siteId}
+          onChange={(e) => setSiteId(e.target.value)}
+          className={inputCls}
+        >
+          <option value="">— 不掛專案 —</option>
+          {sites.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {receivables.length > 0 && (
+        <div>
+          <label className={labelCls} style={labelStyle}>掛應收應付約定(選填)</label>
+          <select
+            value={receivableId}
+            onChange={(e) => setReceivableId(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">— 不掛約定 —</option>
+            {receivables.map((r) => (
+              <option key={r.id} value={r.id}>{r.party} · 未結 ${r.remaining_twd.toLocaleString('zh-TW')}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
         <label className={labelCls} style={labelStyle}>對象(客戶/廠商/員工)</label>

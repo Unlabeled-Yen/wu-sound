@@ -24,6 +24,7 @@ function readFormLedger(fd: FormData): LedgerInput {
     direction: String(fd.get('direction') ?? '') as LedgerDirection,
     kind: String(fd.get('kind') ?? '') as LedgerKind,
     amount_twd: Number(fd.get('amount_twd') ?? 0),
+    fee_twd: Number(fd.get('fee_twd') ?? 0),
     party: (String(fd.get('party') ?? '').trim() || null),
     memo: (String(fd.get('memo') ?? '').trim() || null),
     is_external,
@@ -31,6 +32,8 @@ function readFormLedger(fd: FormData): LedgerInput {
     invoice_no: (String(fd.get('invoice_no') ?? '').trim() || null),
     invoice_date: (String(fd.get('invoice_date') ?? '').trim() || null),
     tax_amount_twd: is_external ? (Number.isFinite(tax) ? tax : 0) : 0,
+    site_id: (String(fd.get('site_id') ?? '').trim() || null),
+    receivable_id: (String(fd.get('receivable_id') ?? '').trim() || null),
   };
 }
 
@@ -137,6 +140,7 @@ export async function updateEntry(id: string, formData: FormData): Promise<Resul
     direction: input.direction,
     kind: input.kind,
     amount_twd: input.amount_twd,
+    fee_twd: input.fee_twd,
     party: input.party,
     memo: input.memo,
     is_external: input.is_external,
@@ -144,6 +148,8 @@ export async function updateEntry(id: string, formData: FormData): Promise<Resul
     invoice_no: input.invoice_no,
     invoice_date: input.invoice_date,
     tax_amount_twd: input.tax_amount_twd,
+    site_id: input.site_id,
+    receivable_id: input.receivable_id,
   }).eq('id', id).select('*').single();
   if (upd.error || !upd.data) {
     return { ok: false, error: `更新失敗: ${upd.error?.message ?? 'unknown'}` };

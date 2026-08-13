@@ -25,15 +25,64 @@ export async function createSite(formData: FormData) {
   const actor = await assertBoss();
   const name = (formData.get('name') as string || '').trim();
   if (!name) throw new Error('專案名稱不得為空');
+  const categoryId = (formData.get('category_id') as string || '').trim() || null;
+  const customerName = (formData.get('customer_name') as string || '').trim() || null;
 
   const sb = getSupabaseAdmin();
   const dup = await sb.from('sites').select('id').eq('name', name).maybeSingle();
   if (dup.error) throw new Error(dup.error.message);
   if (dup.data) throw new Error(`已有專案「${name}」`);
 
-  const ins = await sb.from('sites').insert({ name, active: true }).select('id').single();
+  const ins = await sb
+    .from('sites')
+    .insert({ name, active: true, category_id: categoryId, customer_name: customerName })
+    .select('id')
+    .single();
   if (ins.error) throw new Error(ins.error.message);
-  await audit(actor.id, 'site.create', ins.data.id as string, { name });
+  await audit(actor.id, 'site.create', ins.data.id as string, { name, category_id: categoryId, customer_name: customerName });
+  revalidatePath('/boss/sites');
+}
+
+export async function updateSiteMeta(formData: FormData) {
+  const actor = await assertBoss();
+  const id = formData.get('id') as string;
+  if (!id) throw new Error('缺少 id');
+  const categoryId = (formData.get('category_id') as string || '').trim() || null;
+  const customerName = (formData.get('customer_name') as string || '').trim() || null;
+
+  const sb = getSupabaseAdmin();
+  const cur = await sb.from('sites').select('category_id, customer_name').eq('id', id).maybeSingle();
+  if (cur.error) throw new Error(cur.error.message);
+  if (!cur.data) throw new Error('專案不存在');
+
+  const upd = await sb
+    .from('sites')
+    .update({ category_id: categoryId, customer_name: customerName })
+    .eq('id', id);
+  if (upd.error) throw new Error(upd.error.message);
+  await audit(actor.id, 'site.update_meta', id, { before: cur.data, after: { category_id: categoryId, customer_name: customerName } });
+  revalidatePath('/boss/sites');
+}
+
+export async function createSiteCategory(formData: FormData) {
+  const actor = await assertBoss();
+  const name = (formData.get('name') as string || '').trim();
+  if (!name) throw new Error('類別名稱不得為空');
+
+  const sb = getSupabaseAdmin();
+  const dup = await sb.from('site_categories').select('id').eq('name', name).maybeSingle();
+  if (dup.error) throw new Error(dup.error.message);
+  if (dup.data) throw new Error(`已有類別「${name}」`);
+
+  const ins = await sb.from('site_categories').insert({ name, active: true }).select('id').single();
+  if (ins.error) throw new Error(ins.error.message);
+  await sb.from('audit_log').insert({
+    actor_id: actor.id,
+    action: 'site_category.create',
+    target_table: 'site_categories',
+    target_id: ins.data.id as string,
+    diff: { name },
+  });
   revalidatePath('/boss/sites');
 }
 

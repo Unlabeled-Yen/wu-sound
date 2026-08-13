@@ -47,6 +47,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     direction: (body.direction ?? before.direction) as LedgerDirection,
     kind: (body.kind ?? before.kind) as LedgerKind,
     amount_twd: body.amount_twd !== undefined ? Number(body.amount_twd) : before.amount_twd,
+    fee_twd: body.fee_twd !== undefined ? Number(body.fee_twd) : before.fee_twd,
     party: body.party !== undefined ? (body.party ? String(body.party).trim() || null : null) : before.party,
     memo: body.memo !== undefined ? (body.memo ? String(body.memo).trim() || null : null) : before.memo,
     is_external: body.is_external !== undefined ? Boolean(body.is_external) : before.is_external,
@@ -54,6 +55,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     invoice_no: body.invoice_no !== undefined ? (body.invoice_no ? String(body.invoice_no).trim() || null : null) : before.invoice_no,
     invoice_date: body.invoice_date !== undefined ? (body.invoice_date || null) : before.invoice_date,
     tax_amount_twd: body.tax_amount_twd !== undefined ? Number(body.tax_amount_twd) : before.tax_amount_twd,
+    site_id: body.site_id !== undefined ? (body.site_id ? String(body.site_id) : null) : before.site_id,
+    receivable_id: body.receivable_id !== undefined ? (body.receivable_id ? String(body.receivable_id) : null) : before.receivable_id,
   };
 
   const err = validateLedger(merged);
@@ -64,6 +67,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     direction: merged.direction,
     kind: merged.kind,
     amount_twd: merged.amount_twd,
+    fee_twd: merged.fee_twd,
     party: merged.party,
     memo: merged.memo,
     is_external: merged.is_external,
@@ -71,6 +75,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     invoice_no: merged.invoice_no,
     invoice_date: merged.invoice_date,
     tax_amount_twd: merged.tax_amount_twd,
+    site_id: merged.site_id,
+    receivable_id: merged.receivable_id,
   }).eq('id', id).select('*').single();
 
   if (upd.error || !upd.data) {

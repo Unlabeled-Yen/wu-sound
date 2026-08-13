@@ -10,6 +10,11 @@ interface Clockin {
   backfill_reason: string | null;
 }
 
+interface SiteOption {
+  id: string;
+  name: string;
+}
+
 function todayKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -33,6 +38,53 @@ export default function StaffClockinPage() {
   const [bfError, setBfError] = useState<string | null>(null);
   const [bfSubmitting, setBfSubmitting] = useState(false);
 
+  const [sites, setSites] = useState<SiteOption[]>([]);
+  const [selectedSiteIds, setSelectedSiteIds] = useState<string[]>([]);
+  const [siteSectionOpen, setSiteSectionOpen] = useState(false);
+  const [siteSaving, setSiteSaving] = useState(false);
+  const [siteSaved, setSiteSaved] = useState(false);
+  const [siteError, setSiteError] = useState<string | null>(null);
+
+  async function loadSiteContext() {
+    try {
+      const [sitesRes, allocRes] = await Promise.all([
+        fetch('/api/sites?active=1', { cache: 'no-store' }),
+        fetch(`/api/day-site-allocations?date=${todayKey()}`, { cache: 'no-store' }),
+      ]);
+      const sitesJ = await sitesRes.json().catch(() => ({}));
+      setSites(sitesJ.sites ?? []);
+      const allocJ = await allocRes.json().catch(() => ({}));
+      const ids = ((allocJ.allocations ?? []) as Array<{ site_id: string }>).map((a) => a.site_id);
+      setSelectedSiteIds(ids);
+    } catch {
+      // 靜默:這是輔助性的分攤資料,讀取失敗不擋主流程
+    }
+  }
+
+  function toggleSite(id: string) {
+    setSiteSaved(false);
+    setSelectedSiteIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  }
+
+  async function saveSiteAllocation() {
+    setSiteError(null);
+    setSiteSaving(true);
+    try {
+      const res = await fetch('/api/day-site-allocations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ worked_on: todayKey(), site_ids: selectedSiteIds }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || '儲存失敗');
+      setSiteSaved(true);
+    } catch (e) {
+      setSiteError(e instanceof Error ? e.message : '儲存失敗');
+    } finally {
+      setSiteSaving(false);
+    }
+  }
+
   async function load() {
     setLoading(true);
     setError(null);
@@ -50,6 +102,7 @@ export default function StaffClockinPage() {
 
   useEffect(() => {
     load();
+    loadSiteContext();
   }, []);
 
   const today = todayKey();
@@ -69,6 +122,7 @@ export default function StaffClockinPage() {
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || '打卡失敗');
       await load();
+      if (type === 'out') setSiteSectionOpen(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : '打卡失敗');
     } finally {
@@ -188,6 +242,62 @@ export default function StaffClockinPage() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <button
+          type="button"
+          onClick={() => setSiteSectionOpen((v) => !v)}
+          className="w-full flex items-center justify-between text-[13px] nm-focus rounded px-1 py-1"
+          style={{ color: 'var(--nm-text-muted)' }}
+        >
+          <span>今天去了哪個案場?(可多選、可跳過)</span>
+          <span>{siteSectionOpen ? '收起' : '展開'}</span>
+        </button>
+        {siteSectionOpen && (
+          <div className="nm-raised rounded-2xl p-4 space-y-3">
+            {sites.length === 0 ? (
+              <p className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>目前沒有可選的專案</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {sites.map((s) => {
+                  const active = selectedSiteIds.includes(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleSite(s.id)}
+                      className="nm-pill nm-focus"
+                      style={active ? {
+                        color: 'var(--nm-success-glass-text)',
+                        background: 'rgba(126,207,157,0.14)',
+                        borderColor: 'rgba(126,207,157,0.4)',
+                      } : undefined}
+                    >
+                      {active ? '✓ ' : ''}{s.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {siteError && (
+              <div className="text-[13px]" style={{ color: 'var(--nm-danger)' }}>{siteError}</div>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={saveSiteAllocation}
+                disabled={siteSaving}
+                className="nm-btn-solid text-[13px] nm-focus"
+              >
+                {siteSaving ? '儲存中…' : '儲存'}
+              </button>
+              {siteSaved && !siteSaving && (
+                <span className="text-[13px]" style={{ color: 'var(--nm-success-glass-text)' }}>已儲存</span>
+              )}
+            </div>
+          </div>
         )}
       </section>
 
