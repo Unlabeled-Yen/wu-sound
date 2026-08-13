@@ -163,45 +163,108 @@ function buildHref(params: { days: number; price: string; nature: string }): str
   return `/boss/tenders/monitor?${q.toString()}`;
 }
 
-function FilterRow({
-  title,
-  paramName,
-  options,
-  active,
+// 分佈矩陣:價格帶 × 案件性質。每個數字都是連結——格子套兩軸,邊際的
+// 合計套單軸,右下角總計清空篩選。
+//
+// 兩個刻意的設計決定:
+// 1. 矩陣的行列取自「全部命中案」而非當前篩選結果,所以結構固定不變形。
+//    地圖不該在你走動時改變形狀,否則篩完就找不到路回去。
+// 2. 每格的數字就是點下去會看到的件數(兩軸都套用),不會出現「顯示 5 件、
+//    點進去 0 件」。邊際合計同理。
+function DistributionMatrix({
+  hits,
   days,
   price,
   nature,
 }: {
-  title: string;
-  paramName: 'price' | 'nature';
-  options: Array<{ key: string; label: string; count: number }>;
-  active: string;
+  hits: TenderHit[];
   days: number;
   price: string;
   nature: string;
 }) {
+  const rows = PRICE_ORDER.filter((k) => hits.some((h) => h.price_band?.key === k));
+  const cols = NATURE_ORDER.filter((k) => hits.some((h) => h.nature?.key === k));
+  if (rows.length === 0 || cols.length === 0) return null;
+
+  const priceLabel = (k: string) => hits.find((h) => h.price_band?.key === k)?.price_band?.label ?? k;
+  const natureLabel = (k: string) => hits.find((h) => h.nature?.key === k)?.nature?.label ?? k;
+
+  const count = (p: string, n: string) =>
+    hits.filter(
+      (h) => (p === 'all' || h.price_band?.key === p) && (n === 'all' || h.nature?.key === n),
+    ).length;
+
+  const max = Math.max(...rows.flatMap((r) => cols.map((c) => count(r, c))), 1);
+
+  const Cell = ({ p, n, bold }: { p: string; n: string; bold?: boolean }) => {
+    const c = count(p, n);
+    const active = price === p && nature === n;
+    if (c === 0) {
+      return (
+        <td className="p-0.5 text-center">
+          <span className="text-xs" style={{ color: 'var(--nm-text-muted)', opacity: 0.4 }}>–</span>
+        </td>
+      );
+    }
+    return (
+      <td className="p-0.5 text-center">
+        <a
+          href={buildHref({ days, price: p, nature: n })}
+          className="block rounded-lg tabular-nums"
+          style={{
+            padding: '5px 2px',
+            fontSize: '12px',
+            fontWeight: bold || active ? 600 : 400,
+            color: active ? 'var(--nm-text-primary)' : 'var(--nm-text-secondary)',
+            background: active
+              ? 'rgba(224,179,80,0.22)'
+              : `rgba(156,146,147,${(0.05 + (c / max) * 0.16).toFixed(3)})`,
+          }}
+        >
+          {c}
+        </a>
+      </td>
+    );
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 w-12 shrink-0 text-xs" style={{ color: 'var(--nm-text-faint)' }}>
-        {title}
-      </span>
-      {options.map((o) => {
-        const next = paramName === 'price' ? { days, price: o.key, nature } : { days, price, nature: o.key };
-        const isActive = active === o.key;
-        return (
-          <a
-            key={o.key}
-            href={buildHref(next)}
-            className={isActive ? 'nm-btn-solid' : 'nm-btn'}
-            style={{ padding: '4px 10px', minHeight: 'auto', fontSize: '12px' }}
-          >
-            {o.label}
-            <span className="ml-1 tabular-nums" style={{ opacity: 0.62 }}>
-              {o.count}
-            </span>
-          </a>
-        );
-      })}
+    <div className="overflow-x-auto">
+      <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: 360 }}>
+        <thead>
+          <tr>
+            <th />
+            {cols.map((c) => (
+              <th key={c} className="p-0.5 text-center text-xs font-normal" style={{ color: 'var(--nm-text-faint)' }}>
+                {natureLabel(c)}
+              </th>
+            ))}
+            <th className="p-0.5 text-center text-xs font-normal" style={{ color: 'var(--nm-text-faint)' }}>合計</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r}>
+              <th
+                className="whitespace-nowrap pr-2 text-right text-xs font-normal"
+                style={{ color: 'var(--nm-text-faint)' }}
+              >
+                {priceLabel(r)}
+              </th>
+              {cols.map((c) => (
+                <Cell key={c} p={r} n={c} />
+              ))}
+              <Cell p={r} n="all" bold />
+            </tr>
+          ))}
+          <tr>
+            <th className="pr-2 text-right text-xs font-normal" style={{ color: 'var(--nm-text-faint)' }}>合計</th>
+            {cols.map((c) => (
+              <Cell key={c} p="all" n={c} bold />
+            ))}
+            <Cell p="all" n="all" bold />
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -331,24 +394,6 @@ export default async function BossTendersMonitorPage({
   const byNatureFiltered = nature === 'all' ? hits : hits.filter((h) => h.nature?.key === nature);
   const byPriceFiltered = price === 'all' ? hits : hits.filter((h) => h.price_band?.key === price);
 
-  const priceOptions = [
-    { key: 'all', label: '全部', count: byNatureFiltered.length },
-    ...PRICE_ORDER.map((k) => ({
-      key: k,
-      label: byNatureFiltered.find((h) => h.price_band?.key === k)?.price_band?.label ?? k,
-      count: byNatureFiltered.filter((h) => h.price_band?.key === k).length,
-    })).filter((o) => o.count > 0),
-  ];
-
-  const natureOptions = [
-    { key: 'all', label: '全部', count: byPriceFiltered.length },
-    ...NATURE_ORDER.map((k) => ({
-      key: k,
-      label: byPriceFiltered.find((h) => h.nature?.key === k)?.nature?.label ?? k,
-      count: byPriceFiltered.filter((h) => h.nature?.key === k).length,
-    })).filter((o) => o.count > 0),
-  ];
-
   const visible = hits.filter(
     (h) =>
       (price === 'all' || h.price_band?.key === price) &&
@@ -385,25 +430,15 @@ export default async function BossTendersMonitorPage({
       </header>
 
       {hasClassification && (
-        <div className="mb-4 flex flex-col gap-2 rounded-2xl nm-inset p-3">
-          <FilterRow
-            title="價格"
-            paramName="price"
-            options={priceOptions}
-            active={price}
-            days={days}
-            price={price}
-            nature={nature}
-          />
-          <FilterRow
-            title="性質"
-            paramName="nature"
-            options={natureOptions}
-            active={nature}
-            days={days}
-            price={price}
-            nature={nature}
-          />
+        <div className="mb-4 rounded-2xl nm-inset p-3">
+          <DistributionMatrix hits={hits} days={days} price={price} nature={nature} />
+          {isFiltered && (
+            <p className="mt-2 text-center text-xs">
+              <a href={buildHref({ days, price: 'all', nature: 'all' })} className="underline" style={{ color: 'var(--nm-text-faint)' }}>
+                清除篩選
+              </a>
+            </p>
+          )}
         </div>
       )}
 
