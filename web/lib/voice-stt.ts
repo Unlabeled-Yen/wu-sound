@@ -1,6 +1,16 @@
 import 'server-only';
+import * as OpenCC from 'opencc-js';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { AgentConfigError } from '@/lib/voice-agent-tools';
+
+/**
+ * 辨識結果的簡→繁轉換。
+ * 實測:同一段音檔,提示詞沒講「請用繁體」時整句回簡體
+ * (「方我在盘顶长老教会记一笔,木座进场前先放样」)。
+ * 提示詞講了就會回繁體,但那是模型的自願行為——這裡再轉一次當保險,
+ * 跟 agent 那邊處理模型產生簡體字是同一個道理。
+ */
+const toTw = OpenCC.Converter({ from: 'cn', to: 'tw' });
 
 /**
  * Lab 3b 語音辨識層。
@@ -16,7 +26,7 @@ import { AgentConfigError } from '@/lib/voice-agent-tools';
  */
 
 const DEFAULT_BASE = 'https://api.openai.com/v1';
-const DEFAULT_MODEL = 'gpt-4o-mini-transcribe';
+const DEFAULT_MODEL = 'gpt-4o-transcribe';
 
 export type SttResult =
   | { ok: true; text: string; model: string }
@@ -38,21 +48,38 @@ export function createSttClient(): SttClient {
   return {
     model,
     async transcribe(audio, filename, prompt) {
-      const form = new FormData();
-      form.append('file', audio, filename);
-      form.append('model', model);
-      // zh 指定語言,避免短句被誤判成日文或英文
-      form.append('language', 'zh');
-      if (prompt) form.append('prompt', prompt);
-
-      let res: Response;
-      try {
-        res = await fetch(`${base}/audio/transcriptions`, {
+      const send = async () => {
+        // FormData 不能重複使用,每次重試都要重建
+        const form = new FormData();
+        form.append('file', audio, filename);
+        form.append('model', model);
+        // zh 指定語言,避免短句被誤判成日文或英文
+        form.append('language', 'zh');
+        if (prompt) form.append('prompt', prompt);
+        return fetch(`${base}/audio/transcriptions`, {
           method: 'POST',
           headers: { authorization: `Bearer ${apiKey}` },
           body: form,
           signal: AbortSignal.timeout(30_000),
         });
+      };
+
+      let res: Response;
+      try {
+        res = await send();
+        /**
+         * 重試一次的理由(實測):剛調整過 project 模型白名單時,同一個檔案連打 5 次
+         * 會有 3 次回 403「沒有存取權」、2 次成功——OpenAI 端的權限傳播不是即時一致的。
+         * 現場員工按了麥克風卻隨機失敗、還要重錄一次,是很糟的體驗。
+         *
+         * 只重試一次,而且真的沒權限時第二次一樣會失敗、照樣報錯——
+         * 這不是把錯誤吞掉,是抵銷對方的短暫不一致。
+         * 400(檔案格式錯)和 401(key 錯)不重試,那些重試一百次也一樣。
+         */
+        if (!res.ok && res.status !== 400 && res.status !== 401 && res.status !== 413) {
+          await new Promise((r) => setTimeout(r, 900));
+          res = await send();
+        }
       } catch (e) {
         return {
           ok: false,
@@ -71,7 +98,7 @@ export function createSttClient(): SttClient {
       }
 
       const data = (await res.json()) as { text?: string };
-      const text = (data.text ?? '').trim();
+      const text = toTw((data.text ?? '').trim());
       if (!text) {
         // 空白轉寫不能當成「使用者沒講話所以沒事」——要讓上層明確回「沒聽清楚」(handoff §8)
         return { ok: false, error_code: 'STT_EMPTY', message_zh: '沒有辨識到內容,請再說一次' };
@@ -139,7 +166,10 @@ export async function buildHotwordPrompt(): Promise<HotwordPrompt> {
   }
 
   return {
-    prompt: `這是台灣音響工程公司的現場口述記錄,可能出現以下專有名詞:${parts.join('、')}。`,
+    // 「請用繁體中文轉寫」這句實測有效:不寫的話同一段音檔會整句回簡體
+    prompt:
+      `這是台灣音響工程公司的現場口述記錄,請用繁體中文轉寫。` +
+      `可能出現以下專有名詞:${parts.join('、')}。`,
     siteCount: names.length,
     truncated,
   };
