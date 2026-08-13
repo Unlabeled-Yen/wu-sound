@@ -450,6 +450,27 @@ describe('把 agent 約束在正軌上', () => {
     expect(r.warning).toContain('沒有查詢任何資料');
   });
 
+  it('民生問題(時間)算「查過東西」,可以正常回答', async () => {
+    const llm = fakeLlm([
+      [{ type: 'tool_use', id: 't1', name: 'get_now', input: {} }],
+      [{ type: 'tool_use', id: 't2', name: 'respond', input: { text: '今天是 2026 年 8 月 14 日,星期五。' } }],
+    ]);
+    const r = await runAgentTurn(session(), '今天星期幾', deps(llm.client, fakeTools({}).client));
+    expect(r.reply).toContain('星期五');
+    expect(r.toolTrace[0]).toEqual({ name: 'get_now', ok: true });
+    expect(r.warning).toBeUndefined();
+  });
+
+  it('救難那一輪一定帶上「先打 119」,不靠模型記得講', async () => {
+    const llm = fakeLlm([
+      [{ type: 'tool_use', id: 't1', name: 'emergency_info', input: { topic: 'electric_shock' } }],
+      [{ type: 'tool_use', id: 't2', name: 'respond', input: { text: '先把總開關拉掉再說。' } }],
+    ]);
+    const r = await runAgentTurn(session(), '有人觸電了怎麼辦', deps(llm.client, fakeTools({}).client));
+    expect(r.reply.startsWith('🚨 緊急狀況請先打 119')).toBe(true);
+    expect(r.reply).toContain('先把總開關拉掉');
+  });
+
   it('每一輪都強制模型只能透過工具說話', async () => {
     const llm = fakeLlm([[{ type: 'tool_use', id: 't1', name: 'decline', input: { reason: 'chitchat' } }]]);
     await runAgentTurn(session(), '你好', deps(llm.client, fakeTools({}).client));
