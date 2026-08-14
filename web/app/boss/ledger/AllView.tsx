@@ -141,8 +141,10 @@ export async function AllView({
         <AiInsightCard insight={insight} />
       </div>
 
-      {/* 收支欄首統計:兩欄固定同高,不隨排行筆數多寡變動——切篩選時版面不跳動 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* 收支欄首統計:兩欄固定同高,不隨排行筆數多寡變動——切篩選時版面不跳動。
+          桌機並排;手機只看當前切換到的那一邊(跟下面的混排列表同一顆 tab 狀態,
+          見原型 2b——手機版欄首卡只顯示所選方向那一張,不是兩張都塞進來)。 */}
+      <div className="hidden lg:grid grid-cols-2 gap-4">
         <ColumnHeader
           label="收入" faceAmount={incomeFace} settledAmount={incomeSettled} unsettledAmount={incomeUnsettled}
           settledLabel="已收" unsettledLabel="未收" tone="income"
@@ -158,14 +160,34 @@ export async function AllView({
       </div>
 
       {/* 混排列表:跟頁面捲動,分段標頭吸頂——取消原本固定 560px 內部捲動的面板。
-          桌機並排;手機改切換,一次只看一邊(見 IncomeExpenseTabs)。 */}
+          桌機並排;手機改切換,一次只看一邊,欄首卡跟著同一顆 tab 走。 */}
       <div className="hidden lg:grid grid-cols-2 gap-4">
         <MixedList title="收入" tone="income" unsettledItems={incomeUnsettledItems} settledItems={incomeSettledItems} />
         <MixedList title="支出" tone="expense" unsettledItems={expenseUnsettledItems} settledItems={expenseSettledItems} />
       </div>
       <IncomeExpenseTabs
-        income={<MixedList title="收入" tone="income" unsettledItems={incomeUnsettledItems} settledItems={incomeSettledItems} />}
-        expense={<MixedList title="支出" tone="expense" unsettledItems={expenseUnsettledItems} settledItems={expenseSettledItems} />}
+        income={
+          <div className="flex flex-col gap-4">
+            <ColumnHeader
+              label="收入" faceAmount={incomeFace} settledAmount={incomeSettled} unsettledAmount={incomeUnsettled}
+              settledLabel="已收" unsettledLabel="未收" tone="income"
+              settledHref={buildHref(base, { mode: 'settled' })} unsettledHref={buildHref(base, { mode: 'receivable' })}
+              ranking={incomeRanking} rankingHrefFor={(key) => buildHref(base, { site_id: key })}
+            />
+            <MixedList title="收入" tone="income" unsettledItems={incomeUnsettledItems} settledItems={incomeSettledItems} />
+          </div>
+        }
+        expense={
+          <div className="flex flex-col gap-4">
+            <ColumnHeader
+              label="支出" faceAmount={expenseFace} settledAmount={expenseSettled} unsettledAmount={expenseUnsettled}
+              settledLabel="已付" unsettledLabel="未付" tone="expense"
+              settledHref={buildHref(base, { mode: 'settled' })} unsettledHref={buildHref(base, { mode: 'payable' })}
+              ranking={expenseRanking} rankingHrefFor={(key) => buildHref(base, { kind: key })}
+            />
+            <MixedList title="支出" tone="expense" unsettledItems={expenseUnsettledItems} settledItems={expenseSettledItems} />
+          </div>
+        }
       />
     </div>
   );
