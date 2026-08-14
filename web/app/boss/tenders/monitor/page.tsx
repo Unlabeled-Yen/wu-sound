@@ -72,6 +72,10 @@ interface BasePriceCardData {
   source_label: string;
   stats: GroupedStats;
   group_labels: Record<'best_value' | 'lowest_bid' | 'other', string>;
+  // 排除的採購演出件數(得標者是劇團/樂團等表演團體,決標/預算比例不能
+  // 反映音響工程的競爭定價)。只在 source='agency' 時可能非零——縣市/
+  // 全市場基線的池子跨機關共用,後端固定回 0(見 base-price.ts 的說明)。
+  excludedPerformance: number;
 }
 
 // domain='other' 時不適用(不是錯誤),整塊不顯示;null 是查詢失敗
@@ -258,6 +262,9 @@ function BasePriceCard({ bp }: { bp: BasePriceField | null | undefined }) {
           </span>
         )}
         {bp.headline}
+        {bp.excludedPerformance > 0 && (
+          <span style={{ color: 'var(--nm-text-muted)' }}>;另有 {bp.excludedPerformance} 件是採購演出,不列入計算</span>
+        )}
         <span className="ml-1" style={{ color: 'var(--nm-text-faint)' }}>▾</span>
       </summary>
       <div className="mt-1.5 space-y-1 rounded-lg p-2" style={{ background: 'rgba(120,144,156,0.08)' }}>
