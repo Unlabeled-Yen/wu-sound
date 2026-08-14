@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     .from('ledger_entries')
     .select('*')
     .eq('is_external', true)
-    .eq('status', 'active')
+    .eq('state', 'posted')
     .gte('occurred_on', from)
     .lte('occurred_on', to)
     .order('occurred_on', { ascending: true });

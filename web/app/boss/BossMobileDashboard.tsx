@@ -10,6 +10,7 @@ export type MobileDashStats = {
   pendingCount: number;
   pendingAmount: number;
   draftCount: number;
+  closeBlockedCount: number;
   quoteDraft: number;
   quoteSent: number;
   repairCount: number;
@@ -18,9 +19,11 @@ export type MobileDashStats = {
 export default function BossMobileDashboard({ s }: { s: MobileDashStats }) {
   const netColor = s.net >= 0 ? 'var(--nm-success)' : 'var(--nm-danger)';
 
-  const settlementValue = s.pendingCount > 0 ? '未結' : '可結';
+  // 跟 /boss/close 用同一套判斷(當月 draft+submitted),不是全時段 submitted——
+  // 否則這張卡跟點進去看到的紅框會對不上。
+  const settlementValue = s.closeBlockedCount > 0 ? '未結' : '可結';
   const settlementHint =
-    s.pendingCount > 0 ? `尚有 ${s.pendingCount} 筆未處理` : '所有代墊已審完';
+    s.closeBlockedCount > 0 ? `本月尚有 ${s.closeBlockedCount} 筆未處理` : '本月代墊已審完';
   const quoteTotal = s.quoteDraft + s.quoteSent;
 
   const actions: Array<{
@@ -47,7 +50,7 @@ export default function BossMobileDashboard({ s }: { s: MobileDashStats }) {
       label: '薪資結算',
       hint: settlementHint,
       value: settlementValue,
-      color: s.pendingCount > 0 ? 'var(--nm-warning)' : 'var(--nm-success)',
+      color: s.closeBlockedCount > 0 ? 'var(--nm-warning)' : 'var(--nm-success)',
     },
     {
       href: '/boss/quotes',

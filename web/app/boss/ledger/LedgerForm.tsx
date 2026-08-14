@@ -141,7 +141,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth, defaul
         return;
       }
       const month = occurred.slice(0, 7);
-      window.location.href = `/boss/ledger/entries?month=${month}`;
+      window.location.href = `/boss/ledger?month=${month}`;
     } catch (e) {
       setError(e instanceof Error ? e.message : '網路錯誤');
       setBusy(false);

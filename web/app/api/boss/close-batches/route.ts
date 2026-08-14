@@ -19,10 +19,14 @@ export async function GET() {
   const ids = (batches ?? []).map((b) => b.id as string);
   const set = new Set<string>();
   if (ids.length > 0) {
+    // 已作廢的入帳分錄不算「已入帳」——否則作廢後這批會被永久標記為已處理,
+    // 既無法在畫面上看出需要重新匯入,ledger_batch_party_uidx 也已改成排除
+    // voided 列(見 migrations/017),資料庫層面本來就允許重新匯入。
     const { data: existing, error: e2 } = await sb
       .from('ledger_entries')
       .select('source_batch_id')
-      .in('source_batch_id', ids);
+      .in('source_batch_id', ids)
+      .neq('state', 'voided');
     if (e2) return NextResponse.json({ error: `查詢失敗: ${e2.message}` }, { status: 500 });
     for (const r of existing ?? []) {
       if (r.source_batch_id) set.add(r.source_batch_id as string);

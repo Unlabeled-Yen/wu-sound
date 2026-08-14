@@ -337,6 +337,10 @@ create table ledger_entries (
   ),
   constraint issued_requires_date check (
     invoice_status <> 'issued' or invoice_date is not null
+  ),
+  -- status/state 兩欄必須同步(至少在 voided 這個交集上)——見 migrations/017。
+  constraint ledger_status_state_voided_sync check (
+    (status = 'voided') = (state = 'voided')
   )
 );
 
@@ -349,9 +353,10 @@ create index ledger_receivable_idx on ledger_entries (receivable_id) where recei
 create index ledger_state_idx on ledger_entries (state);
 create index ledger_journal_idx on ledger_entries (journal);
 create index ledger_to_check_idx on ledger_entries (to_check) where to_check = true;
+-- 只鎖「還算數」的列(state<>voided),作廢後同批同人才能重新匯入。見 migrations/017。
 create unique index ledger_batch_party_uidx
   on ledger_entries (source_batch_id, party)
-  where source_batch_id is not null;
+  where source_batch_id is not null and state <> 'voided';
 create unique index ledger_recurring_month_uidx
   on ledger_entries (recurring_template_id, date_trunc('month', occurred_on::timestamp))
   where recurring_template_id is not null;
@@ -377,9 +382,10 @@ select
   coalesce(settled.settled_twd, 0) > r.total_amount_twd as overpaid
 from receivables r
 left join (
+  -- 只認 posted 為已結——draft 尚未確認、voided 已作廢,兩者都不算已結金額。見 migrations/017。
   select receivable_id, sum(amount_twd) as settled_twd
   from ledger_entries
-  where receivable_id is not null and state <> 'voided'
+  where receivable_id is not null and state = 'posted'
   group by receivable_id
 ) settled on settled.receivable_id = r.id;
 

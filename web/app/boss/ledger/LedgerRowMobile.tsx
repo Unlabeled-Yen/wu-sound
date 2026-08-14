@@ -7,8 +7,13 @@ const fmt = (n: number) => n.toLocaleString('zh-TW');
 type Row = LedgerEntry & { sites?: { name: string } | null };
 
 // 桌機看表格,手機看卡片——原本 1100px 寬的表格在手機上完全打不開,只能橫向捲動找欄位。
-export default function LedgerRowMobile({ row }: { row: Row }) {
-  const voided = row.status === 'voided';
+//
+// showSettledBadge:「全部」模式把已收付分錄跟未收/未付約定混排在同一欄,未結約定有
+// 顯眼的黃色「未收/未付」標籤,已結分錄若什麼標記都沒有,掃過去會被黃色蓋過去,
+// 讓人誤以為「沒有已收付的單」——所以在那個情境下要補一個對稱的綠色「已收/已付」標籤。
+// 純「已收付」模式下每一筆本來就都是已結的,標籤反而多餘,所以預設不顯示。
+export default function LedgerRowMobile({ row, showSettledBadge = false }: { row: Row; showSettledBadge?: boolean }) {
+  const voided = row.state === 'voided';
   return (
     <div className="nm-raised rounded-2xl p-3.5 flex flex-col gap-2" style={{ opacity: voided ? 0.5 : 1 }}>
       <div className="flex items-baseline justify-between gap-2">
@@ -35,6 +40,11 @@ export default function LedgerRowMobile({ row }: { row: Row }) {
       </div>
 
       <div className="flex flex-wrap gap-1.5">
+        {showSettledBadge && !voided && (
+          <span className="nm-pill" style={{ color: 'var(--nm-success-glass-text)', background: 'rgba(126,207,157,0.1)', borderColor: 'rgba(126,207,157,0.28)' }}>
+            {row.direction === 'income' ? '已收' : '已付'}
+          </span>
+        )}
         <span className={`nm-pill ${row.is_external ? 'nm-pill-neutral' : 'nm-pill-muted'}`}>{row.is_external ? '外帳' : '內帳'}</span>
         {row.source_batch_id && <span className="nm-pill nm-pill-muted">薪資結算匯入</span>}
         {row.to_check && <span className="nm-pill nm-pill-warning">待確認</span>}

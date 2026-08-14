@@ -37,7 +37,8 @@ select id, direction, party, total_amount_twd, settled_twd, remaining_twd
 from receivable_payment_state
 where overpaid;
 
-\echo '=== I2b: state 與 status 兩欄一致(void route 若漏同步,這裡會抓到)==='
+\echo '=== I2b: state 與 status 兩欄一致 — migrations/017 已加 CHECK constraint,
+     這裡理論上永遠是 0 筆(constraint 會直接擋下寫入),保留當雙重確認 ==='
 select id, occurred_on, status, state
 from ledger_entries
 where (status = 'voided') <> (state = 'voided');

@@ -34,7 +34,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       .from('ledger_entries')
       .select('id', { count: 'exact', head: true })
       .eq('receivable_id', id)
-      .eq('status', 'active');
+      .eq('state', 'posted');
     if (linked.error) return NextResponse.json({ error: `查詢失敗: ${linked.error.message}` }, { status: 500 });
     if ((linked.count ?? 0) > 0) {
       return NextResponse.json({ error: `已有 ${linked.count} 筆帳目掛在此約定,不能作廢;請先把帳目改掛別處` }, { status: 400 });

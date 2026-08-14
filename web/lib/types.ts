@@ -113,7 +113,10 @@ export type LedgerKind =
   | 'salary' | 'bonus' | 'reimbursement' | 'goods' | 'vehicle'
   | 'rent' | 'utility' | 'credit_card' | 'tax' | 'investment' | 'health' | 'other_expense';
 export type InvoiceStatus = 'none' | 'to_issue' | 'issued';
-export type LedgerStatus = 'active' | 'voided' | 'draft';
+// DB enum ledger_status 只有 active/voided 兩態(見 migrations/013 的教訓註記,
+// 'draft' 這個值從未真正加進 DB)——型別曾經含 'draft',會讓型別檢查過但
+// runtime 對 DB 下不存在的 enum 值直接 500,已拿掉。
+export type LedgerStatus = 'active' | 'voided';
 
 // 帳務 v3:帳簿/狀態機/付款方式/案子分攤。見 docs/ledger-v3-spec-v1.md、migrations/014。
 // state 取代 status 作為權威狀態欄位;status 過渡期並存,C3 才移除(不在本輪動)。
@@ -138,9 +141,6 @@ export const LEDGER_PAYMENT_METHOD_LABEL: Record<LedgerPaymentMethod, string> = 
 
 // 案子分攤:{ site_id: 百分比 },Σ必須 = 100。單案時為 { "<id>": 100 }。
 export type SiteDistribution = Record<string, number>;
-
-// 認列口徑排除業外/借款,報表營收/毛利計算用
-export const NON_OPERATING_KINDS: LedgerKind[] = ['loan', 'investment', 'health'];
 
 export interface LedgerEntry {
   id: string;

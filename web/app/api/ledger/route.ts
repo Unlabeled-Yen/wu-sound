@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { validateLedger, type LedgerInput } from '@/lib/ledger-validation';
-import { KIND_TO_JOURNAL, type LedgerDirection, type LedgerKind, type InvoiceStatus, type LedgerStatus } from '@/lib/types';
+import { KIND_TO_JOURNAL, type LedgerDirection, type LedgerKind, type InvoiceStatus, type LedgerState } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
@@ -16,11 +16,12 @@ export async function GET(req: Request) {
   const direction = searchParams.get('direction') as LedgerDirection | null;
   const kind = searchParams.get('kind') as LedgerKind | null;
   const isExtRaw = searchParams.get('is_external');
-  const statusParam = (searchParams.get('status') as LedgerStatus | null) ?? 'active';
+  const stateRaw = searchParams.get('state');
+  const stateParam: LedgerState = stateRaw === 'voided' ? 'voided' : 'posted';
   const siteId = searchParams.get('site_id');
 
   const sb = getSupabaseAdmin();
-  let q = sb.from('ledger_entries').select('*').eq('status', statusParam);
+  let q = sb.from('ledger_entries').select('*').eq('state', stateParam);
 
   if (month && /^\d{4}-\d{2}$/.test(month)) {
     const from = `${month}-01`;

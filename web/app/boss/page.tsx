@@ -26,28 +26,36 @@ async function loadStats() {
   const month = currentMonth();
   const { from, to } = monthRange(month);
 
-  const [ledgerRes, expensesRes, draftsRes, quotesRes, equipmentRes] = await Promise.all([
+  const [ledgerRes, expensesRes, draftsRes, monthExpensesRes, quotesRes, equipmentRes] = await Promise.all([
     sb
       .from('ledger_entries')
       .select('direction, amount_twd, fee_twd')
-      .eq('status', 'active')
+      .eq('state', 'posted')
       .gte('occurred_on', from)
       .lt('occurred_on', to),
     sb.from('expenses').select('id, amount_twd, users!inner(id)').eq('status', 'submitted'),
     sb.from('expenses').select('id, users!inner(id)').eq('status', 'draft'),
+    // 薪資結算「可否結算」跟 /boss/close 用同一套判斷:當月 draft+submitted 都算未處理,
+    // 不能只看全時段 submitted——否則這張卡跟點進去看到的紅框會對不上。
+    sb.from('expenses').select('id, status, spent_on, captured_at').in('status', ['draft', 'submitted']),
     sb.from('quotes').select('id, status').in('status', ['draft', 'sent']),
     sb.from('equipment').select('id').eq('status', 'in_repair'),
   ]);
 
   const ledgerRows = ledgerRes.data ?? [];
-  // 用 summarizeEntries 而非自己 reduce——跟 /boss/ledger、/boss/report 共用同一份
-  // 計算,一致性由建構保證,不是靠事後人工比對三頁數字。
+  // 用 summarizeEntries 而非自己 reduce——跟 /boss/ledger 共用同一份計算,
+  // 一致性由建構保證,不是靠事後人工比對數字。
   const { income, expense, net } = summarizeEntries(ledgerRows);
 
   const pendingExpense = expensesRes.data ?? [];
   const pendingCount = pendingExpense.length;
   const pendingAmount = pendingExpense.reduce((s, r) => s + (r.amount_twd ?? 0), 0);
   const draftCount = (draftsRes.data ?? []).length;
+
+  const closeBlockedCount = (monthExpensesRes.data ?? []).filter((r) => {
+    const src = (r.spent_on ?? r.captured_at) as string;
+    return String(src).slice(0, 7) === month;
+  }).length;
 
   const quoteRows = quotesRes.data ?? [];
   const quoteDraft = quoteRows.filter((r) => r.status === 'draft').length;
@@ -63,12 +71,14 @@ async function loadStats() {
     pendingCount,
     pendingAmount,
     draftCount,
+    closeBlockedCount,
     quoteDraft,
     quoteSent,
     repairCount,
     errors: {
       ledger: ledgerRes.error?.message,
       expenses: expensesRes.error?.message,
+      monthExpenses: monthExpensesRes.error?.message,
       quotes: quotesRes.error?.message,
       equipment: equipmentRes.error?.message,
     },
@@ -141,9 +151,9 @@ export default async function BossDashboard() {
           <StatCard
             href={`/boss/close?month=${s.month}`}
             label="薪資結算"
-            value={s.pendingCount > 0 ? '未可結算' : '可結算'}
-            hint={s.pendingCount > 0 ? `尚有 ${s.pendingCount} 筆未處理` : '所有代墊已審完'}
-            tone={s.pendingCount > 0 ? 'attention' : 'positive'}
+            value={s.closeBlockedCount > 0 ? '未可結算' : '可結算'}
+            hint={s.closeBlockedCount > 0 ? `本月尚有 ${s.closeBlockedCount} 筆未處理` : '本月代墊已審完'}
+            tone={s.closeBlockedCount > 0 ? 'attention' : 'positive'}
           />
         </div>
       </section>
