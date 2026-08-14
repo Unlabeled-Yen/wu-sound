@@ -4,6 +4,7 @@ import {
   authenticateVoiceRequest,
   canonicalJson,
   dbErrorResponse,
+  isUndefinedFunctionError,
   isWellFormedUuid,
   payloadHash,
   voiceError,
@@ -32,28 +33,28 @@ async function parseBody(req: Request): Promise<Json | null> {
 
 // ---------- 讀取工具 ----------
 
+/**
+ * 案名搜尋。走 pg_trgm 相似度比對(migration 016),不是連續子字串——
+ * 「磐頂教會」這種省略中間字的口語講法要搜得到「磐頂長老教會」。
+ * RPC 沒套用時 loud 503,不靜默退回舊的子字串比對(那會讓這個已知缺口重新隱形)。
+ */
 async function searchProjects(sb: SupabaseClient, body: Json): Promise<NextResponse> {
   const query = typeof body.query === 'string' ? body.query.trim() : '';
   if (!query) return voiceError('BAD_REQUEST', '請提供搜尋關鍵字', 400);
 
-  const like = `%${query.replace(/[%_]/g, '')}%`;
-  const { data, error } = await sb
-    .from('sites')
-    .select('id, name, active')
-    .eq('active', true)
-    .ilike('name', like)
-    .limit(20);
-  if (error) return dbErrorResponse(error);
+  const { data, error } = await sb.rpc('search_sites_by_query', { q: query });
+  if (error) {
+    if (isUndefinedFunctionError(error)) {
+      return voiceError(
+        'SERVICE_UNAVAILABLE',
+        'voice 搜尋功能尚未設定,請先套用 migration 016_site_search_trigram.sql',
+        503,
+      );
+    }
+    return dbErrorResponse(error);
+  }
 
   const rows = (data ?? []) as { id: string; name: string; active: boolean }[];
-  const q = query.toLowerCase();
-  rows.sort((a, b) => {
-    const aPrefix = a.name.toLowerCase().startsWith(q) ? 0 : 1;
-    const bPrefix = b.name.toLowerCase().startsWith(q) ? 0 : 1;
-    if (aPrefix !== bPrefix) return aPrefix - bPrefix;
-    return a.name.localeCompare(b.name, 'zh-Hant');
-  });
-
   const candidates = rows.slice(0, 5).map((r) => ({
     id: r.id,
     name: r.name,

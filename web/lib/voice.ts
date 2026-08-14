@@ -64,6 +64,14 @@ export function isUndefinedTableError(error: { code?: string } | null | undefine
   return error?.code === 'PGRST205' || error?.code === '42P01';
 }
 
+/**
+ * RPC 函式不存在(migration 016 未套用)判斷,同一招:PostgREST 包一層自己的代碼
+ * (PGRST202「找不到函式」),原生 Postgres 是 42883 undefined_function,兩種都收。
+ */
+export function isUndefinedFunctionError(error: { code?: string } | null | undefined): boolean {
+  return error?.code === 'PGRST202' || error?.code === '42883';
+}
+
 interface VoiceAuthOk {
   ok: true;
   sb: SupabaseClient;
