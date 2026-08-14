@@ -15,6 +15,7 @@ import {
   type VoiceToolClient,
 } from '@/lib/voice-agent-tools';
 import { createKimiLlm } from '@/lib/voice-agent-kimi';
+import { createOpenAiLlm } from '@/lib/voice-agent-openai';
 import { trimMessages } from '@/lib/voice-agent-session';
 import type { AgentSession, PendingField, PendingWrite } from '@/lib/voice-agent-session';
 
@@ -148,7 +149,8 @@ export function toTraditional(value: string): string {
   return toTw(value);
 }
 
-function normalizePayload(input: Record<string, unknown>): {
+/** 匯出給 Lab 3c(Realtime)重用——簡體轉繁體與空值清理只能有一份規則 */
+export function normalizePayload(input: Record<string, unknown>): {
   payload: Record<string, unknown>;
   converted: boolean;
 } {
@@ -195,7 +197,8 @@ function rememberProjects(session: AgentSession, result: ToolResult): void {
   }
 }
 
-async function resolveProjectName(
+/** 匯出給 Lab 3c(Realtime)重用——同一段「查名稱、失敗要 loud」邏輯,不要另外寫一份會漂移 */
+export async function resolveProjectName(
   session: AgentSession,
   projectId: string,
   tools: VoiceToolClient,
@@ -227,7 +230,8 @@ export function formatDueDate(value: string): string {
   return `${value}(週${WEEKDAY[day]})`;
 }
 
-function buildFields(
+/** 匯出給 Lab 3c(Realtime)重用——確認卡片的欄位規則只能有一份 */
+export function buildFields(
   action: 'create_task' | 'log_note',
   payload: Record<string, unknown>,
   projectName: string,
@@ -668,10 +672,17 @@ export function cancelPending(session: AgentSession): AgentTurnResult {
  * 否則退到 Kimi。兩個都沒有 → loud 拋錯,不靜默降級。
  * 回傳值第二欄是實際用的供應商,呼叫端可以據此告訴使用者現在誰在講話。
  */
-export function createLlmClient(): { llm: LlmClient; provider: 'anthropic' | 'kimi' } {
+/**
+ * 選擇順序:Anthropic → OpenAI → Kimi。
+ * 2026-08-15 加入 OpenAI(gpt-4o)排在 Kimi 之前——這幾天記錄的多數怪異行為
+ * (措辭違規、簡體字、聽不懂上下文)是 Kimi 指令遵從率偏低造成的,
+ * gpt-4o 是 Yen 的 project 白名單裡本來就有的模型,不用多辦一把 key。
+ */
+export function createLlmClient(): { llm: LlmClient; provider: 'anthropic' | 'openai' | 'kimi' } {
   if (process.env.ANTHROPIC_API_KEY) return { llm: createAnthropicLlm(), provider: 'anthropic' };
+  if (process.env.OPENAI_API_KEY) return { llm: createOpenAiLlm(), provider: 'openai' };
   if (process.env.KIMI_API_KEY) return { llm: createKimiLlm(), provider: 'kimi' };
-  throw new AgentConfigError('voice agent 尚未設定(缺 ANTHROPIC_API_KEY 或 KIMI_API_KEY)');
+  throw new AgentConfigError('voice agent 尚未設定(缺 ANTHROPIC_API_KEY / OPENAI_API_KEY / KIMI_API_KEY)');
 }
 
 export function createAnthropicLlm(): LlmClient {
