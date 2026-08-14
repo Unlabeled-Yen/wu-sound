@@ -2,12 +2,12 @@ import Link from 'next/link';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { ExpenseRecord } from '@/lib/types';
 import LockButton from './LockButton';
+import { taipeiCurrentMonthStr } from '@/lib/tz';
 
 export const dynamic = 'force-dynamic';
 
 function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return taipeiCurrentMonthStr();
 }
 
 function monthOf(row: ExpenseRecord): string {

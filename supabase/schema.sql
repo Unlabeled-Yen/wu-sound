@@ -166,6 +166,13 @@ create type ledger_status as enum ('active', 'voided');
 create type receivable_direction as enum ('receivable', 'payable');
 create type receivable_status as enum ('open', 'closed', 'voided');
 
+-- 帳務 v3(2026-08):帳簿/狀態機/付款方式/案子分攤。見 docs/ledger-v3-spec-v1.md 與
+-- migrations/014、015。credit_card 仍留在 ledger_kind 列舉中(僅不再簽發新值,
+-- 刪值需獨立 migration 執行,見下方 013 教訓註記),新專案 setup 不會用到它。
+create type ledger_journal as enum ('customer', 'vendor', 'pettycash', 'payroll', 'personal');
+create type ledger_payment_method as enum ('transfer', 'cash', 'credit_card', 'check');
+create type ledger_state as enum ('draft', 'posted', 'voided');
+
 create table receivables (
   id uuid primary key default gen_random_uuid(),
   direction receivable_direction not null,
@@ -221,6 +228,11 @@ create table ledger_entries (
   tax_amount_twd integer not null default 0 check (tax_amount_twd >= 0),
   status ledger_status not null default 'active',
   voided_reason text,
+  state ledger_state not null default 'posted',
+  to_check boolean not null default false,
+  journal ledger_journal not null,
+  payment_method ledger_payment_method,
+  site_distribution jsonb,
   site_id uuid references sites(id),
   receivable_id uuid references receivables(id),
   recurring_template_id uuid references recurring_templates(id),
@@ -245,6 +257,9 @@ create index ledger_direction_kind_idx on ledger_entries (direction, kind);
 create index ledger_external_idx on ledger_entries (is_external, invoice_status);
 create index ledger_site_idx on ledger_entries (site_id) where site_id is not null;
 create index ledger_receivable_idx on ledger_entries (receivable_id) where receivable_id is not null;
+create index ledger_state_idx on ledger_entries (state);
+create index ledger_journal_idx on ledger_entries (journal);
+create index ledger_to_check_idx on ledger_entries (to_check) where to_check = true;
 create unique index ledger_batch_party_uidx
   on ledger_entries (source_batch_id, party)
   where source_batch_id is not null;
@@ -254,6 +269,30 @@ create unique index ledger_recurring_month_uidx
 
 create trigger ledger_bump_updated
 before update on ledger_entries for each row execute function bump_updated_at();
+
+-- 未結金額派生視圖(DB 算總數,前端/API 不自己 reduce)。見 migrations/015。
+create or replace view receivable_payment_state as
+select
+  r.id,
+  r.direction,
+  r.party,
+  r.site_id,
+  r.total_amount_twd,
+  r.memo,
+  r.status,
+  r.created_by,
+  r.created_at,
+  r.updated_at,
+  coalesce(settled.settled_twd, 0) as settled_twd,
+  r.total_amount_twd - coalesce(settled.settled_twd, 0) as remaining_twd,
+  coalesce(settled.settled_twd, 0) > r.total_amount_twd as overpaid
+from receivables r
+left join (
+  select receivable_id, sum(amount_twd) as settled_twd
+  from ledger_entries
+  where receivable_id is not null and state <> 'voided'
+  group by receivable_id
+) settled on settled.receivable_id = r.id;
 
 create table day_site_allocations (
   id uuid primary key default gen_random_uuid(),

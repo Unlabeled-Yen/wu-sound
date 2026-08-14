@@ -1,4 +1,4 @@
-import type { LedgerDirection, LedgerKind, InvoiceStatus } from './types';
+import type { LedgerDirection, LedgerKind, InvoiceStatus, LedgerPaymentMethod } from './types';
 import { INCOME_KINDS, EXPENSE_KINDS } from './types';
 
 export interface LedgerInput {
@@ -16,6 +16,7 @@ export interface LedgerInput {
   tax_amount_twd: number;
   site_id?: string | null;
   receivable_id?: string | null;
+  payment_method?: LedgerPaymentMethod | null;
 }
 
 export function validateLedger(v: LedgerInput): string | null {

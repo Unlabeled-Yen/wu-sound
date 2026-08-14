@@ -12,6 +12,7 @@ export type MobileCard = {
   site_name: string | null;
   item_text: string | null;
   thumb_url: string | null;
+  low_confidence?: boolean;
 };
 
 export default function ExpenseCardMobile({ row }: { row: MobileCard }) {
@@ -88,6 +89,14 @@ export default function ExpenseCardMobile({ row }: { row: MobileCard }) {
           <div className="text-[12.5px] mt-1 leading-relaxed" style={{ color: 'var(--nm-text-secondary)' }}>
             {metaParts.join(' · ') || '—'}
           </div>
+          {row.low_confidence && (
+            <span
+              className="nm-pill inline-block mt-1.5"
+              style={{ color: 'var(--nm-warning-glass-text)', background: 'rgba(217,181,107,0.1)', borderColor: 'rgba(217,181,107,0.3)' }}
+            >
+              AI 沒把握 · 待確認
+            </span>
+          )}
           {row.item_text ? (
             <div className="text-[13px] mt-1" style={{ color: '#b8b8bb' }}>
               {row.item_text}

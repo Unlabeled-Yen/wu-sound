@@ -66,7 +66,8 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
     }
     feeTotal += r.fee_twd ?? 0;
   }
-  const netOperating = operatingIncome - operatingExpense;
+  // 同 /boss/ledger 口徑:淨額扣手續費,不虛高。
+  const netOperating = operatingIncome - operatingExpense - feeTotal;
 
   const openReceivableTotal = openReceivables.filter((r) => r.direction === 'receivable').reduce((s, r) => s + Math.max(0, r.remaining_twd), 0);
   const openPayableTotal = openReceivables.filter((r) => r.direction === 'payable').reduce((s, r) => s + Math.max(0, r.remaining_twd), 0);
@@ -193,7 +194,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <SummaryCard label="營收(排業外/借款)" value={`$${fmt(operatingIncome)}`} tone="income" />
           <SummaryCard label="支出(排業外/投資健檢)" value={`$${fmt(operatingExpense)}`} tone="expense" />
-          <SummaryCard label="淨額" value={`$${fmt(netOperating)}`} tone={netOperating >= 0 ? 'income' : 'expense'} />
+          <SummaryCard label="淨額(已扣手續費,未含人力成本)" value={`$${fmt(netOperating)}`} tone={netOperating >= 0 ? 'income' : 'expense'} />
           <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
             <div style={{ color: 'var(--nm-text-secondary)' }}>業外/個人小計</div>
             <div className="mt-1" style={{ color: 'var(--nm-text-body)' }}>借款等業外收入 <span className="font-semibold">${fmt(nonOperatingIncome)}</span></div>
@@ -217,7 +218,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
                   </th>
                   <th className="text-right px-3 py-2 font-normal whitespace-nowrap">本期收入</th>
                   <th className="text-right px-3 py-2 font-normal whitespace-nowrap">本期支出</th>
-                  <th className="text-right px-3 py-2 font-normal whitespace-nowrap">淨額</th>
+                  <th className="text-right px-3 py-2 font-normal whitespace-nowrap">{dim === 'project' ? '粗毛利(未含人力)' : '淨額'}</th>
                   {dim !== 'project' && <th className="text-left px-3 py-2 font-normal whitespace-nowrap">組成</th>}
                   {dim === 'project' && <th className="text-left px-3 py-2 font-normal whitespace-nowrap">動作</th>}
                 </tr>
@@ -266,7 +267,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
           </div>
           <p className="text-xs" style={{ color: 'var(--nm-text-faint)' }}>
             殘差行恆等式:各分項 + 未歸類 = 本期營運帳目總額(${fmt(total)})。目前合計 ${fmt(groupedTotal)}{groupedTotal !== total ? '(不符,請回報)' : '(相符)'}。
-            {dim === 'project' && ' 本表為本期活動金額,非案子完整生命週期損益。'}
+            {dim === 'project' && ' 本表為本期活動金額,非案子完整生命週期損益;金額未扣人力成本,是粗毛利、非實際獲利。'}
           </p>
         </div>
       )}

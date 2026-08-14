@@ -115,6 +115,30 @@ export type LedgerKind =
 export type InvoiceStatus = 'none' | 'to_issue' | 'issued';
 export type LedgerStatus = 'active' | 'voided' | 'draft';
 
+// 帳務 v3:帳簿/狀態機/付款方式/案子分攤。見 docs/ledger-v3-spec-v1.md、migrations/014。
+// state 取代 status 作為權威狀態欄位;status 過渡期並存,C3 才移除(不在本輪動)。
+export type LedgerJournal = 'customer' | 'vendor' | 'pettycash' | 'payroll' | 'personal';
+export type LedgerPaymentMethod = 'transfer' | 'cash' | 'credit_card' | 'check';
+export type LedgerState = 'draft' | 'posted' | 'voided';
+
+export const LEDGER_JOURNAL_LABEL: Record<LedgerJournal, string> = {
+  customer: '客戶',
+  vendor: '廠商',
+  pettycash: '零用金',
+  payroll: '薪資',
+  personal: '老闆個人',
+};
+
+export const LEDGER_PAYMENT_METHOD_LABEL: Record<LedgerPaymentMethod, string> = {
+  transfer: '轉帳',
+  cash: '現金',
+  credit_card: '信用卡',
+  check: '支票',
+};
+
+// 案子分攤:{ site_id: 百分比 },Σ必須 = 100。單案時為 { "<id>": 100 }。
+export type SiteDistribution = Record<string, number>;
+
 // 認列口徑排除業外/借款,報表營收/毛利計算用
 export const NON_OPERATING_KINDS: LedgerKind[] = ['loan', 'investment', 'health'];
 
@@ -134,6 +158,11 @@ export interface LedgerEntry {
   tax_amount_twd: number;
   status: LedgerStatus;
   voided_reason: string | null;
+  state: LedgerState;
+  to_check: boolean;
+  journal: LedgerJournal;
+  payment_method: LedgerPaymentMethod | null;
+  site_distribution: SiteDistribution | null;
   site_id: string | null;
   receivable_id: string | null;
   recurring_template_id: string | null;
@@ -142,6 +171,35 @@ export interface LedgerEntry {
   created_at: string;
   updated_at: string;
 }
+
+// kind → 預設帳簿。用於批 1 遷移對照與新分錄的預設值;老闆仍可在表單覆蓋。
+export const KIND_TO_JOURNAL: Partial<Record<LedgerKind, LedgerJournal>> = {
+  project: 'customer',
+  other_income: 'customer',
+  goods: 'vendor',
+  vehicle: 'vendor',
+  rent: 'vendor',
+  utility: 'vendor',
+  tax: 'vendor',
+  other_expense: 'vendor',
+  reimbursement: 'pettycash',
+  salary: 'payroll',
+  bonus: 'payroll',
+  loan: 'personal',
+  investment: 'personal',
+  health: 'personal',
+};
+
+// 反向索引:帳簿 → 該帳簿底下可選的 kind。表單「先選帳簿」時用來過濾類別選單。
+export const JOURNAL_KINDS: Record<LedgerJournal, LedgerKind[]> = (() => {
+  const map: Record<LedgerJournal, LedgerKind[]> = { customer: [], vendor: [], pettycash: [], payroll: [], personal: [] };
+  for (const [kind, journal] of Object.entries(KIND_TO_JOURNAL) as [LedgerKind, LedgerJournal][]) {
+    map[journal].push(kind);
+  }
+  return map;
+})();
+
+export const JOURNAL_ORDER: LedgerJournal[] = ['customer', 'vendor', 'pettycash', 'payroll', 'personal'];
 
 // 帳務 v2:案件類別、應收應付、每日案場歸屬
 export interface SiteCategory {
@@ -237,9 +295,11 @@ export const LEDGER_KIND_LABEL: Record<LedgerKind, string> = {
 };
 
 export const INCOME_KINDS: LedgerKind[] = ['project', 'loan', 'other_income'];
+// credit_card 自 v3 起退役(付款方式與業務性質是兩個維度,見 spec 診斷)——
+// 舊資料仍可能存在該值(遷移前),故不從 LedgerKind 型別移除,只從新增表單的可選清單拿掉。
 export const EXPENSE_KINDS: LedgerKind[] = [
   'salary', 'bonus', 'reimbursement', 'goods', 'vehicle',
-  'rent', 'utility', 'credit_card', 'tax', 'investment', 'health', 'other_expense',
+  'rent', 'utility', 'tax', 'investment', 'health', 'other_expense',
 ];
 
 export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {

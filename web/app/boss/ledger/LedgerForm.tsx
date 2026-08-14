@@ -3,34 +3,53 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   INCOME_KINDS,
-  EXPENSE_KINDS,
+  JOURNAL_KINDS,
+  JOURNAL_ORDER,
   LEDGER_KIND_LABEL,
+  LEDGER_JOURNAL_LABEL,
+  LEDGER_PAYMENT_METHOD_LABEL,
   INVOICE_STATUS_LABEL,
   suggestTax,
   type LedgerDirection,
   type LedgerKind,
+  type LedgerJournal,
+  type LedgerPaymentMethod,
   type InvoiceStatus,
   type LedgerEntry,
 } from '@/lib/types';
 import { validateLedger } from '@/lib/ledger-validation';
+import { taipeiTodayStr } from '@/lib/tz';
 
 interface Props {
   mode: 'create' | 'edit';
   initial?: LedgerEntry | null;
   locked?: boolean; // 由月結匯入,鎖大部分欄位
   defaultMonth?: string;
+  defaultJournal?: LedgerJournal;
 }
 
-function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// kind 與方向是一對一的(INCOME_KINDS/EXPENSE_KINDS 不重疊),所以方向不用讓老闆選,
+// 選了帳簿、選了類別,方向就跟著定了——這是拿掉一整個欄位的地方。
+function directionOfKind(kind: LedgerKind): LedgerDirection {
+  return (INCOME_KINDS as LedgerKind[]).includes(kind) ? 'income' : 'expense';
 }
 
-export default function LedgerForm({ mode, initial, locked, defaultMonth }: Props) {
-  const [direction, setDirection] = useState<LedgerDirection>(initial?.direction ?? 'expense');
-  const [kind, setKind] = useState<LedgerKind>(initial?.kind ?? 'reimbursement');
+function journalOfKind(kind: LedgerKind, fallback: LedgerJournal): LedgerJournal {
+  for (const j of JOURNAL_ORDER) {
+    if (JOURNAL_KINDS[j].includes(kind)) return j;
+  }
+  return fallback;
+}
+
+export default function LedgerForm({ mode, initial, locked, defaultMonth, defaultJournal }: Props) {
+  const [journal, setJournal] = useState<LedgerJournal>(
+    initial ? journalOfKind(initial.kind, 'vendor') : (defaultJournal ?? 'vendor'),
+  );
+  const [kind, setKind] = useState<LedgerKind>(initial?.kind ?? JOURNAL_KINDS[journal][0]);
+  const direction = directionOfKind(kind);
   const [amount, setAmount] = useState<string>(initial?.amount_twd ? String(initial.amount_twd) : '');
   const [fee, setFee] = useState<string>(initial?.fee_twd ? String(initial.fee_twd) : '0');
+  const [paymentMethod, setPaymentMethod] = useState<LedgerPaymentMethod | ''>(initial?.payment_method ?? '');
   const [siteId, setSiteId] = useState<string>(initial?.site_id ?? '');
   const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
   const [receivableId, setReceivableId] = useState<string>(initial?.receivable_id ?? '');
@@ -44,15 +63,12 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
   const [tax, setTax] = useState<string>(initial?.tax_amount_twd ? String(initial.tax_amount_twd) : '');
   const [taxTouched, setTaxTouched] = useState<boolean>(Boolean(initial?.tax_amount_twd));
   const [occurred, setOccurred] = useState<string>(
-    initial?.occurred_on ?? (defaultMonth ? `${defaultMonth}-01` : todayStr()),
+    initial?.occurred_on ?? (defaultMonth ? `${defaultMonth}-01` : taipeiTodayStr()),
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const kindOptions = useMemo(
-    () => (direction === 'income' ? INCOME_KINDS : EXPENSE_KINDS),
-    [direction],
-  );
+  const kindOptions = useMemo(() => JOURNAL_KINDS[journal], [journal]);
 
   useEffect(() => {
     fetch('/api/sites?active=1', { cache: 'no-store' })
@@ -71,11 +87,10 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
     setReceivableId((cur) => (initial?.receivable_id && initial.direction === direction ? cur : ''));
   }, [direction, initial?.receivable_id, initial?.direction]);
 
-  function onDirectionChange(next: LedgerDirection) {
+  function onJournalChange(next: LedgerJournal) {
     if (locked) return;
-    setDirection(next);
-    const opts = next === 'income' ? INCOME_KINDS : EXPENSE_KINDS;
-    if (!opts.includes(kind)) setKind(opts[0]);
+    setJournal(next);
+    if (!JOURNAL_KINDS[next].includes(kind)) setKind(JOURNAL_KINDS[next][0]);
   }
 
   function onAmountChange(next: string) {
@@ -119,6 +134,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       tax_amount_twd: isExternal ? Number(tax || 0) : 0,
       site_id: siteId || null,
       receivable_id: receivableId || null,
+      payment_method: paymentMethod || null,
     };
     const err = validateLedger(input);
     if (err) { setError(err); return; }
@@ -177,31 +193,25 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       </div>
 
       <div>
-        <label className={labelCls} style={labelStyle}>方向</label>
-        <div className="flex gap-3 mt-1" style={{ color: 'var(--nm-text-body)' }}>
-          <label className="flex items-center gap-1">
-            <input
-              type="radio"
-              name="direction"
-              checked={direction === 'income'}
-              onChange={() => onDirectionChange('income')}
+        <label className={labelCls} style={labelStyle}>帳簿</label>
+        <div className="flex flex-wrap gap-2 mt-1">
+          {JOURNAL_ORDER.map((j) => (
+            <button
+              key={j}
+              type="button"
+              onClick={() => onJournalChange(j)}
               disabled={locked}
-            /> 收入
-          </label>
-          <label className="flex items-center gap-1">
-            <input
-              type="radio"
-              name="direction"
-              checked={direction === 'expense'}
-              onChange={() => onDirectionChange('expense')}
-              disabled={locked}
-            /> 支出
-          </label>
+              className={journal === j ? 'nm-btn-solid' : 'nm-btn'}
+              style={{ borderRadius: 999, padding: '4px 14px', minHeight: 'auto', fontSize: 13 }}
+            >
+              {LEDGER_JOURNAL_LABEL[j]}
+            </button>
+          ))}
         </div>
       </div>
 
       <div>
-        <label className={labelCls} style={labelStyle}>類別</label>
+        <label className={labelCls} style={labelStyle}>類別 · {direction === 'income' ? '收入' : '支出'}</label>
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value as LedgerKind)}
@@ -230,50 +240,6 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
       </div>
 
       <div>
-        <label className={labelCls} style={labelStyle}>手續費(元)· 轉帳費另計,不混進金額</label>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={1}
-          value={fee}
-          onChange={(e) => setFee(e.target.value)}
-          disabled={locked}
-          className={inputCls}
-        />
-      </div>
-
-      <div>
-        <label className={labelCls} style={labelStyle}>案場/專案(選填)</label>
-        <select
-          value={siteId}
-          onChange={(e) => setSiteId(e.target.value)}
-          className={inputCls}
-        >
-          <option value="">— 不掛專案 —</option>
-          {sites.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {receivables.length > 0 && (
-        <div>
-          <label className={labelCls} style={labelStyle}>掛應收應付約定(選填)</label>
-          <select
-            value={receivableId}
-            onChange={(e) => setReceivableId(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">— 不掛約定 —</option>
-            {receivables.map((r) => (
-              <option key={r.id} value={r.id}>{r.party} · 未結 ${r.remaining_twd.toLocaleString('zh-TW')}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div>
         <label className={labelCls} style={labelStyle}>對象(客戶/廠商/員工)</label>
         <input
           type="text"
@@ -283,6 +249,73 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth }: Prop
           className={inputCls}
         />
       </div>
+
+      {/* 進階選項:八成情況只需要上面幾格,案場/手續費/掛約定/付款方式收起來, */}
+      {/* 需要的人自己展開,不強迫每筆都面對全部欄位。 */}
+      <details className="rounded-xl nm-inset p-3">
+        <summary className="text-[13px] cursor-pointer select-none" style={{ color: 'var(--nm-text-secondary)' }}>
+          進階選項(案場、手續費、付款方式⋯)
+        </summary>
+        <div className="space-y-4 mt-3">
+          <div>
+            <label className={labelCls} style={labelStyle}>案場/專案(選填)</label>
+            <select
+              value={siteId}
+              onChange={(e) => setSiteId(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">— 不掛專案 —</option>
+              {sites.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {receivables.length > 0 && (
+            <div>
+              <label className={labelCls} style={labelStyle}>掛應收應付約定(選填)</label>
+              <select
+                value={receivableId}
+                onChange={(e) => setReceivableId(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">— 不掛約定 —</option>
+                {receivables.map((r) => (
+                  <option key={r.id} value={r.id}>{r.party} · 未結 ${r.remaining_twd.toLocaleString('zh-TW')}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className={labelCls} style={labelStyle}>付款方式(選填)</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as LedgerPaymentMethod | '')}
+              className={inputCls}
+            >
+              <option value="">— 不指定 —</option>
+              {(Object.entries(LEDGER_PAYMENT_METHOD_LABEL) as [LedgerPaymentMethod, string][]).map(([v, label]) => (
+                <option key={v} value={v}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelCls} style={labelStyle}>手續費(元)· 轉帳費另計,不混進金額</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={fee}
+              onChange={(e) => setFee(e.target.value)}
+              disabled={locked}
+              className={inputCls}
+            />
+          </div>
+        </div>
+      </details>
 
       <div>
         <label className={labelCls} style={labelStyle}>備註</label>

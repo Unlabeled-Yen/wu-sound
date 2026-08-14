@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { fetchReceivablesWithRemaining } from '@/lib/receivables-query';
-import { RECEIVABLE_DIRECTION_LABEL } from '@/lib/types';
+import { RECEIVABLE_DIRECTION_LABEL, type ReceivableDirection } from '@/lib/types';
 import ReceivableForm from './ReceivableForm';
 import StatusButtons from './StatusButtons';
 
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export default async function ReceivablesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; direction?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -20,9 +20,10 @@ export default async function ReceivablesPage({
 
   const sp = await searchParams;
   const statusFilter = sp.status === 'all' ? undefined : (sp.status === 'closed' || sp.status === 'voided' ? sp.status : 'open') as 'open' | 'closed' | 'voided' | undefined;
+  const directionFilter = sp.direction === 'receivable' || sp.direction === 'payable' ? (sp.direction as ReceivableDirection) : undefined;
 
   const sb = getSupabaseAdmin();
-  const { rows, error } = await fetchReceivablesWithRemaining(sb, { status: statusFilter });
+  const { rows, error } = await fetchReceivablesWithRemaining(sb, { status: statusFilter, direction: directionFilter });
 
   const fmt = (n: number) => n.toLocaleString('zh-TW');
   const openReceivable = rows.filter((r) => r.direction === 'receivable' && r.status === 'open').reduce((s, r) => s + Math.max(0, r.remaining_twd), 0);
@@ -51,17 +52,25 @@ export default async function ReceivablesPage({
         </div>
       </div>
 
-      <div className="flex gap-1 text-[13px]">
-        {(['open', 'closed', 'voided', 'all'] as const).map((f) => (
-          <Link
-            key={f}
-            href={`/boss/ledger/receivables?status=${f}`}
-            className={(statusFilter ?? 'all') === f || (f === 'open' && !sp.status) ? 'nm-btn-solid' : 'nm-btn'}
-            style={{ borderRadius: 999, padding: '4px 14px', minHeight: 'auto' }}
-          >
-            {f === 'open' ? '未結' : f === 'closed' ? '已結清' : f === 'voided' ? '已作廢' : '全部'}
-          </Link>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1 text-[13px]">
+          {(['open', 'closed', 'voided', 'all'] as const).map((f) => (
+            <Link
+              key={f}
+              href={`/boss/ledger/receivables?status=${f}${directionFilter ? `&direction=${directionFilter}` : ''}`}
+              className={(statusFilter ?? 'all') === f || (f === 'open' && !sp.status) ? 'nm-btn-solid' : 'nm-btn'}
+              style={{ borderRadius: 999, padding: '4px 14px', minHeight: 'auto' }}
+            >
+              {f === 'open' ? '未結' : f === 'closed' ? '已結清' : f === 'voided' ? '已作廢' : '全部'}
+            </Link>
+          ))}
+        </div>
+        {directionFilter && (
+          <span className="text-[13px] flex items-center gap-2" style={{ color: 'var(--nm-text-muted)' }}>
+            篩選中:只看{RECEIVABLE_DIRECTION_LABEL[directionFilter]}
+            <Link href={`/boss/ledger/receivables?status=${statusFilter ?? 'open'}`} className="underline">清除</Link>
+          </span>
+        )}
       </div>
 
       {error && (

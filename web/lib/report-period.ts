@@ -1,3 +1,5 @@
+import { taipeiCurrentMonthStr, taipeiCurrentYear } from './tz';
+
 export type PeriodType = 'month' | 'quarter' | 'year';
 
 export interface PeriodRange {
@@ -7,12 +9,12 @@ export interface PeriodRange {
 }
 
 export function currentPeriodValue(type: PeriodType): string {
-  const d = new Date();
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth() + 1;
+  const y = taipeiCurrentYear();
+  const monthStr = taipeiCurrentMonthStr();
+  const m = Number(monthStr.slice(5, 7));
   if (type === 'year') return String(y);
   if (type === 'quarter') return `${y}-Q${Math.floor((m - 1) / 3) + 1}`;
-  return `${y}-${String(m).padStart(2, '0')}`;
+  return monthStr;
 }
 
 function pad2(n: number): string {
@@ -26,7 +28,7 @@ export function periodRange(type: PeriodType, value: string): PeriodRange {
   }
   if (type === 'quarter') {
     const m = /^(\d{4})-Q([1-4])$/.exec(value);
-    const y = m ? parseInt(m[1], 10) : new Date().getUTCFullYear();
+    const y = m ? parseInt(m[1], 10) : taipeiCurrentYear();
     const q = m ? parseInt(m[2], 10) : 1;
     const startMonth = (q - 1) * 3 + 1;
     const endMonth = startMonth + 3;
@@ -35,7 +37,7 @@ export function periodRange(type: PeriodType, value: string): PeriodRange {
     return { from: `${y}-${pad2(startMonth)}-01`, to: `${endY}-${pad2(endM)}-01`, label: `${y} Q${q}` };
   }
   const mm = /^(\d{4})-(\d{2})$/.exec(value);
-  const y = mm ? parseInt(mm[1], 10) : new Date().getUTCFullYear();
+  const y = mm ? parseInt(mm[1], 10) : taipeiCurrentYear();
   const mo = mm ? parseInt(mm[2], 10) : 1;
   const nextY = mo === 12 ? y + 1 : y;
   const nextM = mo === 12 ? 1 : mo + 1;
@@ -49,7 +51,7 @@ export function shiftPeriod(type: PeriodType, value: string, delta: number): str
   }
   if (type === 'quarter') {
     const m = /^(\d{4})-Q([1-4])$/.exec(value);
-    const y = m ? parseInt(m[1], 10) : new Date().getUTCFullYear();
+    const y = m ? parseInt(m[1], 10) : taipeiCurrentYear();
     const q = m ? parseInt(m[2], 10) : 1;
     const total = y * 4 + (q - 1) + delta;
     const ny = Math.floor(total / 4);
@@ -57,7 +59,7 @@ export function shiftPeriod(type: PeriodType, value: string, delta: number): str
     return `${ny}-Q${nq}`;
   }
   const mm = /^(\d{4})-(\d{2})$/.exec(value);
-  const y = mm ? parseInt(mm[1], 10) : new Date().getUTCFullYear();
+  const y = mm ? parseInt(mm[1], 10) : taipeiCurrentYear();
   const mo = mm ? parseInt(mm[2], 10) : 1;
   const total = y * 12 + (mo - 1) + delta;
   const ny = Math.floor(total / 12);

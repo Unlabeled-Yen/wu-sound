@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { validateLedger, type LedgerInput } from '@/lib/ledger-validation';
-import type { LedgerEntry, LedgerDirection, LedgerKind, InvoiceStatus } from '@/lib/types';
+import { KIND_TO_JOURNAL, type LedgerEntry, type LedgerDirection, type LedgerKind, type InvoiceStatus } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
@@ -57,10 +57,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     tax_amount_twd: body.tax_amount_twd !== undefined ? Number(body.tax_amount_twd) : before.tax_amount_twd,
     site_id: body.site_id !== undefined ? (body.site_id ? String(body.site_id) : null) : before.site_id,
     receivable_id: body.receivable_id !== undefined ? (body.receivable_id ? String(body.receivable_id) : null) : before.receivable_id,
+    payment_method: body.payment_method !== undefined ? (body.payment_method ? String(body.payment_method) as LedgerInput['payment_method'] : null) : before.payment_method,
   };
 
   const err = validateLedger(merged);
   if (err) return NextResponse.json({ error: err }, { status: 400 });
+
+  // kind 若改變,journal 要跟著重算,不然帳目會留在錯的帳簿卡上;
+  // 對不到的話寧可擋下來,不要留一筆帳簿與類別不一致的紀錄。
+  const journal = KIND_TO_JOURNAL[merged.kind];
+  if (!journal) {
+    return NextResponse.json({ error: `類別「${merged.kind}」對應不到帳簿,請回報` }, { status: 400 });
+  }
 
   const upd = await sb.from('ledger_entries').update({
     occurred_on: merged.occurred_on,
@@ -77,6 +85,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     tax_amount_twd: merged.tax_amount_twd,
     site_id: merged.site_id,
     receivable_id: merged.receivable_id,
+    payment_method: merged.payment_method ?? null,
+    journal,
+    site_distribution: merged.site_id ? { [merged.site_id]: 100 } : null,
   }).eq('id', id).select('*').single();
 
   if (upd.error || !upd.data) {

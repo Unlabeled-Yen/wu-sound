@@ -62,6 +62,7 @@ export async function POST(req: Request) {
         occurred_on,
         direction: 'expense',
         kind: 'reimbursement',
+        journal: 'pettycash',
         amount_twd: sum,
         party,
         memo: `${monthLabel}零用金薪資結算`,

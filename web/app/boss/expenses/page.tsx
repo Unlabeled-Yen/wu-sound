@@ -11,6 +11,17 @@ interface JoinedRow extends ExpenseRecord {
   thumb_url: string | null;
 }
 
+function LowConfidenceBadge() {
+  return (
+    <span
+      className="nm-pill"
+      style={{ color: 'var(--nm-warning-glass-text)', background: 'rgba(217,181,107,0.1)', borderColor: 'rgba(217,181,107,0.3)' }}
+    >
+      AI 沒把握 · 待確認
+    </span>
+  );
+}
+
 export default async function BossExpensesPage() {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
@@ -102,6 +113,7 @@ export default async function BossExpensesPage() {
                 site_name: r.site_name,
                 item_text: r.item_text ?? null,
                 thumb_url: r.thumb_url,
+                low_confidence: r.ai_draft?.confidence === 'low',
               }}
             />
           ))
@@ -172,7 +184,10 @@ export default async function BossExpensesPage() {
                   className="align-top"
                   style={{ borderTop: '1px solid var(--nm-border-hair)' }}
                 >
-                  <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>{r.user_name}</td>
+                  <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>
+                    {r.user_name}
+                    {r.ai_draft?.confidence === 'low' && <div className="mt-1"><LowConfidenceBadge /></div>}
+                  </td>
                   <td className="px-3 py-2 tabular whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.spent_on ?? '—'}</td>
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.category ? CATEGORY_LABEL[r.category] : '—'}</td>
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.item_text ?? '—'}</td>

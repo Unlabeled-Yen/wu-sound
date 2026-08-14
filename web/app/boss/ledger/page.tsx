@@ -2,23 +2,28 @@ import Link from 'next/link';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import {
   LEDGER_KIND_LABEL,
+  LEDGER_JOURNAL_LABEL,
   INVOICE_STATUS_LABEL,
   INCOME_KINDS,
   EXPENSE_KINDS,
+  JOURNAL_KINDS,
   type LedgerEntry,
   type LedgerKind,
   type LedgerDirection,
   type LedgerStatus,
+  type LedgerJournal,
 } from '@/lib/types';
 import ImportBatchDialog from './ImportBatchDialog';
 import ExportCsvDialog from './ExportCsvDialog';
 import { VoidDialog } from './VoidDialog';
+import JournalDashboard from './JournalDashboard';
+import LedgerRowMobile from './LedgerRowMobile';
+import { taipeiCurrentMonthStr } from '@/lib/tz';
 
 export const dynamic = 'force-dynamic';
 
 function currentMonth(): string {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  return taipeiCurrentMonthStr();
 }
 
 function shiftMonth(month: string, delta: number): string {
@@ -42,6 +47,8 @@ interface SP {
   kind?: string;
   status?: string;
   site_id?: string;
+  journal?: string;
+  to_check?: string;
 }
 
 function buildHref(base: SP, overrides: Partial<SP>): string {
@@ -53,6 +60,8 @@ function buildHref(base: SP, overrides: Partial<SP>): string {
   if (merged.kind) p.set('kind', merged.kind);
   if (merged.status && merged.status !== 'active') p.set('status', merged.status);
   if (merged.site_id) p.set('site_id', merged.site_id);
+  if (merged.journal) p.set('journal', merged.journal);
+  if (merged.to_check === '1') p.set('to_check', '1');
   const q = p.toString();
   return q ? `/boss/ledger?${q}` : '/boss/ledger';
 }
@@ -67,6 +76,8 @@ export default async function LedgerPage(
   const kind = (sp.kind as LedgerKind | undefined);
   const statusVal: LedgerStatus = sp.status === 'voided' ? 'voided' : 'active';
   const siteId = sp.site_id;
+  const journal = sp.journal && sp.journal in JOURNAL_KINDS ? (sp.journal as LedgerJournal) : undefined;
+  const toCheckOnly = sp.to_check === '1';
 
   const { from, to } = monthRange(month);
   const sb = getSupabaseAdmin();
@@ -82,6 +93,8 @@ export default async function LedgerPage(
   if (direction === 'income' || direction === 'expense') q = q.eq('direction', direction);
   if (kind) q = q.eq('kind', kind);
   if (siteId) q = q.eq('site_id', siteId);
+  if (journal) q = q.eq('journal', journal);
+  if (toCheckOnly) q = q.eq('to_check', true);
   q = q.order('occurred_on', { ascending: true }).order('created_at', { ascending: true });
   const { data, error } = await q;
   type LedgerRowWithSite = LedgerEntry & { sites?: { name: string } | null };
@@ -106,7 +119,8 @@ export default async function LedgerPage(
     }
     feeTotal += r.fee_twd ?? 0;
   }
-  const net = income - expense;
+  // 淨額扣手續費:轉帳費是真的從戶頭出去的錢,不扣的話老闆看到的淨額會虛高。
+  const net = income - expense - feeTotal;
 
   const kindOptions = direction === 'income' ? INCOME_KINDS
     : direction === 'expense' ? EXPENSE_KINDS
@@ -114,10 +128,33 @@ export default async function LedgerPage(
 
   const fmt = (n: number) => n.toLocaleString('zh-TW');
 
-  const base: SP = { month, filter, direction, kind, status: statusVal, site_id: siteId };
+  const base: SP = { month, filter, direction, kind, status: statusVal, site_id: siteId, journal, to_check: toCheckOnly ? '1' : undefined };
 
   return (
     <div className="space-y-4">
+      {/* 帳簿看板:一進頁面先看「有什麼事要做」,不用自己在表格裡找 */}
+      <JournalDashboard />
+
+      {journal && (
+        <div
+          className="rounded-xl px-3 py-2 text-[13px] flex items-center gap-2"
+          style={{ background: 'rgba(126,207,157,0.08)', border: '1px solid rgba(126,207,157,0.26)', color: 'var(--nm-success-glass-text)' }}
+        >
+          篩選中:「{LEDGER_JOURNAL_LABEL[journal]}」帳簿
+          <Link href={buildHref(base, { journal: undefined })} className="underline ml-auto" style={{ color: 'var(--nm-text-muted)' }}>清除篩選</Link>
+        </div>
+      )}
+
+      {toCheckOnly && (
+        <div
+          className="rounded-xl px-3 py-2 text-[13px] flex items-center gap-2"
+          style={{ background: 'rgba(217,181,107,0.09)', border: '1px solid rgba(217,181,107,0.3)', color: 'var(--nm-warning-glass-text)' }}
+        >
+          篩選中:只顯示「AI 沒把握 / 待確認」的帳目
+          <Link href={buildHref(base, { to_check: undefined })} className="underline ml-auto" style={{ color: 'var(--nm-text-muted)' }}>清除篩選</Link>
+        </div>
+      )}
+
       {/* 頂部:月份 + 篩選 */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 text-[13px]">
@@ -205,7 +242,7 @@ export default async function LedgerPage(
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <SummaryCard label="當月收入合計" value={`$${fmt(income)}`} tone="income" />
         <SummaryCard label="當月支出合計" value={`$${fmt(expense)}`} tone="expense" />
-        <SummaryCard label="淨額" value={`$${fmt(net)}`} tone={net >= 0 ? 'income' : 'expense'} />
+        <SummaryCard label="淨額(已扣手續費)" value={`$${fmt(net)}`} tone={net >= 0 ? 'income' : 'expense'} />
         <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
           <div style={{ color: 'var(--nm-text-secondary)' }}>外帳彙總</div>
           <div className="mt-1" style={{ color: 'var(--nm-text-body)' }}>收入合計 <span className="font-semibold">${fmt(extIncome)}</span></div>
@@ -217,8 +254,19 @@ export default async function LedgerPage(
         </div>
       </div>
 
-      {/* 表格 */}
-      <div className="rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
+      {/* 手機:卡片流 */}
+      <div className="lg:hidden flex flex-col gap-3">
+        {error && (
+          <p className="text-[13px]" style={{ color: 'var(--nm-danger)' }}>查詢失敗: {error.message}</p>
+        )}
+        {!error && rows.length === 0 && (
+          <p className="text-[13px] text-center py-6" style={{ color: 'var(--nm-text-secondary)' }}>本月沒有紀錄</p>
+        )}
+        {rows.map((r) => <LedgerRowMobile key={r.id} row={r} />)}
+      </div>
+
+      {/* 桌機:表格 */}
+      <div className="hidden lg:block rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
         <table className="w-full text-[13px]" style={{ minWidth: 1100, borderCollapse: 'collapse' }}>
           <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
             <tr style={{ color: 'var(--nm-text-muted)' }}>
@@ -258,6 +306,9 @@ export default async function LedgerPage(
                     {LEDGER_KIND_LABEL[r.kind]}
                     {r.source_batch_id && (
                       <span className="nm-pill nm-pill-muted ml-2">薪資結算匯入</span>
+                    )}
+                    {r.to_check && (
+                      <span className="nm-pill nm-pill-warning ml-2">待確認</span>
                     )}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.party ?? '—'}</td>

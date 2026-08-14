@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { validateLedger, type LedgerInput } from '@/lib/ledger-validation';
-import type { LedgerDirection, LedgerKind, InvoiceStatus, LedgerStatus } from '@/lib/types';
+import { KIND_TO_JOURNAL, type LedgerDirection, type LedgerKind, type InvoiceStatus, type LedgerStatus } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
@@ -70,10 +70,19 @@ export async function POST(req: Request) {
     tax_amount_twd: Number(body.tax_amount_twd ?? 0),
     site_id: body.site_id ? String(body.site_id) : null,
     receivable_id: body.receivable_id ? String(body.receivable_id) : null,
+    payment_method: body.payment_method ? (String(body.payment_method) as LedgerInput['payment_method']) : null,
   };
 
   const err = validateLedger(input);
   if (err) return NextResponse.json({ error: err }, { status: 400 });
+
+  // journal 永遠由 kind 在伺服器端算,不信任前端送來的值——kind 與帳簿是一對一,
+  // 沒有理由讓兩者在請求裡各自表述、之後又對不上。對不到的(理論上不會發生,
+  // KIND_TO_JOURNAL 窮舉了所有 kind)就 loud 擋掉,不要用猜的塞一個帳簿進去。
+  const journal = KIND_TO_JOURNAL[input.kind];
+  if (!journal) {
+    return NextResponse.json({ error: `類別「${input.kind}」對應不到帳簿,請回報` }, { status: 400 });
+  }
 
   const sb = getSupabaseAdmin();
   const ins = await sb
@@ -93,6 +102,9 @@ export async function POST(req: Request) {
       tax_amount_twd: input.tax_amount_twd,
       site_id: input.site_id,
       receivable_id: input.receivable_id,
+      payment_method: input.payment_method ?? null,
+      journal,
+      site_distribution: input.site_id ? { [input.site_id]: 100 } : null,
       created_by: session.id,
     })
     .select('*')
