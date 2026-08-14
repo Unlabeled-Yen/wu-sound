@@ -47,13 +47,38 @@ const MAX_RECORD_MS = 60_000;
  * 根據 handoff §7 VAD 段落的建議值(静音 800ms,口述紀錄場景放寬到 1.5s)
  * 抓中間值,實際跑起來太敏感或太遲鈍都要調,不能當成定案數字。
  */
-const SILENCE_MS = 1200;
+/**
+ * 停頓多久算「講完了」。
+ *
+ * 實測教訓(Yen 2026-08-14):原本設 1200ms,講「幫我在磐頂教會的專案,
+ * 記著要帶銅線、兩組麥克風」這種有自然停頓的句子時,會在句中就被切斷,
+ * 只錄到片段 → 辨識模型拿到聽不清的音檔就開始編造內容(見下方 MIN_UTTERANCE_MS)。
+ * handoff §7 講口述紀錄場景要放寬到 1.5s,這裡再保守一點抓 2s。
+ */
+const SILENCE_MS = 2000;
 const MIN_SPEECH_MS = 300; // handoff §8:短於這個長度的觸發當噪音丟棄,不要偵測到就停
 const SPEECH_LEVEL = 0.02; // 音量閾值(0~1 的 RMS),環境噪音大時可能要調高
 
-function watchSilence(stream: MediaStream, onSilence: () => void): () => void {
+/**
+ * 一段錄音裡「真的有講話」的累計時間下限,低於這個就不送去辨識。
+ *
+ * 這道防線是必要的,不是保險起見:實測 gpt-4o-transcribe 拿到過短或幾乎無聲的音檔時
+ * **會編造內容**,而且會從我們給的熱詞提示裡撈詞彙來編——
+ * 送一段只有「嗯」的音檔,它回「木。」「喇叭」(音檔裡根本沒這些字);
+ * 不帶熱詞時甚至回日文「はい。」。
+ * 如果不擋,使用者會看到系統把編造的句子當成他講的話,那是系統在說謊。
+ */
+const MIN_UTTERANCE_MS = 800;
+
+interface SilenceWatcher {
+  cleanup: () => void;
+  /** 累計偵測到人聲的毫秒數,用來判斷這段錄音值不值得送去辨識 */
+  speechMs: () => number;
+}
+
+function watchSilence(stream: MediaStream, onSilence: () => void): SilenceWatcher {
   const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return () => {};
+  if (!Ctor) return { cleanup: () => {}, speechMs: () => Number.POSITIVE_INFINITY };
 
   const ctx = new Ctor();
   const source = ctx.createMediaStreamSource(stream);
@@ -64,6 +89,8 @@ function watchSilence(stream: MediaStream, onSilence: () => void): () => void {
 
   let speechStartedAt: number | null = null;
   let silenceStartedAt: number | null = null;
+  let totalSpeechMs = 0;
+  let lastTickAt = performance.now();
   let raf = 0;
   let stopped = false;
 
@@ -77,8 +104,11 @@ function watchSilence(stream: MediaStream, onSilence: () => void): () => void {
     }
     const level = Math.sqrt(sumSq / data.length);
     const now = performance.now();
+    const delta = now - lastTickAt;
+    lastTickAt = now;
 
     if (level > SPEECH_LEVEL) {
+      totalSpeechMs += delta;
       if (speechStartedAt === null) speechStartedAt = now;
       silenceStartedAt = null;
     } else if (speechStartedAt !== null && now - speechStartedAt > MIN_SPEECH_MS) {
@@ -99,7 +129,7 @@ function watchSilence(stream: MediaStream, onSilence: () => void): () => void {
   }
 
   raf = requestAnimationFrame(tick);
-  return cleanup;
+  return { cleanup, speechMs: () => totalSpeechMs };
 }
 
 function pickMimeType(): string | undefined {
@@ -120,7 +150,7 @@ export function useVoice(onTranscript: (text: string) => void): VoiceState {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const silenceCleanupRef = useRef<(() => void) | null>(null);
+  const silenceRef = useRef<SilenceWatcher | null>(null);
   const onTranscriptRef = useRef(onTranscript);
   onTranscriptRef.current = onTranscript;
 
@@ -194,16 +224,21 @@ export function useVoice(onTranscript: (text: string) => void): VoiceState {
         recorderRef.current = null;
         setRecording(false);
         if (timerRef.current) clearTimeout(timerRef.current);
-        if (silenceCleanupRef.current) {
-          silenceCleanupRef.current();
-          silenceCleanupRef.current = null;
+
+        const speechMs = silenceRef.current?.speechMs() ?? Number.POSITIVE_INFINITY;
+        if (silenceRef.current) {
+          silenceRef.current.cleanup();
+          silenceRef.current = null;
         }
 
         const type = rec.mimeType || mime || 'audio/webm';
         const blob = new Blob(chunksRef.current, { type });
         chunksRef.current = [];
-        if (blob.size < 1000) {
-          setError('錄到的聲音太短,請再說一次');
+
+        // 講太少就別送去辨識——模型拿到聽不清的音檔會編造內容(見 MIN_UTTERANCE_MS)。
+        // 寧可請使用者重講,也不要讓他看到一句他沒講過的話被當成他講的。
+        if (blob.size < 2000 || speechMs < MIN_UTTERANCE_MS) {
+          setError('沒有聽到完整的話,請按麥克風再說一次');
           return;
         }
         void upload(blob, type);
@@ -216,20 +251,17 @@ export function useVoice(onTranscript: (text: string) => void): VoiceState {
         if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
       }, MAX_RECORD_MS);
 
-      if (autoStop) {
-        silenceCleanupRef.current = watchSilence(stream, () => {
-          if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
-        });
-      }
+      // 不管手動還自動都要監聽:自動模式用它判斷「講完了」,
+      // 手動模式也需要它算出的 speechMs 來擋掉幾乎沒講話的錄音
+      silenceRef.current = watchSilence(stream, () => {
+        if (autoStop && recorderRef.current?.state === 'recording') recorderRef.current.stop();
+      });
     },
     [upload],
   );
 
   const stop = useCallback(() => {
-    if (silenceCleanupRef.current) {
-      silenceCleanupRef.current();
-      silenceCleanupRef.current = null;
-    }
+    // 這裡不清掉 silenceRef——onstop 還要用它算 speechMs 才能判斷要不要送去辨識
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
   }, []);
 
@@ -264,7 +296,7 @@ export function useVoice(onTranscript: (text: string) => void): VoiceState {
     return () => {
       if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
       if (timerRef.current) clearTimeout(timerRef.current);
-      if (silenceCleanupRef.current) silenceCleanupRef.current();
+      silenceRef.current?.cleanup();
       window.speechSynthesis?.cancel();
     };
   }, []);

@@ -17,6 +17,13 @@ export const dynamic = 'force-dynamic';
 /** 錄音長度上限對應的檔案大小。太大的檔案要擋在打到辨識服務之前,不然是花錢買一個必定失敗 */
 const MAX_BYTES = 8 * 1024 * 1024;
 
+/**
+ * 音檔大小下限。實測值:macOS 語音合成講「嗯」約 5.5KB、講「幫我」約 6.5KB,
+ * 都短到會誘發模型編造。一句最短的有效指令(「磐頂記一筆」)約 15KB 起跳,
+ * 取 10KB 當門檻——擋掉單字級的雜訊,不誤傷真的短句。
+ */
+const MIN_BYTES = 10 * 1024;
+
 export async function POST(req: Request) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: '未登入' }, { status: 401 });
@@ -44,6 +51,20 @@ export async function POST(req: Request) {
   }
   if (file.size === 0) {
     return NextResponse.json({ error: '音檔是空的,可能沒有錄到聲音' }, { status: 400 });
+  }
+  /**
+   * 太小的音檔直接擋掉,不要送去辨識。
+   *
+   * 這不是省錢,是防止系統說謊:實測 gpt-4o-transcribe 拿到過短音檔時**會編造內容**,
+   * 而且會從我們給的熱詞提示裡撈詞——送一段只有「嗯」的 5.5KB 音檔,
+   * 它回「木。」「喇叭」(音檔裡沒這些字)。前端已有一道 speechMs 防線,
+   * 這裡再擋一次:前端防線繞得過(直接打 API),這道繞不過。
+   */
+  if (file.size < MIN_BYTES) {
+    return NextResponse.json(
+      { error: '錄到的聲音太短,請再說一次', error_code: 'AUDIO_TOO_SHORT' },
+      { status: 422 },
+    );
   }
   if (file.size > MAX_BYTES) {
     return NextResponse.json(
