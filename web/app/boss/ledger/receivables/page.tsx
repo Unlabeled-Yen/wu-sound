@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { fetchReceivablesWithRemaining } from '@/lib/receivables-query';
+import { fetchReceivablesWithRemaining, summarizeReceivables } from '@/lib/receivables-query';
 import { RECEIVABLE_DIRECTION_LABEL, type ReceivableDirection } from '@/lib/types';
 import ReceivableForm from './ReceivableForm';
 import StatusButtons from './StatusButtons';
+import ReceivableRowMobile from './ReceivableRowMobile';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +27,7 @@ export default async function ReceivablesPage({
   const { rows, error } = await fetchReceivablesWithRemaining(sb, { status: statusFilter, direction: directionFilter });
 
   const fmt = (n: number) => n.toLocaleString('zh-TW');
-  const openReceivable = rows.filter((r) => r.direction === 'receivable' && r.status === 'open').reduce((s, r) => s + Math.max(0, r.remaining_twd), 0);
-  const openPayable = rows.filter((r) => r.direction === 'payable' && r.status === 'open').reduce((s, r) => s + Math.max(0, r.remaining_twd), 0);
+  const { receivableOpenTotal: openReceivable, payableOpenTotal: openPayable } = summarizeReceivables(rows);
 
   return (
     <div className="space-y-4">
@@ -41,16 +41,20 @@ export default async function ReceivablesPage({
         <Link href="/boss/ledger" className="text-[13px] underline" style={{ color: 'var(--nm-text-muted)' }}>← 回帳務</Link>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
-        <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
-          <div style={{ color: 'var(--nm-text-secondary)' }}>在手應收(未結)</div>
-          <div className="text-lg font-semibold mt-1" style={{ color: 'var(--nm-success-glass-text)' }}>${fmt(openReceivable)}</div>
+      {/* 查詢失敗時不顯示總額卡——$0 跟「真的沒有應收應付」是兩件事,
+          混在一起就是把「查不到」偽裝成「沒有資料」,靜默說謊。 */}
+      {!error && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+          <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
+            <div style={{ color: 'var(--nm-text-secondary)' }}>在手應收(未結)</div>
+            <div className="text-lg font-semibold mt-1" style={{ color: 'var(--nm-success-glass-text)' }}>${fmt(openReceivable)}</div>
+          </div>
+          <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
+            <div style={{ color: 'var(--nm-text-secondary)' }}>在手應付(未結)</div>
+            <div className="text-lg font-semibold mt-1" style={{ color: 'var(--nm-danger-glass-text)' }}>${fmt(openPayable)}</div>
+          </div>
         </div>
-        <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
-          <div style={{ color: 'var(--nm-text-secondary)' }}>在手應付(未結)</div>
-          <div className="text-lg font-semibold mt-1" style={{ color: 'var(--nm-danger-glass-text)' }}>${fmt(openPayable)}</div>
-        </div>
-      </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex gap-1 text-[13px]">
@@ -79,7 +83,16 @@ export default async function ReceivablesPage({
         </div>
       )}
 
-      <div className="rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
+      {/* 手機:卡片流 */}
+      <div className="lg:hidden flex flex-col gap-3">
+        {rows.length === 0 && (
+          <p className="text-[13px] text-center py-6" style={{ color: 'var(--nm-text-secondary)' }}>沒有紀錄</p>
+        )}
+        {rows.map((r) => <ReceivableRowMobile key={r.id} row={r} />)}
+      </div>
+
+      {/* 桌機:表格 */}
+      <div className="hidden lg:block rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
         <table className="w-full text-[13px]" style={{ minWidth: 900, borderCollapse: 'collapse' }}>
           <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
             <tr style={{ color: 'var(--nm-text-muted)' }}>

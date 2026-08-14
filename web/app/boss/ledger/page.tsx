@@ -1,23 +1,7 @@
 import Link from 'next/link';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import {
-  LEDGER_KIND_LABEL,
-  LEDGER_JOURNAL_LABEL,
-  INVOICE_STATUS_LABEL,
-  INCOME_KINDS,
-  EXPENSE_KINDS,
-  JOURNAL_KINDS,
-  type LedgerEntry,
-  type LedgerKind,
-  type LedgerDirection,
-  type LedgerStatus,
-  type LedgerJournal,
-} from '@/lib/types';
-import ImportBatchDialog from './ImportBatchDialog';
-import ExportCsvDialog from './ExportCsvDialog';
-import { VoidDialog } from './VoidDialog';
+import { summarizeEntries } from '@/lib/ledger-summary';
 import JournalDashboard from './JournalDashboard';
-import LedgerRowMobile from './LedgerRowMobile';
 import { taipeiCurrentMonthStr } from '@/lib/tz';
 
 export const dynamic = 'force-dynamic';
@@ -42,339 +26,81 @@ function monthRange(month: string): { from: string; to: string } {
 
 interface SP {
   month?: string;
-  filter?: string;
-  direction?: string;
-  kind?: string;
-  status?: string;
-  site_id?: string;
-  journal?: string;
-  to_check?: string;
 }
 
-function buildHref(base: SP, overrides: Partial<SP>): string {
-  const p = new URLSearchParams();
-  const merged: SP = { ...base, ...overrides };
-  if (merged.month) p.set('month', merged.month);
-  if (merged.filter && merged.filter !== 'all') p.set('filter', merged.filter);
-  if (merged.direction) p.set('direction', merged.direction);
-  if (merged.kind) p.set('kind', merged.kind);
-  if (merged.status && merged.status !== 'active') p.set('status', merged.status);
-  if (merged.site_id) p.set('site_id', merged.site_id);
-  if (merged.journal) p.set('journal', merged.journal);
-  if (merged.to_check === '1') p.set('to_check', '1');
-  const q = p.toString();
-  return q ? `/boss/ledger?${q}` : '/boss/ledger';
+function buildHref(month: string): string {
+  return `/boss/ledger?month=${month}`;
 }
 
-export default async function LedgerPage(
+const fmt = (n: number) => n.toLocaleString('zh-TW');
+
+// 帳簿看板首頁:一進頁面先看「今天有什麼帳務的事要做」,不用先在表格裡找。
+// 明細/篩選/匯出全部移到 /boss/ledger/entries——這裡是全月總覽,語意單一,
+// 摘要卡永遠是「本月全部帳簿」,不受任何篩選影響,不會跟看板卡的數字打架。
+export default async function LedgerDashboardPage(
   { searchParams }: { searchParams: Promise<SP> },
 ) {
   const sp = (await searchParams) ?? {};
   const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : currentMonth();
-  const filter = (sp.filter as 'all' | 'internal' | 'external') ?? 'all';
-  const direction = (sp.direction as LedgerDirection | undefined);
-  const kind = (sp.kind as LedgerKind | undefined);
-  const statusVal: LedgerStatus = sp.status === 'voided' ? 'voided' : 'active';
-  const siteId = sp.site_id;
-  const journal = sp.journal && sp.journal in JOURNAL_KINDS ? (sp.journal as LedgerJournal) : undefined;
-  const toCheckOnly = sp.to_check === '1';
-
   const { from, to } = monthRange(month);
   const sb = getSupabaseAdmin();
 
-  let q = sb
-    .from('ledger_entries')
-    .select('*, sites(name)')
-    .gte('occurred_on', from)
-    .lte('occurred_on', to)
-    .eq('status', statusVal);
-  if (filter === 'internal') q = q.eq('is_external', false);
-  if (filter === 'external') q = q.eq('is_external', true);
-  if (direction === 'income' || direction === 'expense') q = q.eq('direction', direction);
-  if (kind) q = q.eq('kind', kind);
-  if (siteId) q = q.eq('site_id', siteId);
-  if (journal) q = q.eq('journal', journal);
-  if (toCheckOnly) q = q.eq('to_check', true);
-  q = q.order('occurred_on', { ascending: true }).order('created_at', { ascending: true });
-  const { data, error } = await q;
-  type LedgerRowWithSite = LedgerEntry & { sites?: { name: string } | null };
-  const rows: LedgerRowWithSite[] = (data ?? []) as LedgerRowWithSite[];
-  const siteName = siteId ? (rows.find((r) => r.site_id === siteId)?.sites?.name ?? null) : null;
-
-  // 合計(只算 active,不論 filter 顯示 voided 或否,摘要都以 active 為準)
-  const sumQ = await sb
+  const sumRes = await sb
     .from('ledger_entries')
     .select('direction, amount_twd, fee_twd, is_external, tax_amount_twd')
     .gte('occurred_on', from)
     .lte('occurred_on', to)
     .eq('status', 'active');
-  const sums = (sumQ.data ?? []) as Array<Pick<LedgerEntry, 'direction' | 'amount_twd' | 'fee_twd' | 'is_external' | 'tax_amount_twd'>>;
-  let income = 0, expense = 0, extIncome = 0, extTax = 0, feeTotal = 0;
-  for (const r of sums) {
-    if (r.direction === 'income') income += r.amount_twd;
-    else expense += r.amount_twd;
-    if (r.is_external) {
-      if (r.direction === 'income') extIncome += r.amount_twd;
-      extTax += r.tax_amount_twd;
-    }
-    feeTotal += r.fee_twd ?? 0;
-  }
-  // 淨額扣手續費:轉帳費是真的從戶頭出去的錢,不扣的話老闆看到的淨額會虛高。
-  const net = income - expense - feeTotal;
 
-  const kindOptions = direction === 'income' ? INCOME_KINDS
-    : direction === 'expense' ? EXPENSE_KINDS
-    : [...INCOME_KINDS, ...EXPENSE_KINDS];
-
-  const fmt = (n: number) => n.toLocaleString('zh-TW');
-
-  const base: SP = { month, filter, direction, kind, status: statusVal, site_id: siteId, journal, to_check: toCheckOnly ? '1' : undefined };
+  const summaryError = sumRes.error?.message ?? null;
+  const { income, expense, net, extIncome, extTax, feeTotal } = summarizeEntries(sumRes.data ?? []);
 
   return (
     <div className="space-y-4">
       {/* 帳簿看板:一進頁面先看「有什麼事要做」,不用自己在表格裡找 */}
       <JournalDashboard />
 
-      {journal && (
-        <div
-          className="rounded-xl px-3 py-2 text-[13px] flex items-center gap-2"
-          style={{ background: 'rgba(126,207,157,0.08)', border: '1px solid rgba(126,207,157,0.26)', color: 'var(--nm-success-glass-text)' }}
-        >
-          篩選中:「{LEDGER_JOURNAL_LABEL[journal]}」帳簿
-          <Link href={buildHref(base, { journal: undefined })} className="underline ml-auto" style={{ color: 'var(--nm-text-muted)' }}>清除篩選</Link>
-        </div>
-      )}
-
-      {toCheckOnly && (
-        <div
-          className="rounded-xl px-3 py-2 text-[13px] flex items-center gap-2"
-          style={{ background: 'rgba(217,181,107,0.09)', border: '1px solid rgba(217,181,107,0.3)', color: 'var(--nm-warning-glass-text)' }}
-        >
-          篩選中:只顯示「AI 沒把握 / 待確認」的帳目
-          <Link href={buildHref(base, { to_check: undefined })} className="underline ml-auto" style={{ color: 'var(--nm-text-muted)' }}>清除篩選</Link>
-        </div>
-      )}
-
-      {/* 頂部:月份 + 篩選 */}
+      {/* 月份導覽 */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 text-[13px]">
-          <Link
-            href={buildHref(base, { month: shiftMonth(month, -1) })}
-            className="nm-btn"
-            style={{ padding: '4px 10px', minHeight: 'auto' }}
-          >← 上月</Link>
+          <Link href={buildHref(shiftMonth(month, -1))} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto' }}>← 上月</Link>
           <span className="font-semibold min-w-[6rem] text-center" style={{ color: 'var(--nm-text-primary)' }}>{month}</span>
-          <Link
-            href={buildHref(base, { month: shiftMonth(month, 1) })}
-            className="nm-btn"
-            style={{ padding: '4px 10px', minHeight: 'auto' }}
-          >下月 →</Link>
-          <Link
-            href={buildHref(base, { month: currentMonth() })}
-            className="underline"
-            style={{ color: 'var(--nm-text-muted)', padding: '4px 8px' }}
-          >回本月</Link>
+          <Link href={buildHref(shiftMonth(month, 1))} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto' }}>下月 →</Link>
+          <Link href={buildHref(currentMonth())} className="underline" style={{ color: 'var(--nm-text-muted)', padding: '4px 8px' }}>回本月</Link>
         </div>
-
-        <div className="flex gap-1 text-[13px]">
-          {(['all', 'internal', 'external'] as const).map((f) => (
-            <Link
-              key={f}
-              href={buildHref(base, { filter: f })}
-              className={filter === f ? 'nm-btn-solid' : 'nm-btn'}
-              style={{ borderRadius: 999, padding: '4px 14px', minHeight: 'auto' }}
-            >{f === 'all' ? '全部' : f === 'internal' ? '內帳' : '外帳'}</Link>
-          ))}
-        </div>
-
-        <form action="/boss/ledger" method="get" className="flex items-center gap-2 text-[13px]">
-          <input type="hidden" name="month" value={month} />
-          <input type="hidden" name="filter" value={filter} />
-          {statusVal !== 'active' && <input type="hidden" name="status" value={statusVal} />}
-          <select
-            name="direction"
-            defaultValue={direction ?? ''}
-            className="nm-input"
-            style={{ width: 'auto', minHeight: 34, padding: '4px 10px' }}
-          >
-            <option value="">方向:全部</option>
-            <option value="income">收入</option>
-            <option value="expense">支出</option>
-          </select>
-          <select
-            name="kind"
-            defaultValue={kind ?? ''}
-            className="nm-input"
-            style={{ width: 'auto', minHeight: 34, padding: '4px 10px' }}
-          >
-            <option value="">類別:全部</option>
-            {kindOptions.map((k) => (
-              <option key={k} value={k}>{LEDGER_KIND_LABEL[k]}</option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="nm-btn"
-            style={{ padding: '4px 14px', minHeight: 'auto' }}
-          >套用</button>
-        </form>
-
-        <Link
-          href={buildHref(base, { status: statusVal === 'active' ? 'voided' : 'active' })}
-          className="text-[13px] underline ml-auto"
-          style={{ color: 'var(--nm-text-muted)' }}
-        >
-          {statusVal === 'active' ? '顯示已作廢' : '返回作用中'}
-        </Link>
       </div>
 
-      {siteId && (
+      {/* 本月摘要卡:全部帳簿、不受篩選影響——語意單一,標籤明確寫「本月全部帳簿」 */}
+      {summaryError ? (
         <div
-          className="rounded-xl px-3 py-2 text-[13px] flex items-center gap-2"
-          style={{ background: 'rgba(126,207,157,0.08)', border: '1px solid rgba(126,207,157,0.26)', color: 'var(--nm-success-glass-text)' }}
+          className="rounded-2xl px-4 py-3 text-[13px]"
+          style={{ background: 'rgba(224,122,122,0.08)', border: '1px solid rgba(224,122,122,0.34)', color: 'var(--nm-danger-glass-text)' }}
         >
-          篩選中:{siteName ? `專案「${siteName}」` : '此專案本月無資料'}
-          <Link href={buildHref(base, { site_id: undefined })} className="underline ml-auto" style={{ color: 'var(--nm-text-muted)' }}>清除篩選</Link>
+          本月摘要讀取失敗,以下數字不可信:{summaryError}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <SummaryCard label="本月收入合計(全部帳簿)" value={`$${fmt(income)}`} tone="income" />
+          <SummaryCard label="本月支出合計(全部帳簿)" value={`$${fmt(expense)}`} tone="expense" />
+          <SummaryCard label="本月淨額(已扣手續費)" value={`$${fmt(net)}`} tone={net >= 0 ? 'income' : 'expense'} />
+          <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
+            <div style={{ color: 'var(--nm-text-secondary)' }}>外帳彙總</div>
+            <div className="mt-1" style={{ color: 'var(--nm-text-body)' }}>收入合計 <span className="font-semibold">${fmt(extIncome)}</span></div>
+            <div style={{ color: 'var(--nm-text-body)' }}>稅額合計 <span className="font-semibold">${fmt(extTax)}</span></div>
+          </div>
+          <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
+            <div style={{ color: 'var(--nm-text-secondary)' }}>轉帳手續費合計</div>
+            <div className="mt-1 text-lg font-semibold" style={{ color: 'var(--nm-text-body)' }}>${fmt(feeTotal)}</div>
+          </div>
         </div>
       )}
-
-      {/* 摘要卡 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <SummaryCard label="當月收入合計" value={`$${fmt(income)}`} tone="income" />
-        <SummaryCard label="當月支出合計" value={`$${fmt(expense)}`} tone="expense" />
-        <SummaryCard label="淨額(已扣手續費)" value={`$${fmt(net)}`} tone={net >= 0 ? 'income' : 'expense'} />
-        <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
-          <div style={{ color: 'var(--nm-text-secondary)' }}>外帳彙總</div>
-          <div className="mt-1" style={{ color: 'var(--nm-text-body)' }}>收入合計 <span className="font-semibold">${fmt(extIncome)}</span></div>
-          <div style={{ color: 'var(--nm-text-body)' }}>稅額合計 <span className="font-semibold">${fmt(extTax)}</span></div>
-        </div>
-        <div className="rounded-2xl nm-raised-sm p-3 text-[13px]">
-          <div style={{ color: 'var(--nm-text-secondary)' }}>轉帳手續費合計</div>
-          <div className="mt-1 text-lg font-semibold" style={{ color: 'var(--nm-text-body)' }}>${fmt(feeTotal)}</div>
-        </div>
-      </div>
-
-      {/* 手機:卡片流 */}
-      <div className="lg:hidden flex flex-col gap-3">
-        {error && (
-          <p className="text-[13px]" style={{ color: 'var(--nm-danger)' }}>查詢失敗: {error.message}</p>
-        )}
-        {!error && rows.length === 0 && (
-          <p className="text-[13px] text-center py-6" style={{ color: 'var(--nm-text-secondary)' }}>本月沒有紀錄</p>
-        )}
-        {rows.map((r) => <LedgerRowMobile key={r.id} row={r} />)}
-      </div>
-
-      {/* 桌機:表格 */}
-      <div className="hidden lg:block rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
-        <table className="w-full text-[13px]" style={{ minWidth: 1100, borderCollapse: 'collapse' }}>
-          <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
-            <tr style={{ color: 'var(--nm-text-muted)' }}>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">日期</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">方向</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">類別</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">對象</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">案場</th>
-              <th className="text-right px-3 py-2 font-normal whitespace-nowrap">金額</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">內外帳</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">發票</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">備註</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">動作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {error && (
-              <tr><td colSpan={10} className="px-3 py-4 whitespace-nowrap" style={{ color: 'var(--nm-danger)' }}>查詢失敗: {error.message}</td></tr>
-            )}
-            {!error && rows.length === 0 && (
-              <tr><td colSpan={10} className="px-3 py-6 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>本月沒有紀錄</td></tr>
-            )}
-            {rows.map((r) => {
-              const voided = r.status === 'voided';
-              return (
-                <tr
-                  key={r.id}
-                  style={{ borderTop: '1px solid var(--nm-border-hair)', opacity: voided ? 0.5 : 1 }}
-                >
-                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.occurred_on}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {r.direction === 'income'
-                      ? <span style={{ color: 'var(--nm-success-glass-text)' }}>↑ 收</span>
-                      : <span style={{ color: 'var(--nm-danger-glass-text)' }}>↓ 支</span>}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>
-                    {LEDGER_KIND_LABEL[r.kind]}
-                    {r.source_batch_id && (
-                      <span className="nm-pill nm-pill-muted ml-2">薪資結算匯入</span>
-                    )}
-                    {r.to_check && (
-                      <span className="nm-pill nm-pill-warning ml-2">待確認</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.party ?? '—'}</td>
-                  <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>
-                    {r.sites?.name ?? <span style={{ color: 'var(--nm-text-faint)' }}>—</span>}
-                  </td>
-                  <td className={`px-3 py-2 text-right font-mono tabular whitespace-nowrap ${voided ? 'line-through' : ''}`} style={{ color: 'var(--nm-text-body)' }}>
-                    ${fmt(r.amount_twd)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <span className={`nm-pill ${r.is_external ? 'nm-pill-neutral' : 'nm-pill-muted'}`}>{r.is_external ? '外帳' : '內帳'}</span>
-                    {r.is_external && r.tax_amount_twd > 0 && (
-                      <span className="ml-1 text-xs" style={{ color: 'var(--nm-text-muted)' }}>稅 ${fmt(r.tax_amount_twd)}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {r.invoice_status === 'none' && <span style={{ color: 'var(--nm-text-secondary)' }}>—</span>}
-                    {r.invoice_status === 'to_issue' && (
-                      <span className="nm-pill nm-pill-warning">
-                        {INVOICE_STATUS_LABEL.to_issue}
-                      </span>
-                    )}
-                    {r.invoice_status === 'issued' && (
-                      <span className="nm-pill" style={{ color: 'var(--nm-success-glass-text)', background: 'rgba(126,207,157,0.1)', borderColor: 'rgba(126,207,157,0.28)' }}>
-                        {INVOICE_STATUS_LABEL.issued}
-                        {r.invoice_date && <span className="ml-1" style={{ color: 'var(--nm-text-muted)' }}>{r.invoice_date}</span>}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 max-w-[16rem]">
-                    <div className="truncate" title={r.memo ?? ''} style={{ color: 'var(--nm-text-secondary)' }}>{r.memo ?? ''}</div>
-                    {voided && r.voided_reason && (
-                      <div className="text-xs whitespace-nowrap" style={{ color: 'var(--nm-text-muted)' }}>作廢原因:{r.voided_reason}</div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {!voided && (
-                      <div className="flex gap-2 items-center">
-                        <Link
-                          href={`/boss/ledger/${r.id}`}
-                          className="underline"
-                          style={{ color: 'var(--nm-text-secondary)' }}
-                        >編輯</Link>
-                        <VoidDialog
-                          id={r.id}
-                          summary={`${r.occurred_on} · ${LEDGER_KIND_LABEL[r.kind]} · ${r.party ?? '—'} · $${fmt(r.amount_twd)}`}
-                        />
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
 
       {/* 底部按鈕列 */}
       <div className="flex flex-wrap gap-3 items-center pt-2">
-        <Link
-          href={`/boss/ledger/new?month=${month}`}
-          className="nm-btn-solid text-[13px]"
-        >新增一筆</Link>
-        <ImportBatchDialog />
-        <ExportCsvDialog defaultMonth={month} />
+        <Link href={`/boss/ledger/new?month=${month}`} className="nm-btn-solid text-[13px]">新增一筆</Link>
+        <Link href={`/boss/ledger/entries?month=${month}`} className="nm-btn text-[13px]">看全部帳目</Link>
         <Link href="/boss/ledger/receivables" className="nm-btn text-[13px]">應收應付</Link>
+        <Link href="/boss/ledger/invoices" className="nm-btn text-[13px]">待開發票</Link>
         <Link href="/boss/report" className="nm-btn text-[13px]">報表中心</Link>
       </div>
     </div>

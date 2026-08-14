@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import BossMobileDashboard from './BossMobileDashboard';
+import { taipeiCurrentMonthStr } from '@/lib/tz';
+import { summarizeEntries } from '@/lib/ledger-summary';
 
 export const dynamic = 'force-dynamic';
 
 function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return taipeiCurrentMonthStr();
 }
 
 function monthRange(month: string): { from: string; to: string } {
@@ -28,7 +29,7 @@ async function loadStats() {
   const [ledgerRes, expensesRes, draftsRes, quotesRes, equipmentRes] = await Promise.all([
     sb
       .from('ledger_entries')
-      .select('direction, amount_twd')
+      .select('direction, amount_twd, fee_twd')
       .eq('status', 'active')
       .gte('occurred_on', from)
       .lt('occurred_on', to),
@@ -39,12 +40,9 @@ async function loadStats() {
   ]);
 
   const ledgerRows = ledgerRes.data ?? [];
-  const income = ledgerRows
-    .filter((r) => r.direction === 'income')
-    .reduce((s, r) => s + (r.amount_twd ?? 0), 0);
-  const expense = ledgerRows
-    .filter((r) => r.direction === 'expense')
-    .reduce((s, r) => s + (r.amount_twd ?? 0), 0);
+  // 用 summarizeEntries 而非自己 reduce——跟 /boss/ledger、/boss/report 共用同一份
+  // 計算,一致性由建構保證,不是靠事後人工比對三頁數字。
+  const { income, expense, net } = summarizeEntries(ledgerRows);
 
   const pendingExpense = expensesRes.data ?? [];
   const pendingCount = pendingExpense.length;
@@ -61,7 +59,7 @@ async function loadStats() {
     month,
     income,
     expense,
-    net: income - expense,
+    net,
     pendingCount,
     pendingAmount,
     draftCount,
@@ -122,7 +120,7 @@ export default async function BossDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <StatCard
             href="/boss/ledger"
-            label="本月淨額"
+            label="本月淨額(已扣手續費)"
             value={`$${fmt(s.net)}`}
             hint={`收 $${fmt(s.income)} · 支 $${fmt(s.expense)}`}
             tone={s.net >= 0 ? 'positive' : 'negative'}

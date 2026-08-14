@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { fetchReceivablesWithRemaining } from '@/lib/receivables-query';
+import { fetchReceivablesWithRemaining, summarizeReceivables } from '@/lib/receivables-query';
 import { NON_OPERATING_KINDS, type LedgerEntry } from '@/lib/types';
 import { periodRange, shiftPeriod, isValidPeriodValue, currentPeriodValue, type PeriodType } from '@/lib/report-period';
 
@@ -69,8 +69,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
   // 同 /boss/ledger 口徑:淨額扣手續費,不虛高。
   const netOperating = operatingIncome - operatingExpense - feeTotal;
 
-  const openReceivableTotal = openReceivables.filter((r) => r.direction === 'receivable').reduce((s, r) => s + Math.max(0, r.remaining_twd), 0);
-  const openPayableTotal = openReceivables.filter((r) => r.direction === 'payable').reduce((s, r) => s + Math.max(0, r.remaining_twd), 0);
+  const { receivableOpenTotal: openReceivableTotal, payableOpenTotal: openPayableTotal } = summarizeReceivables(openReceivables);
 
   // 分組:排除業外/借款(kind 屬 NON_OPERATING_KINDS 的帳目不進案件類別/專案/客戶分組,只留在總覽的業外小計)
   const operatingRows = rows.filter((r) => !NON_OPERATING_KINDS.includes(r.kind));
@@ -243,7 +242,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
                     {dim === 'project' && (
                       <td className="px-3 py-2 whitespace-nowrap">
                         {periodType === 'month' ? (
-                          <Link href={`/boss/ledger?month=${value}&site_id=${g.key}`} className="underline text-xs" style={{ color: 'var(--nm-text-muted)' }}>看帳目明細</Link>
+                          <Link href={`/boss/ledger/entries?month=${value}&site_id=${g.key}`} className="underline text-xs" style={{ color: 'var(--nm-text-muted)' }}>看帳目明細</Link>
                         ) : (
                           <span className="text-xs" style={{ color: 'var(--nm-text-faint)' }}>切到月檢視可下鑽</span>
                         )}

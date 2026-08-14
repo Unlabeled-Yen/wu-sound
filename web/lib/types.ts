@@ -302,6 +302,20 @@ export const EXPENSE_KINDS: LedgerKind[] = [
   'rent', 'utility', 'tax', 'investment', 'health', 'other_expense',
 ];
 
+// kind 與方向是一對一的(INCOME_KINDS/EXPENSE_KINDS 不重疊),所以表單不用讓老闆選
+// 方向——選了帳簿、選了類別,方向就跟著定了。這條規則值得測試釘住(ledger-journal-map.test.ts),
+// 所以搬到這裡跟資料一起放,而不是埋在某個表單元件裡。
+export function directionOfKind(kind: LedgerKind): LedgerDirection {
+  return (INCOME_KINDS as LedgerKind[]).includes(kind) ? 'income' : 'expense';
+}
+
+export function journalOfKind(kind: LedgerKind, fallback: LedgerJournal): LedgerJournal {
+  for (const j of JOURNAL_ORDER) {
+    if (JOURNAL_KINDS[j].includes(kind)) return j;
+  }
+  return fallback;
+}
+
 export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   none: '不列外帳',
   to_issue: '待開立',
@@ -319,7 +333,16 @@ export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost';
 export type QuoteLineSection = '器材' | '安裝';
 export type AmpPowerMode = 'rms' | 'burst';
 export interface CatalogItem { id:string; brand:string|null; name:string; item_type:string|null; unit:string; cost_price_twd:number|null; sell_price_twd:number|null; category:string|null; note:string|null; active:boolean; created_at:string; updated_at:string; max_spl_db?:number|null; spl_ref_distance_m?:number|null; sensitivity_db_1w1m?:number|null; amp_power_w?:number|null; speaker_impedance_ohm?:number|null; amp_power_mode?:AmpPowerMode|null; coverage_h_deg?:number|null; coverage_v_deg?:number|null; }
-export interface Quote { id:string; client_name:string; project_name:string|null; status:QuoteStatus; need_text:string|null; ai_rationale:string|null; note:string|null; tax_rate:number; created_by:string; created_at:string; updated_at:string; }
+export interface Quote { id:string; client_name:string; project_name:string|null; status:QuoteStatus; need_text:string|null; ai_rationale:string|null; note:string|null; site_id:string|null; tax_rate:number; created_by:string; created_at:string; updated_at:string; }
+
+// 報價單狀態合法轉移。won/lost 是終態——已成交/未成交的單不該再被切回草稿或
+// 互轉,要重新報價就開一張新單。draft/sent 之間可以自由來回(送出前改內容很常見)。
+export const QUOTE_STATUS_TRANSITIONS: Record<QuoteStatus, QuoteStatus[]> = {
+  draft: ['sent'],
+  sent: ['draft', 'won', 'lost'],
+  won: [],
+  lost: [],
+};
 export interface QuoteLine { id:string; quote_id:string; catalog_item_id:string|null; name:string; spec:string|null; qty:number; unit:string|null; unit_price_twd:number|null; section:QuoteLineSection; is_ai_suggested:boolean; sort_order:number; created_at:string; }
 export const QUOTE_STATUS_LABEL: Record<QuoteStatus,string> = { draft:'草稿', sent:'已送出', won:'成交', lost:'未成交' };
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  INCOME_KINDS,
   JOURNAL_KINDS,
   JOURNAL_ORDER,
   LEDGER_KIND_LABEL,
@@ -10,7 +9,8 @@ import {
   LEDGER_PAYMENT_METHOD_LABEL,
   INVOICE_STATUS_LABEL,
   suggestTax,
-  type LedgerDirection,
+  directionOfKind,
+  journalOfKind,
   type LedgerKind,
   type LedgerJournal,
   type LedgerPaymentMethod,
@@ -26,19 +26,6 @@ interface Props {
   locked?: boolean; // 由月結匯入,鎖大部分欄位
   defaultMonth?: string;
   defaultJournal?: LedgerJournal;
-}
-
-// kind 與方向是一對一的(INCOME_KINDS/EXPENSE_KINDS 不重疊),所以方向不用讓老闆選,
-// 選了帳簿、選了類別,方向就跟著定了——這是拿掉一整個欄位的地方。
-function directionOfKind(kind: LedgerKind): LedgerDirection {
-  return (INCOME_KINDS as LedgerKind[]).includes(kind) ? 'income' : 'expense';
-}
-
-function journalOfKind(kind: LedgerKind, fallback: LedgerJournal): LedgerJournal {
-  for (const j of JOURNAL_ORDER) {
-    if (JOURNAL_KINDS[j].includes(kind)) return j;
-  }
-  return fallback;
 }
 
 export default function LedgerForm({ mode, initial, locked, defaultMonth, defaultJournal }: Props) {
@@ -154,7 +141,7 @@ export default function LedgerForm({ mode, initial, locked, defaultMonth, defaul
         return;
       }
       const month = occurred.slice(0, 7);
-      window.location.href = `/boss/ledger?month=${month}`;
+      window.location.href = `/boss/ledger/entries?month=${month}`;
     } catch (e) {
       setError(e instanceof Error ? e.message : '網路錯誤');
       setBusy(false);

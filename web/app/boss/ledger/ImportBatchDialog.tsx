@@ -74,6 +74,10 @@ export default function ImportBatchDialog() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="rounded-2xl nm-raised-lg max-w-md w-full p-6 space-y-4" style={{ background: 'rgba(24,24,28,0.75)' }}>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>從薪資結算匯入零用金</h2>
+            <p className="text-xs" style={{ color: 'var(--nm-text-muted)' }}>
+              這是目前的月結流程,把整月代墊金額依人彙總成一筆入帳。之後會改成收據逐筆入帳,
+              屆時這個功能會被取代——在那之前,這裡是正常的每月操作,不是待清除的殘留物。
+            </p>
 
             {result ? (
               <div className="text-[13px]" style={{ color: 'var(--nm-text-body)' }}>

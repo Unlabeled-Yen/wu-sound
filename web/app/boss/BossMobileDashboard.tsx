@@ -72,7 +72,7 @@ export default function BossMobileDashboard({ s }: { s: MobileDashStats }) {
         className="rounded-[22px] nm-raised-sm p-[22px]"
       >
         <div className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
-          本月淨額
+          本月淨額(已扣手續費)
         </div>
         <div
           className="text-[40px] font-semibold tabular-nums leading-none mt-2 tracking-[-0.01em]"
