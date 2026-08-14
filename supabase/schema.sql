@@ -270,6 +270,9 @@ create table receivables (
   total_amount_twd integer not null check (total_amount_twd > 0),
   memo text,
   status receivable_status not null default 'open',
+  -- 約定收款日(應收)/到期日(應付),見 018。可為 NULL——舊約定與未填的新約定一律留空,
+  -- 帳務首頁的未來四週現金分桶要把 NULL 獨立列成「未排定」,不可預設塞進某一週。
+  agreed_due_date date,
   created_by uuid not null references users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -374,6 +377,7 @@ select
   r.total_amount_twd,
   r.memo,
   r.status,
+  r.agreed_due_date,
   r.created_by,
   r.created_at,
   r.updated_at,

@@ -229,6 +229,9 @@ export interface Receivable {
   total_amount_twd: number;
   memo: string | null;
   status: ReceivableStatus;
+  /** 約定收款日(應收)/到期日(應付)。可為 null——2026-08 前建立的約定與任何未填的
+   *  新約定都是 null,代表「沒有約定明確日期」,不可當成「今天到期」處理。 */
+  agreed_due_date: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
