@@ -22,6 +22,7 @@ export async function GET(req: Request) {
   const category = url.searchParams.get('category') || '';
   const status = url.searchParams.get('status') || '';
   const site_id = url.searchParams.get('site_id') || '';
+  const includeRetired = url.searchParams.get('include_retired') === '1';
   const limitRaw = parseInt(url.searchParams.get('limit') || '200', 10);
   const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 200, 1), 500);
 
@@ -40,6 +41,11 @@ export async function GET(req: Request) {
   }
   if (status && STATUSES.includes(status as EquipmentStatus)) {
     query = query.eq('status', status);
+  } else if (!includeRetired) {
+    // 沒有指定明確狀態時,預設排除已淘汰的設備——之前這裡不過濾,員工端如果
+    // 直接呼叫這支 API(目前 repo 內沒有,但這支端點是開放給登入者用的)會看到
+    // 已淘汰設備混在正常清單裡。想看已淘汰的,明確帶 include_retired=1。
+    query = query.neq('status', 'retired');
   }
   if (site_id) {
     query = query.eq('current_site_id', site_id);

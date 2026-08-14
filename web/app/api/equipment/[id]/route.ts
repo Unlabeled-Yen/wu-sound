@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { computeChangedFields, retireEquipmentCore } from '@/lib/equipment-actions';
 
 export const runtime = 'nodejs';
 
@@ -70,11 +71,9 @@ export async function PATCH(
   if (cur.error) return NextResponse.json({ error: `查詢失敗: ${cur.error.message}` }, { status: 500 });
   if (!cur.data) return NextResponse.json({ error: '找不到設備' }, { status: 404 });
 
-  const before: Record<string, unknown> = {};
-  const after: Record<string, unknown> = {};
-  for (const k of Object.keys(patch)) {
-    before[k] = (cur.data as any)[k];
-    after[k] = patch[k];
+  const { before, after } = computeChangedFields(cur.data as Record<string, unknown>, patch);
+  if (Object.keys(after).length === 0) {
+    return NextResponse.json({ ok: true, equipment: cur.data });
   }
 
   const upd = await sb.from('equipment').update(patch).eq('id', id).select('*').single();
@@ -102,37 +101,8 @@ export async function DELETE(
   if (!id) return NextResponse.json({ error: '缺少 id' }, { status: 400 });
 
   const sb = getSupabaseAdmin();
-  const cur = await sb.from('equipment').select('*').eq('id', id).maybeSingle();
-  if (cur.error) return NextResponse.json({ error: `查詢失敗: ${cur.error.message}` }, { status: 500 });
-  if (!cur.data) return NextResponse.json({ error: '找不到設備' }, { status: 404 });
-
-  if (cur.data.status === 'retired') {
-    return NextResponse.json({ error: '此設備已淘汰' }, { status: 400 });
-  }
-
-  const before = { status: cur.data.status, current_site_id: cur.data.current_site_id };
-  const after = { status: 'retired' as const, current_site_id: null };
-
-  const upd = await sb.from('equipment').update(after).eq('id', id);
-  if (upd.error) return NextResponse.json({ error: `刪除失敗: ${upd.error.message}` }, { status: 500 });
-
-  await sb.from('equipment_movements').insert({
-    equipment_id: id,
-    moved_by: session.id,
-    from_status: before.status,
-    to_status: 'retired',
-    from_site_id: before.current_site_id,
-    to_site_id: null,
-    notes: '軟刪除:淘汰',
-  });
-
-  await sb.from('audit_log').insert({
-    actor_id: session.id,
-    action: 'equipment.retire',
-    target_table: 'equipment',
-    target_id: id,
-    diff: { before, after },
-  });
+  const result = await retireEquipmentCore(sb, id, session.id);
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
 
   return NextResponse.json({ ok: true });
 }

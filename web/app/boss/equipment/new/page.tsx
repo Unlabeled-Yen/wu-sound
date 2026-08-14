@@ -79,11 +79,11 @@ export default function NewEquipmentPage() {
             <input value={model_number} onChange={(e) => setModel(e.target.value)} className="nm-input w-full text-[13.5px]" />
           </Field>
         </div>
-        <Field label="序號">
+        <Field label="序號 · 系統不檢查是否重複,同序號可能對應多筆設備紀錄">
           <input value={serial_number} onChange={(e) => setSerial(e.target.value)} className="nm-input w-full text-[13.5px]" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="數量">
+          <Field label="數量 · 這批會整批一起移動,不支援拆開部分調度">
             <input type="number" min={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} className="nm-input w-full text-[13.5px]" />
           </Field>
           <Field label="單位">

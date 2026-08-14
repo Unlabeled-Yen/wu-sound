@@ -101,9 +101,9 @@ export default async function EquipmentDetailPage({
             </F>
             <F label="品牌"><input name="brand" defaultValue={data.brand ?? ''} className={inp} /></F>
             <F label="型號"><input name="model_number" defaultValue={data.model_number ?? ''} className={inp} /></F>
-            <F label="序號"><input name="serial_number" defaultValue={data.serial_number ?? ''} className={inp} /></F>
+            <F label="序號 · 系統不檢查是否重複"><input name="serial_number" defaultValue={data.serial_number ?? ''} className={inp} /></F>
             <div className="grid grid-cols-2 gap-2">
-              <F label="數量"><input name="quantity" type="number" min={1} defaultValue={data.quantity} className={inp} /></F>
+              <F label="數量 · 整批一起移動,不支援部分調度"><input name="quantity" type="number" min={1} defaultValue={data.quantity} className={inp} /></F>
               <F label="單位"><input name="unit" defaultValue={data.unit} className={inp} /></F>
             </div>
           </div>
@@ -121,7 +121,10 @@ export default async function EquipmentDetailPage({
             <div className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>狀態 · 位置</div>
             <div className="text-lg" style={{ color: 'var(--nm-text-body)' }}>{formatEquipmentLocation(data.status, data.sites?.name)}</div>
           </div>
-          <MoveDialog equipmentId={data.id} currentStatus={data.status} currentSiteId={data.current_site_id} />
+          {/* 已淘汰是終態,不提供移動入口——想再啟用要重新登記,不是「移動」回來。 */}
+          {data.status !== 'retired' && (
+            <MoveDialog equipmentId={data.id} currentStatus={data.status} currentSiteId={data.current_site_id} />
+          )}
         </div>
       </section>
 
