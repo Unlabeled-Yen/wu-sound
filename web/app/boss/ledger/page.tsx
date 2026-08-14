@@ -5,6 +5,7 @@ import ImportBatchDialog from './ImportBatchDialog';
 import ExportCsvDialog from './ExportCsvDialog';
 import { AllView } from './AllView';
 import { SettledView, ReceivablesView } from './SettledReceivablesViews';
+import { FilterDrawer } from './FilterDrawer';
 import { buildHref, currentMonth, shiftMonth, NO_SITE, type Mode, type SP } from './ledger-page-helpers';
 
 export const dynamic = 'force-dynamic';
@@ -43,46 +44,54 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
 
   const base: SP = { month, mode, site_id: siteId, kind, invoice, to_check: toCheckOnly ? '1' : undefined, ext, show_voided: showVoided ? '1' : undefined };
   const siteName = siteId && siteId !== NO_SITE ? sites.find((s) => s.id === siteId)?.name ?? null : null;
+  const activeFilterLabels = [
+    siteId ? (siteId === NO_SITE ? '專案外' : '歸屬') : null,
+    kind ? '分類' : null,
+    invoice ? '發票' : null,
+    ext ? (ext === 'internal' ? '內帳' : '外帳') : null,
+  ].filter((x): x is string => x !== null);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>帳務</h1>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {(mode === 'settled' || mode === 'all') && (
+            <div className="flex items-center gap-2 text-[13px]">
+              <Link href={buildHref(base, { month: shiftMonth(month === 'all' ? currentMonth() : month, -1) })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto' }}>← 上月</Link>
+              <span className="font-semibold min-w-[6rem] text-center" style={{ color: 'var(--nm-text-primary)' }}>
+                {month === 'all' ? '不限月份' : month}
+              </span>
+              <Link href={buildHref(base, { month: shiftMonth(month === 'all' ? currentMonth() : month, 1) })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto' }}>下月 →</Link>
+              {month !== currentMonth() && (
+                <Link href={buildHref(base, { month: currentMonth() })} className="underline" style={{ color: 'var(--nm-text-muted)', padding: '4px 8px' }}>回本月</Link>
+              )}
+            </div>
+          )}
           <Link href={`/boss/ledger/new?month=${month === 'all' ? currentMonth() : month}`} className="nm-btn-solid text-[13px]">記一筆</Link>
         </div>
       </div>
 
-      {/* 待處理:全部不限月份,點了直接套對應篩選。手機橫向可捲,避免擠壓換行。 */}
-      {(toIssueCount > 0 || toCheckCount > 0 || overpaidCount > 0 || pettycashCount > 0) && (
-        <div className="flex flex-nowrap overflow-x-auto gap-2 text-[13px] pb-1">
+      {/* 待處理:桌機是一行黃字摘要(取代原本一整排pill);手機維持pill——兩個斷點的
+          原型(7a／2b)本來就不同待遇,不是同一份東西縮放。手機橫向可捲動,不擠壓換行。 */}
+      {(toIssueCount > 0 || toCheckCount > 0 || overpaidCount > 0) && (
+        <div className="lg:hidden flex flex-nowrap overflow-x-auto gap-1.5 text-[11.5px]">
           {toIssueCount > 0 && (
-            <Link href={buildHref(base, { mode: 'settled', month: 'all', invoice: 'to_issue' })} className="nm-pill nm-pill-warning shrink-0">
-              {toIssueCount} 筆待開發票
-            </Link>
-          )}
-          {toCheckCount > 0 && (
-            <Link href={buildHref(base, { mode: 'settled', month: 'all', to_check: '1' })} className="nm-pill nm-pill-warning shrink-0">
-              {toCheckCount} 筆 AI 待確認
-            </Link>
+            <Link href={buildHref(base, { mode: 'settled', month: 'all', invoice: 'to_issue' })} className="nm-pill nm-pill-warning shrink-0">待開發票 {toIssueCount}</Link>
           )}
           {overpaidCount > 0 && (
-            <Link href={buildHref(base, { mode: 'receivable' })} className="nm-pill shrink-0" style={{ color: 'var(--nm-danger-glass-text)', background: 'rgba(224,122,122,0.1)', borderColor: 'rgba(224,122,122,0.3)' }}>
-              {overpaidCount} 筆超收/超付
-            </Link>
+            <Link href={buildHref(base, { mode: 'receivable' })} className="nm-pill nm-pill-danger shrink-0" style={{ fontWeight: 600 }}>超收 {overpaidCount}</Link>
           )}
-          {pettycashCount > 0 && (
-            <Link href="/boss/expenses" className="nm-pill shrink-0">
-              {pettycashCount} 筆零用金待審
-            </Link>
+          {toCheckCount > 0 && (
+            <Link href={buildHref(base, { mode: 'settled', month: 'all', to_check: '1' })} className="nm-pill nm-pill-warning shrink-0">AI {toCheckCount}</Link>
           )}
         </div>
       )}
 
-      {/* 模式切換:全部(帳面)vs 已收付 vs 應收未收 vs 應付未付——已收跟未收永遠分開標,不相加成單一數字。
-          手機橫向可捲動,不擠壓換行。 */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1 text-[13px] flex-nowrap overflow-x-auto pb-1">
+      {/* 模式切換:一顆軌道裡的分段(nm-inset track),不是四顆各自帶邊框的按鈕——
+          照抄原型 7a 的 inline style。手機橫向可捲動,不擠壓換行。 */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="nm-inset flex gap-1.5 text-[13px] flex-nowrap overflow-x-auto" style={{ borderRadius: 999, padding: 4, color: 'var(--nm-text-secondary)' }}>
           {([
             ['all', '全部'],
             ['settled', '已收付'],
@@ -92,31 +101,36 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
             <Link
               key={m}
               href={buildHref(base, { mode: m })}
-              className={`shrink-0 ${mode === m ? 'nm-btn-solid' : 'nm-btn'}`}
-              style={{ borderRadius: 999, padding: '4px 14px', minHeight: 'auto' }}
+              className="shrink-0"
+              style={
+                mode === m
+                  ? { borderRadius: 999, padding: '6px 14px', background: '#f0f0f2', color: '#17171a', fontWeight: 500 }
+                  : { borderRadius: 999, padding: '6px 14px' }
+              }
             >{label}</Link>
           ))}
         </div>
 
-        {(mode === 'settled' || mode === 'all') && (
-          <div className="flex items-center gap-2 text-[13px]">
-            <Link href={buildHref(base, { month: shiftMonth(month === 'all' ? currentMonth() : month, -1) })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto' }}>← 上月</Link>
-            <span className="font-semibold min-w-[6rem] text-center" style={{ color: 'var(--nm-text-primary)' }}>
-              {month === 'all' ? '不限月份' : month}
-            </span>
-            <Link href={buildHref(base, { month: shiftMonth(month === 'all' ? currentMonth() : month, 1) })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto' }}>下月 →</Link>
-            {month !== currentMonth() && (
-              <Link href={buildHref(base, { month: currentMonth() })} className="underline" style={{ color: 'var(--nm-text-muted)', padding: '4px 8px' }}>回本月</Link>
-            )}
+        {(toIssueCount > 0 || toCheckCount > 0 || overpaidCount > 0) && (
+          <div className="hidden lg:block text-[12.5px]" style={{ color: 'var(--nm-warning-glass-text)' }}>
+            {[
+              toIssueCount > 0 ? <Link key="issue" href={buildHref(base, { mode: 'settled', month: 'all', invoice: 'to_issue' })}>待開發票 {toIssueCount}</Link> : null,
+              toCheckCount > 0 ? <Link key="check" href={buildHref(base, { mode: 'settled', month: 'all', to_check: '1' })}>AI 待確認 {toCheckCount}</Link> : null,
+              overpaidCount > 0 ? <Link key="over" href={buildHref(base, { mode: 'receivable' })}>超收/超付 {overpaidCount}</Link> : null,
+            ].filter(Boolean).reduce((acc: React.ReactNode[], el, i) => (i === 0 ? [el] : [...acc, '　·　', el]), [])}
           </div>
+        )}
+        {pettycashCount > 0 && (
+          <Link href="/boss/expenses" className="nm-pill shrink-0">{pettycashCount} 筆零用金待審</Link>
         )}
       </div>
 
       {/* 歸屬篩選:專案內(選特定案場)/ 專案外(依分類)/ 全部——兩種模式共用同一個案場篩選。
-          手機橫向可捲動,取代原型的抽屜——這個系統的篩選一律走無 JS 的原生 <form>,
-          沒有既有的抽屜元件可沿用,橫向捲動同樣達到「不擠壓版面」的效果。 */}
+          桌機常駐橫排;手機收進☰抽屜(規格明講,原型 2b 也是這樣)——同一份欄位在
+          兩個斷點各自一份 <form method="get">,無 JS 也能用,跟本頁其他區塊的
+          手機/桌機雙份 markup 慣例一致。 */}
       <div className="flex flex-wrap items-center gap-3">
-        <form action="/boss/ledger" method="get" className="flex flex-nowrap overflow-x-auto items-center gap-2 text-[13px] pb-1">
+        <form action="/boss/ledger" method="get" className="hidden lg:flex flex-nowrap overflow-x-auto items-center gap-2 text-[13px] pb-1">
           <input type="hidden" name="mode" value={mode} />
           {month !== currentMonth() && <input type="hidden" name="month" value={month} />}
           <select name="site_id" defaultValue={siteId ?? ''} className="nm-input shrink-0" style={{ width: 'auto', minHeight: 34, padding: '4px 10px' }}>
@@ -145,6 +159,51 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
           )}
           <button type="submit" className="nm-btn shrink-0" style={{ padding: '4px 14px', minHeight: 'auto' }}>套用</button>
         </form>
+
+        <FilterDrawer activeCount={activeFilterLabels.length} activeSummary={activeFilterLabels.join('・')}>
+          <form action="/boss/ledger" method="get" className="flex flex-col gap-3 text-[13px]">
+            <input type="hidden" name="mode" value={mode} />
+            {month !== currentMonth() && <input type="hidden" name="month" value={month} />}
+            <label className="flex flex-col gap-1">
+              <span style={{ color: 'var(--nm-text-secondary)' }}>歸屬</span>
+              <select name="site_id" defaultValue={siteId ?? ''} className="nm-input">
+                <option value="">全部</option>
+                <option value={NO_SITE}>— 專案外 —</option>
+                {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+            {(mode === 'settled' || mode === 'all') && (
+              <>
+                <label className="flex flex-col gap-1">
+                  <span style={{ color: 'var(--nm-text-secondary)' }}>分類</span>
+                  <select name="kind" defaultValue={kind ?? ''} className="nm-input">
+                    <option value="">全部</option>
+                    {ALL_KINDS.map((k) => <option key={k} value={k}>{LEDGER_KIND_LABEL[k]}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span style={{ color: 'var(--nm-text-secondary)' }}>發票</span>
+                  <select name="invoice" defaultValue={invoice ?? ''} className="nm-input">
+                    <option value="">全部</option>
+                    <option value="none">不列外帳</option>
+                    <option value="to_issue">待開立</option>
+                    <option value="issued">已開立</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span style={{ color: 'var(--nm-text-secondary)' }}>內外帳</span>
+                  <select name="ext" defaultValue={ext ?? ''} className="nm-input">
+                    <option value="">全部</option>
+                    <option value="internal">內帳</option>
+                    <option value="external">外帳</option>
+                  </select>
+                </label>
+              </>
+            )}
+            <button type="submit" className="nm-btn-solid mt-2">套用</button>
+          </form>
+        </FilterDrawer>
+
         {(siteId || kind || invoice || ext || toCheckOnly) && (
           <Link href={buildHref(base, { site_id: undefined, kind: undefined, invoice: undefined, ext: undefined, to_check: undefined })} className="text-[13px] underline" style={{ color: 'var(--nm-text-muted)' }}>
             清除篩選

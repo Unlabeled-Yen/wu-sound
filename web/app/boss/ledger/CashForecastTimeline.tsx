@@ -13,13 +13,8 @@ function weekLabel(w: { from: string; to: string }, idx: number): string {
 //
 // 全部是預估(依約定日推算),資料層與已收付彙總分開回傳,這裡不做任何「這筆錢
 // 一定會準時進來」的假設——如期與逾期用不同顏色區分,未排定日期的金額獨立顯示,
-// 不會被藏進某一週假裝已經排定。
+// 不會被藏進某一週假裝已經排定。0 元的週不畫色塊,不硬湊一個 $0 佔位。
 export function CashForecastTimeline({ forecast }: { forecast: CashForecast }) {
-  const maxAmount = Math.max(
-    1,
-    ...forecast.weeks.map((w) => w.incomeTwd),
-    ...forecast.weeks.map((w) => w.expenseTwd),
-  );
   const hasUnscheduled = forecast.unscheduledIncomeTwd > 0 || forecast.unscheduledExpenseTwd > 0;
   const hasBeyond = forecast.beyondIncomeTwd > 0 || forecast.beyondExpenseTwd > 0;
 
@@ -30,37 +25,39 @@ export function CashForecastTimeline({ forecast }: { forecast: CashForecast }) {
         <div className="text-[12px]" style={{ color: 'var(--nm-text-faint)' }}>依約定收款日／到期日排入週次,全是預估,不與已收付合計</div>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3">
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
         {forecast.weeks.map((w, idx) => {
-          const incomePct = (w.incomeTwd / maxAmount) * 100;
-          const expensePct = (w.expenseTwd / maxAmount) * 100;
           const overdueInWeek0 = idx === 0 && (forecast.overdueIncomeTwd > 0 || forecast.overdueExpenseTwd > 0);
           return (
-            <div key={idx}>
-              <div className="flex items-center justify-between text-[12px] mb-1">
-                <span style={{ color: 'var(--nm-text-secondary)' }}>{weekLabel(w, idx)}</span>
-                {overdueInWeek0 && (
-                  <span className="nm-pill" style={{ color: 'var(--nm-danger-glass-text)', background: 'rgba(224,122,122,0.1)', borderColor: 'rgba(224,122,122,0.3)' }}>
-                    含已逾期 收 ${fmt(forecast.overdueIncomeTwd)} · 付 ${fmt(forecast.overdueExpenseTwd)}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-8 text-[11px] shrink-0" style={{ color: 'var(--nm-success-glass-text)' }}>進帳</span>
-                  <div className="flex-1 h-4 rounded overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    {w.incomeTwd > 0 && <div className="h-full rounded" style={{ width: `${incomePct}%`, background: 'var(--nm-success-glass-text)' }} />}
-                  </div>
-                  <span className="w-24 text-right text-[12px] tabular-nums shrink-0" style={{ color: 'var(--nm-text-body)' }}>${fmt(w.incomeTwd)}</span>
+            <div key={idx} className="flex flex-col gap-1.5">
+              <div className="text-[12px]" style={{ color: 'var(--nm-text-secondary)' }}>{weekLabel(w, idx)}</div>
+              <div className="text-[11px] mb-0.5" style={{ color: 'var(--nm-text-faint)' }}>當週進帳</div>
+              {w.incomeTwd > 0 ? (
+                <div
+                  className="rounded-lg px-2.5 py-1.5 text-[13px] font-semibold tabular-nums"
+                  style={{ background: 'var(--nm-success)', color: '#0f1f16' }}
+                >
+                  +${fmt(w.incomeTwd)}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-8 text-[11px] shrink-0" style={{ color: 'var(--nm-danger-glass-text)' }}>付出</span>
-                  <div className="flex-1 h-4 rounded overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    {w.expenseTwd > 0 && <div className="h-full rounded" style={{ width: `${expensePct}%`, background: 'var(--nm-danger-glass-text)' }} />}
-                  </div>
-                  <span className="w-24 text-right text-[12px] tabular-nums shrink-0" style={{ color: 'var(--nm-text-body)' }}>${fmt(w.expenseTwd)}</span>
+              ) : (
+                <div className="text-[12px]" style={{ color: 'var(--nm-text-faint)' }}>—</div>
+              )}
+              <div className="text-[11px] mt-1 mb-0.5" style={{ color: 'var(--nm-text-faint)' }}>當週付出</div>
+              {w.expenseTwd > 0 ? (
+                <div
+                  className="rounded-lg px-2.5 py-1.5 text-[13px] font-semibold tabular-nums"
+                  style={{ background: 'var(--nm-danger)', color: '#2a0f0f' }}
+                >
+                  -${fmt(w.expenseTwd)}
                 </div>
-              </div>
+              ) : (
+                <div className="text-[12px]" style={{ color: 'var(--nm-text-faint)' }}>—</div>
+              )}
+              {overdueInWeek0 && (
+                <div className="text-[10.5px] mt-1" style={{ color: 'var(--nm-danger-glass-text)' }}>
+                  含已逾期 收 ${fmt(forecast.overdueIncomeTwd)} · 付 ${fmt(forecast.overdueExpenseTwd)}
+                </div>
+              )}
             </div>
           );
         })}
