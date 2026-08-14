@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import ViewportLock from '@/app/_shared/ViewportLock';
+import { fetchTenderRadar } from '@/lib/tender-radar';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,26 +35,10 @@ interface LoadResult {
 }
 
 async function loadAgencies(minCases: number): Promise<LoadResult> {
-  const base = process.env.TENDER_RADAR_API_URL;
-  const token = process.env.TENDER_RADAR_API_TOKEN;
-  if (!base || !token) {
-    return { agencies: [], computedAt: null, error: '標案雷達連線尚未設定(缺 TENDER_RADAR_API_URL/TOKEN)' };
-  }
-  try {
-    const res = await fetch(`${base}/api/market/agencies?min=${minCases}&limit=40`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    });
-    if (!res.ok) return { agencies: [], computedAt: null, error: `標案雷達回應異常:HTTP ${res.status}` };
-    const json = (await res.json()) as { agencies: Agency[]; computed_at: string | null };
-    return { agencies: json.agencies, computedAt: json.computed_at, error: null };
-  } catch (err) {
-    return {
-      agencies: [],
-      computedAt: null,
-      error: `連線標案雷達失敗:${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
+  const { data, error } = await fetchTenderRadar<{ agencies: Agency[]; computed_at: string | null }>(
+    `/api/market/agencies?min=${minCases}&limit=40`,
+  );
+  return { agencies: data?.agencies ?? [], computedAt: data?.computed_at ?? null, error };
 }
 
 // 距今幾個月。政府採購有年度預算週期,「多久沒發案」比「發過幾案」更能

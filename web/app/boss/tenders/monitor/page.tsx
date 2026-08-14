@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import ViewportLock from '@/app/_shared/ViewportLock';
+import { fetchTenderRadar } from '@/lib/tender-radar';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,6 +37,47 @@ interface AgencyCompetition {
   excludedPerformance?: number;
 }
 
+// A 計劃(歷史決標參考)卡片。docs/handoff-base-price-card.md §2c。
+// tier 對齊機關雷達同一套小樣本誠實邏輯:none=無資料、raw=1-2筆(列原始
+// 比值不算統計量)、range_median=3-9筆(範圍+中位數)、quartile=≥10筆
+// (加四分位數)。
+interface RatioStats {
+  n: number;
+  tier: 'none' | 'raw' | 'range_median' | 'quartile';
+  ratios?: number[];
+  min?: number;
+  max?: number;
+  median?: number;
+  q1?: number;
+  q3?: number;
+}
+
+interface GroupedStats {
+  best_value: RatioStats;
+  lowest_bid: RatioStats;
+  other: RatioStats;
+  totalN: number;
+}
+
+// group_labels 是分類名稱的顯示文字,由 API 送——wu-sound 是公開 repo,
+// 不能把這幾個分類名稱寫死在前端原始碼裡(見 handoff §1a)。
+interface BasePriceCardData {
+  // 明確排除 'other'(而非用 string)——這樣 `bp.domain === 'other'` 才能讓
+  // TypeScript 正確做判別聯集窄化,窄化後 TS 才知道剩下的分支一定有
+  // headline/stats 等欄位。
+  domain: 'audio' | 'fire' | 'hvac' | 'it';
+  headline: string;
+  confidence: 'insufficient' | 'low' | 'medium' | 'high';
+  source: 'agency' | 'county' | 'market';
+  source_label: string;
+  stats: GroupedStats;
+  group_labels: Record<'best_value' | 'lowest_bid' | 'other', string>;
+}
+
+// domain='other' 時不適用(不是錯誤),整塊不顯示;null 是查詢失敗
+// (不同於 agency_competition,這裡多一個「不適用」狀態要處理)。
+type BasePriceField = BasePriceCardData | { domain: 'other' };
+
 interface TenderHit {
   id: string;
   job_number: string;
@@ -55,6 +97,7 @@ interface TenderHit {
   price_band?: PriceBand;
   nature?: Nature;
   agency_competition?: AgencyCompetition | null;
+  base_price?: BasePriceField | null;
 }
 
 interface LoadResult {
@@ -68,25 +111,8 @@ const PRICE_ORDER = ['micro', 'small', 'medium', 'large', 'undisclosed', 'unknow
 const NATURE_ORDER = ['install', 'procure', 'maintain', 'event', 'service', 'unclassified'] as const;
 
 async function loadRecentTenders(days: number): Promise<LoadResult> {
-  const base = process.env.TENDER_RADAR_API_URL;
-  const token = process.env.TENDER_RADAR_API_TOKEN;
-  if (!base || !token) {
-    return { hits: [], error: '標案雷達連線尚未設定(缺 TENDER_RADAR_API_URL/TOKEN)' };
-  }
-
-  try {
-    const res = await fetch(`${base}/api/tenders/recent?days=${days}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      return { hits: [], error: `標案雷達回應異常:HTTP ${res.status}` };
-    }
-    const json = (await res.json()) as { hits: TenderHit[] };
-    return { hits: json.hits, error: null };
-  } catch (err) {
-    return { hits: [], error: `連線標案雷達失敗:${err instanceof Error ? err.message : String(err)}` };
-  }
+  const { data, error } = await fetchTenderRadar<{ hits: TenderHit[] }>(`/api/tenders/recent?days=${days}`);
+  return { hits: data?.hits ?? [], error };
 }
 
 function formatBudget(hit: TenderHit): string {
@@ -165,6 +191,82 @@ function agencyRadarText(a: AgencyCompetition): { text: string; hint: string } {
     text: `近 3 年 ${a.n} 件可競爭的音響案 · ${a.soloCount} 件只有一家投標(${pct}%,真實值 ${Math.round(lo * 100)}–${Math.round(hi * 100)}%${thin})${perfNote}`,
     hint: `平均每案 ${a.avgBidders?.toFixed(1)} 家投標。「真實值」是 95% 信賴區間——樣本越少區間越寬,不能只看前面那個百分比`,
   };
+}
+
+// 比例轉百分比字串,跟後端 base-price.ts 的 formatPct 同規則(1 位小數,
+// 整數時不留 .0 尾巴)——前端這裡是為了展開細節裡的原始比值(raw tier)
+// 才需要自己格式化,headline 本身已經是後端組好的完整字串,不用再處理。
+function formatRatioPct(ratio: number): string {
+  const p = Math.round(ratio * 1000) / 10;
+  return `${Number.isInteger(p) ? p : p.toFixed(1)}%`;
+}
+
+function RatioGroupDetail({ label, stats }: { label: string; stats: RatioStats }) {
+  if (stats.tier === 'none') return null; // n=0 的分組不佔版面
+  return (
+    <p className="text-xs" style={{ color: 'var(--nm-text-secondary)' }}>
+      <span style={{ color: 'var(--nm-text-primary)' }}>{label}</span>
+      {'　'}
+      {stats.tier === 'raw' ? (
+        <span>{stats.ratios!.map(formatRatioPct).join('、')}(僅 {stats.n} 筆,非統計量)</span>
+      ) : (
+        <span>
+          {stats.n} 筆 · 範圍 {formatRatioPct(stats.min!)}–{formatRatioPct(stats.max!)} · 中位{' '}
+          {formatRatioPct(stats.median!)}
+          {stats.tier === 'quartile' && ` · Q1 ${formatRatioPct(stats.q1!)} / Q3 ${formatRatioPct(stats.q3!)}`}
+        </span>
+      )}
+    </p>
+  );
+}
+
+// 歷史決標參考卡片(A 計劃前端,docs/handoff-base-price-card.md §3)。
+// 三種異常態各自處理,不能混用同一種顯示(§1d):
+//   undefined → 舊版 Worker 沒有這欄位,整塊不渲染(跟 hasClassification
+//     判斷同一邏輯,但這裡是逐案判斷)
+//   null      → 查詢失敗,紅字「歷史參考載入失敗」
+//   {domain:'other'} → 不適用(非四領域案件),整塊不顯示,不是錯誤
+// 用原生 <details>/<summary> 做行內展開,不需要 client component、不跳轉。
+function BasePriceCard({ bp }: { bp: BasePriceField | null | undefined }) {
+  if (bp === undefined) return null;
+  if (bp === null) {
+    return (
+      <p className="mt-2 text-xs" style={{ color: 'var(--nm-danger-glass-text)' }}>
+        ⚠️ 歷史參考載入失敗
+      </p>
+    );
+  }
+  if (bp.domain === 'other') return null;
+
+  // source='agency' 是本機關自己的數據,一般底色;county/market 是借來的
+  // 退階基線,警示底色+⚠️前綴——老闆掃過去一眼要能分辨兩者(§1c)。
+  const isFallback = bp.source !== 'agency';
+  const dim = bp.confidence === 'insufficient' || bp.confidence === 'low';
+
+  return (
+    <details className="mt-2">
+      <summary
+        className="cursor-pointer list-none text-xs"
+        style={{ color: dim ? 'var(--nm-text-muted)' : 'var(--nm-text-secondary)' }}
+      >
+        {isFallback && (
+          <span
+            className="mr-1 rounded-full px-1.5 py-0.5"
+            style={{ background: 'rgba(224,179,80,0.14)', color: '#c99a3a' }}
+          >
+            ⚠️ {bp.source_label}
+          </span>
+        )}
+        {bp.headline}
+        <span className="ml-1" style={{ color: 'var(--nm-text-faint)' }}>▾</span>
+      </summary>
+      <div className="mt-1.5 space-y-1 rounded-lg p-2" style={{ background: 'rgba(120,144,156,0.08)' }}>
+        <RatioGroupDetail label={bp.group_labels.best_value} stats={bp.stats.best_value} />
+        <RatioGroupDetail label={bp.group_labels.lowest_bid} stats={bp.stats.lowest_bid} />
+        <RatioGroupDetail label={bp.group_labels.other} stats={bp.stats.other} />
+      </div>
+    </details>
+  );
 }
 
 interface ViewParams {
@@ -391,6 +493,8 @@ function TenderCard({ hit }: { hit: TenderHit }) {
           </p>
         );
       })()}
+
+      <BasePriceCard bp={hit.base_price} />
 
       <div className="mt-2 text-xs">
         {hasLink ? (

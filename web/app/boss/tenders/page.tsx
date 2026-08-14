@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
+import { fetchTenderRadar } from '@/lib/tender-radar';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,25 +64,8 @@ interface LoadResult {
 }
 
 async function loadBidPlan(): Promise<LoadResult> {
-  const base = process.env.TENDER_RADAR_API_URL;
-  const token = process.env.TENDER_RADAR_API_TOKEN;
-  if (!base || !token) {
-    return { plan: null, error: '標案雷達連線尚未設定(缺 TENDER_RADAR_API_URL/TOKEN)' };
-  }
-
-  try {
-    const res = await fetch(`${base}/api/meta/bid-plan`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      return { plan: null, error: `標案雷達回應異常:HTTP ${res.status}` };
-    }
-    const json = (await res.json()) as BidPlanResponse;
-    return { plan: json, error: null };
-  } catch (err) {
-    return { plan: null, error: `連線標案雷達失敗:${err instanceof Error ? err.message : String(err)}` };
-  }
+  const { data, error } = await fetchTenderRadar<BidPlanResponse>('/api/meta/bid-plan');
+  return { plan: data, error };
 }
 
 const STATUS_LABEL: Record<ItemStatus, string> = {
