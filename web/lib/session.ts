@@ -2,6 +2,7 @@ import 'server-only';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { cookies } from 'next/headers';
 import type { SessionUser } from './types';
+import { getSupabaseAdmin } from './supabase';
 
 const COOKIE_NAME = 'sess';
 const TTL_SECONDS = 60 * 60 * 24 * 14; // 14 days
@@ -72,6 +73,15 @@ export async function getSession(): Promise<SessionUser | null> {
   }
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
   if (!payload.id || !payload.name || !payload.role) return null;
+
+  // session cookie 14 天內不查 DB,role 直接簽在 payload 裡——這代表老闆停用
+  // 某員工後,對方手上的舊 session 理論上還能繼續操作到 cookie 過期。這裡補一次
+  // 輕量的 active 檢查,讓停用立即生效,不用等 14 天。查 users 表用 id(有索引),
+  // 單筆查詢成本低,換來的是「停用」這個動作真的當下就生效。
+  const sb = getSupabaseAdmin();
+  const { data: user } = await sb.from('users').select('active').eq('id', payload.id).maybeSingle();
+  if (!user || !user.active) return null;
+
   return { id: payload.id, name: payload.name, role: payload.role };
 }
 

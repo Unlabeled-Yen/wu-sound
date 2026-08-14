@@ -78,6 +78,7 @@ export const NAV_SECTIONS: NavSection[] = [
     // /boss/tenders/monitor 會被 /boss/tenders 那條先比中,顯示錯的標題。
     items: [
       { href: '/boss/tenders/monitor', label: '標案監測' },
+      { href: '/boss/tenders/agencies', label: '機關經營名單' },
       { href: '/boss/tenders', label: '資料進度板' },
     ],
   },
@@ -157,6 +158,7 @@ const MOBILE_TITLES: Record<string, MobileTitle> = {
   '/boss/equipment': { title: '設備庫存' },
   '/boss/sites': { title: '專案管理' },
   '/boss/tenders/monitor': { title: '標案監測', subtitle: '標案' },
+  '/boss/tenders/agencies': { title: '機關經營名單', subtitle: '標案' },
   '/boss/tenders': { title: '資料進度板', subtitle: '標案' },
   '/boss/users': { title: '使用者管理' },
   '/tools/spl-calculator': { title: 'SPL 預算計算器', subtitle: '聲學計算' },

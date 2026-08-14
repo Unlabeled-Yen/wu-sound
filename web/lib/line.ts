@@ -29,9 +29,7 @@ export function verifyLineSignature(rawBody: string, signatureHeader: string | n
   return timingSafeEqual(a, b);
 }
 
-export type LineMessage =
-  | { type: 'text'; text: string }
-  | { type: 'text'; text: string; quickReply?: unknown };
+export type LineMessage = { type: 'text'; text: string; quickReply?: unknown };
 
 export function textMessage(text: string): LineMessage {
   return { type: 'text', text };
