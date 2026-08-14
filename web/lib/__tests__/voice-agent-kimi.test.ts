@@ -85,17 +85,16 @@ describe('訊息結構轉換', () => {
 });
 
 describe('工具定義轉換', () => {
-  it('11 個工具都轉成 function 格式,input_schema 原樣當 parameters', () => {
+  it('8 個工具都轉成 function 格式,input_schema 原樣當 parameters', () => {
+    // 2026-08-14 回退:民生救難三個工具(get_now/get_weather/emergency_info)
+    // 移除後準確度回到 Yen 親自肯定過的水準,見 voice-agent-tools.ts 的 READ_TOOLS 註解
     const tools = toOpenAiTools(AGENT_TOOLS);
-    expect(tools).toHaveLength(11);
+    expect(tools).toHaveLength(8);
     expect(tools.map((t) => t.function.name)).toEqual([
       'search_projects',
       'get_project_summary',
       'list_tasks',
       'ask_clarification',
-      'get_now',
-      'get_weather',
-      'emergency_info',
       'respond',
       'decline',
       'propose_create_task',

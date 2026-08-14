@@ -70,28 +70,22 @@ export const TERMINAL_TOOLS = new Set([
 
 /**
  * 讀取工具。「這一輪有沒有查過東西」是判斷閒聊的機械依據,見 voice-agent.ts 的 respond 閘門。
- * 民生/救難三個工具也算——它們同樣是「有正確答案、且答案來自資料源」的查詢,
- * 跟閒聊的差別正在於此。
+ *
+ * 2026-08-14 移除民生/救難三個工具(Yen 確認):加入它們之後 Kimi 的辨答率明顯下降——
+ * 工具從 8 個變 11 個、prompt 從 39 行變 50 行,模型判斷「該用哪個工具」的空間變大,
+ * 準確度就掉了。回退到「只做 wu 現場記錄」是還原到 Yen 親自肯定過的品質,不是功能倒退。
+ * 若日後真的需要民生/救難,規劃另做獨立入口的 agent,不要塞回這裡。
  */
-export const READ_TOOLS = new Set([
-  'search_projects',
-  'get_project_summary',
-  'list_tasks',
-  'get_now',
-  'get_weather',
-  'emergency_info',
-]);
+export const READ_TOOLS = new Set(['search_projects', 'get_project_summary', 'list_tasks']);
 
-/** 不經 Lab 1 端點、由 runtime 自己執行的工具(民生/救難) */
-export const LOCAL_TOOLS = new Set(['get_now', 'get_weather', 'emergency_info']);
+/** 不經 Lab 1 端點、由 runtime 自己執行的工具。回退民生救難後暫時清空,結構保留給日後其他 local 工具用 */
+export const LOCAL_TOOLS = new Set<string>();
 
 /** decline 的固定文案。理由分類由模型給,話由系統講——不讓模型自己造拒絕句 */
 export const DECLINE_TEXT: Record<string, string> = {
   unsupported_action: '這個操作目前不支援,請用系統介面。',
-  out_of_scope:
-    '我能做的是:查專案狀況、記工作記錄、新增任務,以及查時間天氣、提供緊急求救資訊。這件事請用系統介面處理。',
-  chitchat:
-    '我是現場記錄助理,可以幫你查專案、記工作記錄、開任務,也可以查時間天氣或提供緊急求救資訊。有什麼要記的嗎?',
+  out_of_scope: '我只能幫你查專案狀況、記工作記錄、新增任務。這件事請用系統介面處理。',
+  chitchat: '我是現場記錄助理,只處理專案查詢、工作記錄和任務。有什麼要記的嗎?',
 };
 
 export const AGENT_TOOLS: ToolSchema[] = [
@@ -145,36 +139,6 @@ export const AGENT_TOOLS: ToolSchema[] = [
         },
       },
       required: ['question'],
-    },
-  },
-  {
-    name: 'get_now',
-    description:
-      '取得現在的日期、星期幾與時間(台灣時間)。使用者問「今天幾號」「現在幾點」「今天星期幾」時用這個,不要自己算。',
-    input_schema: { type: 'object', properties: {} },
-  },
-  {
-    name: 'get_weather',
-    description:
-      '查天氣(現在天氣 + 今明兩天高低溫與降雨機率)。使用者問天氣、會不會下雨、要不要收工具時用。location 給縣市名,不給就查臺中市。你沒有其他天氣來源,絕對不可以憑印象回答天氣。',
-    input_schema: {
-      type: 'object',
-      properties: { location: { type: 'string', description: '縣市名,例如「臺中市」;省略則用臺中市' } },
-    },
-  },
-  {
-    name: 'emergency_info',
-    description:
-      '現場有人受傷、觸電、墜落、大量出血、中暑,或使用者問急救、求救電話相關問題時呼叫。回傳的是系統寫死的求救指引,不是你生成的醫療建議——照著回覆,不要自己加步驟。',
-    input_schema: {
-      type: 'object',
-      properties: {
-        topic: {
-          type: 'string',
-          enum: ['numbers', 'electric_shock', 'fall', 'bleeding', 'heat_stroke', 'general'],
-          description: 'numbers=只問緊急電話;其餘依現場狀況選;不確定用 general',
-        },
-      },
     },
   },
   {

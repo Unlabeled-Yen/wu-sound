@@ -5,7 +5,6 @@ import {
   AGENT_TOOLS,
   AgentConfigError,
   DECLINE_TEXT,
-  LOCAL_TOOLS,
   PROPOSE_ACTION,
   READ_TOOLS,
   TERMINAL_TOOLS,
@@ -16,7 +15,6 @@ import {
   type VoiceToolClient,
 } from '@/lib/voice-agent-tools';
 import { createKimiLlm } from '@/lib/voice-agent-kimi';
-import { EMERGENCY_PREFIX, getEmergencyInfo, getNow, getWeather } from '@/lib/voice-agent-daily';
 import { trimMessages } from '@/lib/voice-agent-session';
 import type { AgentSession, PendingField, PendingWrite } from '@/lib/voice-agent-session';
 
@@ -115,13 +113,9 @@ export function buildSystemPrompt(now: number): string {
 12. 全程使用繁體中文。標籤、任務標題、內容一律不可以出現簡體字。
 13. 你不能直接講話,只能透過工具:要回答用 respond,要追問用 ask_clarification,
    要拒絕用 decline,要寫入用 propose_*。
-14. 現場人員會問的民生與救難問題你要答,但答案一律來自工具:
-   時間/日期/星期 → get_now;天氣/會不會下雨 → get_weather;
-   有人受傷、觸電、墜落、出血、中暑、問急救電話 → emergency_info。
-   救難問題最優先處理,先給求救資訊,其他事情之後再說。
-   真正的閒聊(你喜歡什麼、講笑話、你是誰、聊時事)才 decline(reason='chitchat'),
+14. 跟工作無關的閒聊(你喜歡什麼、講笑話、你是誰、聊天氣)一律 decline(reason='chitchat'),
    不要陪聊、不要反問使用者興趣。
-   跟工作有關但你沒有工具能做的(改金額、刪資料、建新專案)用
+   跟工作有關但你沒有工具能做的(改金額、刪資料、建新專案、查時間、查天氣、急救資訊)用
    decline(reason='unsupported_action')。
 15. respond 只能講你這一輪從工具拿到的東西。沒查過就不要講——要查就先呼叫查詢工具。
 16. 使用者這句話裡**沒有提到任何專案/案場名稱**,而且這段對話**也還沒有已經對齊過的專案**
@@ -294,8 +288,6 @@ export async function runAgentTurn(
   // 這一輪有沒有查過東西。閒聊的共同特徵是「不需要查任何資料」,
   // 所以這個布林值就是「模型現在有沒有事實可講」的機械判準,不靠語意理解
   let didRead = false;
-  // 這一輪碰過救難工具的話,最終回覆一定要帶「先打 119」那句,不靠模型記得講
-  let usedEmergency = false;
 
   for (let step = 0; step < MAX_STEPS; step += 1) {
     const res = await deps.llm.createMessage({
@@ -340,11 +332,7 @@ export async function runAgentTurn(
 
       const proposeAction = PROPOSE_ACTION[use.name];
       let result: ToolResult;
-      if (LOCAL_TOOLS.has(use.name)) {
-        // 民生/救難工具由 runtime 自己執行,不走 Lab 1 端點(那是 wu 網域的契約)
-        result = await runLocalTool(use.name, use.input, now);
-        if (use.name === 'emergency_info') usedEmergency = true;
-      } else if (proposeAction) {
+      if (proposeAction) {
         const normalized = normalizePayload(use.input);
         if (normalized.converted) warning = '模型產生了簡體字,已自動轉成繁體';
         result = await deps.tools.call('propose_write', {
@@ -390,7 +378,7 @@ export async function runAgentTurn(
     if (terminal && terminal.use.name === 'respond') {
       const gated = gateFreeText(String(terminal.use.input.text ?? ''), didRead);
       return {
-        reply: usedEmergency ? `${EMERGENCY_PREFIX}\n${gated.text}` : gated.text,
+        reply: gated.text,
         state: 'responding',
         toolTrace: trace,
         warning: gated.warning ?? warning,
@@ -474,26 +462,6 @@ export async function runAgentTurn(
  * 已知取捨:使用者打「你好」也會收到這句固定文案,不會有寒暄。
  * 這是刻意的——現場工具是拿來記事情的,不是拿來聊天的。
  */
-/** 民生/救難工具:runtime 自己執行,結果包成跟 Lab 1 工具一樣的形狀餵回模型 */
-async function runLocalTool(
-  name: string,
-  input: Record<string, unknown>,
-  now: () => number,
-): Promise<ToolResult> {
-  if (name === 'get_now') return { ok: true, data: getNow(now()) };
-  if (name === 'emergency_info') {
-    return { ok: true, data: getEmergencyInfo(typeof input.topic === 'string' ? input.topic : undefined).data };
-  }
-  const weather = await getWeather(typeof input.location === 'string' ? input.location : undefined);
-  if (weather.ok) return { ok: true, data: weather.data };
-  return {
-    ok: false,
-    status: 503,
-    error_code: String(weather.data.error ?? 'WEATHER_UNAVAILABLE'),
-    message_zh: String(weather.data.message_zh ?? '查不到天氣'),
-  };
-}
-
 function gateFreeText(text: string, didRead: boolean): { text: string; warning?: string } {
   const trimmed = text.trim();
   if (didRead && trimmed) return { text: trimmed };
