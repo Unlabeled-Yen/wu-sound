@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import type { Quote, QuoteLine, QuoteStatus } from '@/lib/types';
+import { QUOTE_STATUS_TRANSITIONS, type Quote, type QuoteLine, type QuoteStatus } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
@@ -66,6 +66,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if ('note' in body) {
     patch.note = typeof body.note === 'string' && body.note.trim() ? body.note.trim() : null;
   }
+  if ('site_id' in body) {
+    patch.site_id = typeof body.site_id === 'string' && body.site_id ? body.site_id : null;
+  }
   if ('tax_rate' in body) {
     const tr = Number(body.tax_rate);
     if (!Number.isFinite(tr) || tr < 0 || tr > 1) {
@@ -76,6 +79,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if ('status' in body) {
     const st = body.status as QuoteStatus;
     if (!VALID_STATUS.includes(st)) return NextResponse.json({ error: '狀態不正確' }, { status: 400 });
+    if (st !== before.status && !QUOTE_STATUS_TRANSITIONS[before.status].includes(st)) {
+      return NextResponse.json(
+        { error: `不可從「${before.status}」轉移到「${st}」——成交/未成交是終態,要修改請開一張新報價單` },
+        { status: 400 },
+      );
+    }
     if (st === 'sent') {
       // 缺價 loud:任何一行 unit_price 為 null,不可送出
       const lines = await sb.from('quote_lines').select('unit_price_twd').eq('quote_id', id);

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   QUOTE_STATUS_LABEL,
+  QUOTE_STATUS_TRANSITIONS,
   type CatalogItem,
   type Quote,
   type QuoteLine,
@@ -39,6 +40,9 @@ export default function QuoteEditor({
   const [costByItemId, setCostByItemId] = useState<Record<string, number | null>>(initialCostByItemId);
   const [clientName, setClientName] = useState(quote.client_name);
   const [projectName, setProjectName] = useState(quote.project_name ?? '');
+  const [note, setNote] = useState(quote.note ?? '');
+  const [siteId, setSiteId] = useState(quote.site_id ?? '');
+  const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
   const [status, setStatus] = useState<QuoteStatus>(quote.status);
   const [rationale, setRationale] = useState(quote.ai_rationale ?? '');
   const [needText, setNeedText] = useState(quote.need_text ?? '');
@@ -64,6 +68,13 @@ export default function QuoteEditor({
     setSpeechSupported(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition));
   }, []);
 
+  useEffect(() => {
+    fetch('/api/sites?active=1', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => setSites(j.sites ?? []))
+      .catch(() => {});
+  }, []);
+
   const groups = useMemo(() => groupQuoteLines(lines), [lines]);
   const missing = groups.missingCount;
   const totals = useMemo(() => computeQuoteTotals(groups, Number(taxRate) || 0), [groups, taxRate]);
@@ -85,7 +96,12 @@ export default function QuoteEditor({
       const res = await fetch(`/api/quotes/${quote.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_name: clientName.trim(), project_name: projectName.trim() || null }),
+        body: JSON.stringify({
+          client_name: clientName.trim(),
+          project_name: projectName.trim() || null,
+          note: note.trim() || null,
+          site_id: siteId || null,
+        }),
       });
       const j = await res.json().catch(() => ({}));
       setHeaderMsg(res.ok ? '已儲存' : (j.error ?? '儲存失敗'));
@@ -98,6 +114,11 @@ export default function QuoteEditor({
 
   async function changeStatus(next: QuoteStatus) {
     setActionError(null);
+    if (next === status) return;
+    if (next === 'sent' && !canSend) {
+      setActionError('尚有待設定售價或沒有明細,無法送出');
+      return;
+    }
     const prev = status;
     setStatus(next);
     try {
@@ -224,6 +245,19 @@ export default function QuoteEditor({
             <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>案件名稱</label>
             <input value={projectName} onChange={(e) => setProjectName(e.target.value)} className={inputCls} />
           </div>
+          <div>
+            <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>案場(選填 · 供之後報價↔實際毛利對照用)</label>
+            <select value={siteId} onChange={(e) => setSiteId(e.target.value)} className={inputCls}>
+              <option value="">— 不掛案場 —</option>
+              {sites.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>備註(內部用,不出現在列印/匯出)</label>
+            <input value={note} onChange={(e) => setNote(e.target.value)} className={inputCls} />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 print-hide">
           <button onClick={saveHeader} disabled={headerBusy} className="nm-btn-solid text-[13px] disabled:opacity-50">
@@ -231,11 +265,21 @@ export default function QuoteEditor({
           </button>
           <div className="flex items-center gap-2 text-[13px]">
             <span style={{ color: 'var(--nm-text-secondary)' }}>狀態</span>
-            <select value={status} onChange={(e) => changeStatus(e.target.value as QuoteStatus)} className="nm-input" style={{ width: 'auto', minHeight: 36, padding: '4px 10px' }}>
-              {(['draft', 'sent', 'won', 'lost'] as QuoteStatus[]).map((s) => (
+            <select
+              value={status}
+              onChange={(e) => changeStatus(e.target.value as QuoteStatus)}
+              disabled={QUOTE_STATUS_TRANSITIONS[status].length === 0}
+              className="nm-input"
+              style={{ width: 'auto', minHeight: 36, padding: '4px 10px' }}
+            >
+              <option value={status}>{QUOTE_STATUS_LABEL[status]}(目前)</option>
+              {QUOTE_STATUS_TRANSITIONS[status].map((s) => (
                 <option key={s} value={s}>{QUOTE_STATUS_LABEL[s]}</option>
               ))}
             </select>
+            {QUOTE_STATUS_TRANSITIONS[status].length === 0 && (
+              <span className="text-xs" style={{ color: 'var(--nm-text-muted)' }}>已是終態,不可再變更</span>
+            )}
           </div>
           {headerMsg && <span className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>{headerMsg}</span>}
           {actionError && <span className="text-[13px]" style={{ color: 'var(--nm-danger)' }}>{actionError}</span>}
@@ -400,14 +444,6 @@ export default function QuoteEditor({
       <div className="flex flex-wrap items-center gap-3 print-hide">
         <a href={`/api/quotes/${quote.id}/export.csv`} className="nm-btn text-[13px]">匯出 CSV</a>
         <a href={`/boss/quotes/${quote.id}/print`} className="nm-btn text-[13px]">列印</a>
-        <button
-          onClick={() => changeStatus('sent')}
-          disabled={!canSend || status === 'sent'}
-          title={!canSend ? '尚有待設定售價或沒有明細,無法送出' : ''}
-          className="nm-success-btn text-[13px] disabled:opacity-50"
-        >
-          標記已送出
-        </button>
         <a href="/boss/quotes" className="ml-auto nm-btn text-[13px]">返回列表</a>
       </div>
 

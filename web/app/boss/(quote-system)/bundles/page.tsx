@@ -4,13 +4,19 @@ import type { BundleLine, BundleTemplate } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function BundlesPage() {
+interface SP {
+  include_inactive?: string;
+}
+
+export default async function BundlesPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const sp = (await searchParams) ?? {};
+  const includeInactive = sp.include_inactive === '1';
+
   const sb = getSupabaseAdmin();
-  const { data, error } = await sb
-    .from('bundle_templates')
-    .select('*')
-    .eq('active', true)
-    .order('updated_at', { ascending: false });
+  let query = sb.from('bundle_templates').select('*');
+  if (!includeInactive) query = query.eq('active', true);
+  query = query.order('updated_at', { ascending: false });
+  const { data, error } = await query;
   const bundles = (data ?? []) as BundleTemplate[];
 
   const ids = bundles.map((b) => b.id);
@@ -31,6 +37,13 @@ export default async function BundlesPage() {
         <span className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>
           共 {bundles.length} 組
         </span>
+        <Link
+          href={includeInactive ? '/boss/bundles' : '/boss/bundles?include_inactive=1'}
+          className="text-[13px] underline underline-offset-2"
+          style={{ color: 'var(--nm-text-muted)' }}
+        >
+          {includeInactive ? '隱藏已停用' : '顯示已停用'}
+        </Link>
         <div className="ml-auto">
           <Link href="/boss/bundles/new" className="nm-btn-solid text-[13px]">
             ＋ 新增套組
@@ -60,12 +73,13 @@ export default async function BundlesPage() {
               <Link
                 key={b.id}
                 href={`/boss/bundles/${b.id}`}
-                className="rounded-2xl nm-raised p-4 nm-lift block"
+                className={`rounded-2xl nm-raised p-4 nm-lift block${b.active ? '' : ' opacity-50'}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-lg font-semibold truncate" style={{ color: 'var(--nm-text-primary)' }}>
                       {b.name}
+                      {!b.active && <span className="nm-pill ml-2 text-[12px]">已停用</span>}
                     </div>
                     {b.applicable_to && (
                       <div className="text-[13px] mt-1" style={{ color: 'var(--nm-text-muted)' }}>

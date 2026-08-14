@@ -110,6 +110,24 @@ export default function BundleEditor({
     }
   }
 
+  async function reactivate() {
+    setActionError(null);
+    setDeactivateBusy(true);
+    try {
+      const res = await fetch(`/api/bundles/${bundle.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: true }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setActionError(j.error ?? '啟用失敗'); setDeactivateBusy(false); return; }
+      window.location.reload();
+    } catch {
+      setActionError('網路錯誤');
+      setDeactivateBusy(false);
+    }
+  }
+
   const inputCls = 'nm-input';
 
   return (
@@ -118,7 +136,9 @@ export default function BundleEditor({
       <div className="rounded-2xl nm-raised p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>套組名稱</label>
+            <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+              套組名稱 {!bundle.active && <span className="nm-pill ml-1">已停用</span>}
+            </label>
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
           </div>
           <div>
@@ -189,13 +209,23 @@ export default function BundleEditor({
 
       {/* 動作 */}
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={deactivate}
-          disabled={deactivateBusy}
-          className="nm-danger text-[13px] disabled:opacity-50"
-        >
-          {deactivateBusy ? '停用中…' : '停用此套組'}
-        </button>
+        {bundle.active ? (
+          <button
+            onClick={deactivate}
+            disabled={deactivateBusy}
+            className="nm-danger text-[13px] disabled:opacity-50"
+          >
+            {deactivateBusy ? '停用中…' : '停用此套組'}
+          </button>
+        ) : (
+          <button
+            onClick={reactivate}
+            disabled={deactivateBusy}
+            className="nm-btn-solid text-[13px] disabled:opacity-50"
+          >
+            {deactivateBusy ? '啟用中…' : '重新啟用此套組'}
+          </button>
+        )}
         <a href="/boss/bundles" className="ml-auto nm-btn text-[13px]">返回列表</a>
       </div>
 

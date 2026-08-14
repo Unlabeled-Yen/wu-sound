@@ -19,9 +19,11 @@ export async function GET(req: Request) {
   const q = searchParams.get('q')?.trim();
   const category = searchParams.get('category')?.trim();
   const itemType = searchParams.get('item_type')?.trim();
+  const includeInactive = searchParams.get('include_inactive') === '1';
 
   const sb = getSupabaseAdmin();
-  let query = sb.from('catalog_items').select('*').eq('active', true);
+  let query = sb.from('catalog_items').select('*');
+  if (!includeInactive) query = query.eq('active', true);
   if (category) query = query.eq('category', category);
   if (itemType) query = query.eq('item_type', itemType);
   if (q) query = query.or(`name.ilike.%${q}%,brand.ilike.%${q}%,item_type.ilike.%${q}%`);

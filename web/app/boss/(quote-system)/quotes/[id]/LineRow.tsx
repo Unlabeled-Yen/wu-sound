@@ -31,7 +31,9 @@ export default function LineRow({
   const [unit, setUnit] = useState(line.unit ?? '');
   const [price, setPrice] = useState(line.unit_price_twd !== null ? String(line.unit_price_twd) : '');
   const [section, setSection] = useState<QuoteLineSection>(line.section);
-  const [saveToCatalog, setSaveToCatalog] = useState<boolean>(Boolean(line.catalog_item_id));
+  // 預設不勾——編輯單一報價單的價格,預設只影響這一張報價單,不該靜默覆寫
+  // 全域品項庫售價。想讓這次的調整以後每張新報價單都套用,才手動打勾。
+  const [saveToCatalog, setSaveToCatalog] = useState<boolean>(false);
 
   const noPrice = line.unit_price_twd === null;
   const subtotal = line.unit_price_twd !== null ? line.qty * line.unit_price_twd : null;

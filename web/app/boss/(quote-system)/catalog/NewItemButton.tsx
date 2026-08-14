@@ -16,6 +16,7 @@ export default function NewItemButton() {
   const [cost, setCost] = useState('');
   const [sell, setSell] = useState('');
   const [category, setCategory] = useState('');
+  const [note, setNote] = useState('');
 
   const inputCls = 'nm-input text-[13px]';
 
@@ -35,13 +36,14 @@ export default function NewItemButton() {
           cost_price_twd: cost.trim() === '' ? null : Number(cost),
           sell_price_twd: sell.trim() === '' ? null : Number(sell),
           category: category.trim() || null,
+          note: note.trim() || null,
         }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) { setError(j.error ?? '新增失敗'); setBusy(false); return; }
       setBusy(false);
       setOpen(false);
-      setBrand(''); setName(''); setItemType(''); setUnit('式'); setCost(''); setSell(''); setCategory('');
+      setBrand(''); setName(''); setItemType(''); setUnit('式'); setCost(''); setSell(''); setCategory(''); setNote('');
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : '網路錯誤');

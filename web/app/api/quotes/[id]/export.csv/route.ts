@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Quote, QuoteLine } from '@/lib/types';
+import { computeQuoteTotals } from '@/lib/quote-calc';
 
 export const runtime = 'nodejs';
 
@@ -68,7 +69,15 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (missing > 0) {
     out.push(['', `尚有 ${missing} 項待設定售價`, '', '', '', '', ''].map(csvEscape).join(','));
   } else {
-    out.push(['', '總計', '', '', '', '', String(total)].map(csvEscape).join(','));
+    // 跟列印頁/編輯頁用同一個函式算稅額,CSV 的「總計」以前只加總品項小計、
+    // 沒套用 tax_rate,金額會比畫面上顯示的「總價」少稅額那一塊。
+    const { tax, grandTotal } = computeQuoteTotals(
+      { equipmentSubtotal: total, installSubtotal: 0, equipment: [], install: [], missingCount: 0 },
+      quote.tax_rate,
+    );
+    out.push(['', '小計', '', '', '', '', String(total)].map(csvEscape).join(','));
+    out.push(['', `稅額(稅率 ${quote.tax_rate})`, '', '', '', '', String(tax)].map(csvEscape).join(','));
+    out.push(['', '總計(含稅)', '', '', '', '', String(grandTotal)].map(csvEscape).join(','));
   }
 
   const safeClient = (quote.client_name || 'quote').replace(/[^\w一-龥-]/g, '_');

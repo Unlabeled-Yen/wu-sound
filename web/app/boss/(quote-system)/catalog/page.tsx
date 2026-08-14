@@ -9,12 +9,14 @@ export const dynamic = 'force-dynamic';
 interface SP {
   q?: string;
   category?: string;
+  include_inactive?: string;
 }
 
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = (await searchParams) ?? {};
   const q = sp.q?.trim() ?? '';
   const category = sp.category?.trim() ?? '';
+  const includeInactive = sp.include_inactive === '1';
 
   const sb = getSupabaseAdmin();
 
@@ -27,18 +29,19 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
     ),
   ).sort();
 
-  let query = sb.from('catalog_items').select('*').eq('active', true);
+  let query = sb.from('catalog_items').select('*');
+  if (!includeInactive) query = query.eq('active', true);
   if (category) query = query.eq('category', category);
   if (q) query = query.or(`name.ilike.%${q}%,brand.ilike.%${q}%,item_type.ilike.%${q}%`);
   query = query.order('category', { ascending: true }).order('name', { ascending: true });
   const { data, error } = await query;
   const items = (data ?? []) as CatalogItem[];
 
-  const missingCount = items.filter((i) => i.sell_price_twd === null).length;
-  const isFiltered = Boolean(q || category);
+  const missingCount = items.filter((i) => i.active && i.sell_price_twd === null).length;
+  const isFiltered = Boolean(q || category || includeInactive);
 
   // 依 category 分組(未 filter 時才分)
-  const missingItems = items.filter((i) => i.sell_price_twd === null);
+  const missingItems = items.filter((i) => i.active && i.sell_price_twd === null);
   const groups = groupByCategory(items);
 
   const panels: CarouselPanel[] = isFiltered
@@ -115,6 +118,10 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
+        <label className="flex items-center gap-1.5 whitespace-nowrap" style={{ color: 'var(--nm-text-muted)' }}>
+          <input type="checkbox" name="include_inactive" value="1" defaultChecked={includeInactive} />
+          顯示已下架
+        </label>
         <button type="submit" className="nm-btn nm-focus text-[13px]" style={{ minHeight: 40 }}>
           查詢
         </button>
