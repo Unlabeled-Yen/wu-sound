@@ -4,6 +4,7 @@
 -- migrations/*.sql 是給已上線 DB 升級用的歷史 patch、新 setup 不必跑。
 
 create extension if not exists pgcrypto;
+create extension if not exists pg_trgm;
 
 create type user_role as enum ('boss', 'staff');
 create type expense_source as enum ('app', 'line');
@@ -17,8 +18,21 @@ create table users (
   role user_role not null,
   pin_hash text not null,
   active boolean not null default true,
+  line_user_id text unique,
   created_at timestamptz not null default now()
 );
+
+-- LINE bot 綁定:一次性綁定碼(6 位數字,10 分鐘 TTL)。
+-- 綁定 flow:使用者在 web 產生碼 → 加 bot 好友後傳「綁定 123456」→ webhook 查碼綁 line_user_id。
+create table line_bind_codes (
+  code text primary key,
+  user_id uuid not null references users(id),
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  used_at timestamptz
+);
+
+create index line_bind_codes_expiry_idx on line_bind_codes (expires_at);
 
 create table site_categories (
   id uuid primary key default gen_random_uuid(),
@@ -37,6 +51,43 @@ create table sites (
 );
 
 create index sites_category_idx on sites (category_id);
+
+-- voice-lab Lab 2 案場模糊搜尋:trigram 相似度接住跳字省略的口語講法
+-- (例:講「磐頂教會」要能搜到「磐頂長老教會」)。見 migrations/016。
+create index sites_name_trgm_idx on sites using gin (name gin_trgm_ops);
+
+create or replace function search_sites_by_query(q text)
+returns table (
+  id uuid,
+  name text,
+  active boolean,
+  is_substring_match boolean,
+  match_score real
+)
+language sql
+stable
+as $$
+  select
+    s.id,
+    s.name,
+    s.active,
+    (s.name ilike '%' || q || '%') as is_substring_match,
+    greatest(
+      similarity(s.name, q),
+      case when s.name ilike '%' || q || '%' then 1.0 else 0.0 end
+    ) as match_score
+  from sites s
+  where s.active = true
+    and (
+      s.name ilike '%' || q || '%'
+      or similarity(s.name, q) > 0.15
+    )
+  order by
+    (s.name ilike q || '%') desc,
+    match_score desc,
+    s.name
+  limit 20;
+$$;
 
 create table book_batches (
   id uuid primary key default gen_random_uuid(),
@@ -106,12 +157,50 @@ create table audit_log (
 
 create index audit_log_ts_idx on audit_log (ts desc);
 
+-- voice-lab Lab 1:語音/打字介面,任務(派工最小版)。見 voice-lab/lab1-wu-adapter-spec-v1.md §3。
+create table tasks (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references sites(id),
+  title text not null,
+  description text,
+  due_date date,
+  status text not null default 'open' check (status in ('open', 'done')),
+  created_by uuid not null references users(id),
+  source text not null default 'web' check (source in ('voice', 'text', 'web')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index tasks_site_status_idx on tasks (site_id, status, due_date);
+
+-- 兩階段寫入的提案/token。存 DB 而非記憶體:Vercel serverless 不保證同一實例,
+-- 記憶體 token 會隨函式回收蒸發 → 確認流程隨機失敗,違反可靠性要求。
+create table write_proposals (
+  token uuid primary key default gen_random_uuid(),
+  action text not null check (action in ('create_task', 'log_note')),
+  payload jsonb not null,
+  payload_hash text not null,
+  actor_id uuid not null references users(id),
+  source text not null check (source in ('voice', 'text')),
+  transcript_ref text,
+  capture_ref text,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  result jsonb
+);
+
+create index write_proposals_expiry_idx on write_proposals (expires_at);
+
 -- updated_at 自動維護
 create or replace function bump_updated_at() returns trigger as $$
 begin new.updated_at = now(); return new; end $$ language plpgsql;
 
 create trigger expenses_bump_updated
 before update on expenses for each row execute function bump_updated_at();
+
+create trigger tasks_bump_updated
+before update on tasks for each row execute function bump_updated_at();
 
 -- Phase 2:大型設備位置追蹤
 create type equipment_category as enum (
@@ -366,6 +455,15 @@ create table catalog_items (
   category text,
   note text,
   active boolean not null default true,
+  -- 聲學規格(全部可 null——缺值 loud 原則,不強迫立刻補全,計算器缺值時走手動輸入)
+  max_spl_db numeric check (max_spl_db is null or max_spl_db > 0),
+  spl_ref_distance_m numeric check (spl_ref_distance_m is null or spl_ref_distance_m > 0),
+  sensitivity_db_1w1m numeric check (sensitivity_db_1w1m is null or sensitivity_db_1w1m > 0),
+  amp_power_w numeric check (amp_power_w is null or amp_power_w > 0),
+  speaker_impedance_ohm numeric check (speaker_impedance_ohm is null or speaker_impedance_ohm > 0),
+  amp_power_mode text check (amp_power_mode is null or amp_power_mode in ('rms', 'burst')),
+  coverage_h_deg numeric check (coverage_h_deg is null or (coverage_h_deg > 0 and coverage_h_deg <= 360)),
+  coverage_v_deg numeric check (coverage_v_deg is null or (coverage_v_deg > 0 and coverage_v_deg <= 360)),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -377,6 +475,37 @@ create index catalog_search_idx on catalog_items using gin (to_tsvector('simple'
 create trigger catalog_bump_updated
 before update on catalog_items for each row execute function bump_updated_at();
 
+-- 標配套組:報價常用配置模板,new quote 可從 bundle materialize 出 quote_lines
+create table bundle_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  applicable_to text,
+  note text,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index bundle_templates_active_idx on bundle_templates (active, name);
+
+create trigger bundle_templates_bump_updated
+before update on bundle_templates for each row execute function bump_updated_at();
+
+create table bundle_lines (
+  id uuid primary key default gen_random_uuid(),
+  bundle_id uuid not null references bundle_templates(id) on delete cascade,
+  catalog_item_id uuid references catalog_items(id),
+  name text not null,
+  spec text,
+  qty integer not null default 1 check (qty > 0),
+  unit text,
+  section text not null default '器材' check (section in ('器材', '安裝')),
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index bundle_lines_bundle_idx on bundle_lines (bundle_id, sort_order);
+
 create table quotes (
   id uuid primary key default gen_random_uuid(),
   client_name text not null,
@@ -386,6 +515,7 @@ create table quotes (
   ai_rationale text,
   note text,
   site_id uuid references sites(id),
+  tax_rate numeric(4,3) not null default 0.05 check (tax_rate >= 0 and tax_rate <= 1),
   created_by uuid not null references users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -407,6 +537,7 @@ create table quote_lines (
   qty integer not null default 1 check (qty > 0),
   unit text,
   unit_price_twd integer check (unit_price_twd is null or unit_price_twd >= 0),
+  section text not null default '器材' check (section in ('器材', '安裝')),
   is_ai_suggested boolean not null default false,
   sort_order integer not null default 0,
   created_at timestamptz not null default now()
@@ -435,6 +566,11 @@ alter table recurring_templates enable row level security;
 alter table day_site_allocations enable row level security;
 alter table user_pay_profiles enable row level security;
 alter table monthly_cost_rates enable row level security;
+alter table bundle_templates enable row level security;
+alter table bundle_lines enable row level security;
+alter table line_bind_codes enable row level security;
+alter table tasks enable row level security;
+alter table write_proposals enable row level security;
 -- 只有 service_role 能存取(anon 全部拒絕),應用端一律由 server 走。
 -- 若日後改用 Supabase Auth,改為以 auth.uid() 比對 users.id 即可。
 -- user_pay_profiles/monthly_cost_rates 額外強調:即使 service_role 繞過 RLS,
