@@ -55,6 +55,10 @@ export function ChatClient() {
   const nextId = useRef(1);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<ChatMessage['state']>(undefined);
+  // send() 是每次 render 重新產生的函式,裡面若直接讀 voiceMode 會拿到呼叫當下那次
+  // render 的值,不是「回覆送達那一刻」的最新值——中途取消勾選會抓不到。用 ref 保證即時。
+  const voiceModeRef = useRef(voiceMode);
+  voiceModeRef.current = voiceMode;
 
   // 聽到的話怎麼處理,取決於當下狀態:
   // 等你確認的時候走 voice_command(伺服器端白名單比對),其餘當一般訊息
@@ -124,10 +128,11 @@ export function ChatClient() {
         toolTrace: Array.isArray(data.tool_trace) ? (data.tool_trace as ToolTraceEntry[]) : undefined,
       });
 
-      if (voiceMode) {
-        voice.speak(speechFor(String(data.reply ?? ''), state, pending));
-        // 等你確認的時候自動再開麥克風,免手情境才不用一直碰螢幕
-        if (state === 'confirming') setTimeout(() => voice.start(), 600);
+      if (voiceModeRef.current) {
+        // 等唸完再開始聽,不然會錄到自己的聲音;唸完後不管什麼狀態都繼續聽下一句,
+        // 這才是「來回對話」而不是只有等確認那一步才會動——這是這次要解決的體驗問題
+        await voice.speak(speechFor(String(data.reply ?? ''), state, pending));
+        if (voiceModeRef.current) void voice.start(true);
       }
     } catch (e) {
       push({ role: 'error', text: `連線失敗: ${e instanceof Error ? e.message : String(e)}` });
@@ -251,12 +256,17 @@ export function ChatClient() {
       )}
       {voice.recording && (
         <p className="text-[13px]" style={{ color: 'var(--nm-accent)' }}>
-          🔴 錄音中…講完按一下停止
+          🔴 {voiceMode ? '聽你說…講完停頓一下會自動送出' : '錄音中…講完按一下停止'}
         </p>
       )}
       {voice.transcribing && (
         <p className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>
           辨識中…
+        </p>
+      )}
+      {voice.speaking && (
+        <p className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>
+          🔊 播放中…(按麥克風可以打斷直接講下一句)
         </p>
       )}
 
@@ -265,9 +275,22 @@ export function ChatClient() {
           type="button"
           className="nm-btn text-[16px] px-3"
           aria-label={voice.recording ? '停止錄音' : '開始說話'}
-          title={voice.supported ? '按一下開始講,講完再按一下' : '這個瀏覽器不支援錄音'}
+          title={
+            voice.supported
+              ? voiceMode
+                ? '按一下開始說話,講完停頓會自動送出'
+                : '按一下開始講,講完再按一下停止'
+              : '這個瀏覽器不支援錄音'
+          }
           disabled={busy || !sessionId || !voice.supported || voice.transcribing}
-          onClick={() => (voice.recording ? voice.stop() : void voice.start())}
+          onClick={() => {
+            if (voice.recording) {
+              voice.stop();
+              return;
+            }
+            voice.cancelSpeech(); // 唸話中按下去,先打斷朗讀再開始聽,才有機會真的插話
+            void voice.start(voiceMode);
+          }}
         >
           {voice.recording ? '⏹' : '🎤'}
         </button>
@@ -291,10 +314,14 @@ export function ChatClient() {
           disabled={!voice.supported}
           onChange={(e) => {
             setVoiceMode(e.target.checked);
-            if (!e.target.checked) voice.cancelSpeech();
+            if (!e.target.checked) {
+              voice.cancelSpeech();
+              if (voice.recording) voice.stop();
+            }
           }}
         />
-        免手模式:唸出回覆,等你確認時自動開始錄音,說「確認」或「取消」
+        免手模式:講完停頓自動送出、agent 唸完回覆自動繼續聽,像對話一樣來回;
+        等你確認時說「確認」或「取消」
         {!voice.supported && '(這個瀏覽器不支援錄音)'}
       </label>
     </div>
