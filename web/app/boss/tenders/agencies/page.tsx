@@ -12,6 +12,7 @@ interface Competition {
   soloRate: number | null;
   soloCI: [number, number] | null;
   avgBidders: number | null;
+  excludedPerformance?: number;
 }
 
 interface Agency {
@@ -22,6 +23,7 @@ interface Agency {
   avg_bidders: number;
   first_award_date: string | null;
   last_award_date: string | null;
+  performance_count: number;
   competition: Competition;
 }
 
@@ -119,6 +121,11 @@ function AgencyRow({ a, rank }: { a: Agency; rank: number }) {
           </>
         )}
         {' · '}平均 {a.avg_bidders.toFixed(1)} 家
+        {a.performance_count > 0 && (
+          <span style={{ color: 'var(--nm-text-muted)' }}>
+            {' · '}另有 {a.performance_count} 件是採購演出,未列入
+          </span>
+        )}
       </p>
     </li>
   );
@@ -177,6 +184,7 @@ export default async function BossAgenciesPage({
         條長是「只有一家投標」的比率,越長代表過去越少人跟你搶。但括號裡的區間才是誠實的範圍——
         多數機關的案量只有個位數,真實值可能差很多,不要只看前面那個百分比。
         少於 3 件的機關不列入,樣本太小算什麼都是巧合。
+        得標者是劇團/樂團/馬戲團的案(機關買的是演出而不是音響工程)不列入計算,因為那種案只有該團能接。
       </p>
 
       {error && (

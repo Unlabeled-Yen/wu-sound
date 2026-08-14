@@ -33,6 +33,7 @@ interface AgencyCompetition {
   soloRate: number | null;
   soloCI: [number, number] | null;
   avgBidders: number | null;
+  excludedPerformance?: number;
 }
 
 interface TenderHit {
@@ -133,10 +134,19 @@ function daysLeft(hit: TenderHit): number | null {
 // 2. 1-2 案只講原始件數,不算比率(對 2 案講「50%」是假精確)。
 // 3. 沒有歷史就明講沒有,不留白——留白會被讀成「沒有競爭」。
 function agencyRadarText(a: AgencyCompetition): { text: string; hint: string } {
+  // 採購演出的案(得標者是表演團體)不算競爭強度,但要講出來——這種案
+  // 只有那個團能接,獨標是天經地義,混進來會讓機關看起來「很好打」。
+  const perf = a.excludedPerformance ?? 0;
+  const perfNote = perf > 0 ? `;另有 ${perf} 件是採購演出,不列入計算` : '';
+
   if (a.tier === 'none') {
     return {
-      text: '近 3 年查無此機關的音響案紀錄,無從判斷競爭',
-      hint: '這不代表沒有競爭,只代表資料庫裡沒有這個機關的音響類決標歷史',
+      text: perf > 0
+        ? `近 3 年此機關 ${perf} 件音響案全是採購演出(請表演團體),無可競爭的工程案`
+        : '近 3 年查無此機關的音響案紀錄,無從判斷競爭',
+      hint: perf > 0
+        ? '得標者是劇團/樂團/馬戲團這類表演團體,代表機關買的是演出而不是音響工程,Wu 接不到這種案'
+        : '這不代表沒有競爭,只代表資料庫裡沒有這個機關的音響類決標歷史',
     };
   }
   if (a.tier === 'thin') {
@@ -144,15 +154,15 @@ function agencyRadarText(a: AgencyCompetition): { text: string; hint: string } {
     // n=1 用「皆」不通順,單數講「該案」
     const which = all ? (a.n === 1 ? '該案' : '皆') : `其中 ${a.soloCount} 件`;
     return {
-      text: `近 3 年僅 ${a.n} 件音響案,${which}只有一家投標(樣本太少,不算比率)`,
-      hint: '少於 3 件不計算百分比——樣本這麼小時,任何比率都只是巧合',
+      text: `近 3 年僅 ${a.n} 件可競爭的音響案,${which}只有一家投標(樣本太少,不算比率)${perfNote}`,
+      hint: '少於 3 件不計算百分比——樣本這麼小時,任何比率都只是巧合。採購演出的案(得標者是表演團體)已排除,那種案只有該團能接,不算競爭',
     };
   }
   const pct = Math.round((a.soloRate ?? 0) * 100);
   const [lo, hi] = a.soloCI ?? [0, 1];
   const thin = a.tier === 'range' ? ',樣本少' : '';
   return {
-    text: `近 3 年 ${a.n} 件音響案 · ${a.soloCount} 件只有一家投標(${pct}%,真實值 ${Math.round(lo * 100)}–${Math.round(hi * 100)}%${thin})`,
+    text: `近 3 年 ${a.n} 件可競爭的音響案 · ${a.soloCount} 件只有一家投標(${pct}%,真實值 ${Math.round(lo * 100)}–${Math.round(hi * 100)}%${thin})${perfNote}`,
     hint: `平均每案 ${a.avgBidders?.toFixed(1)} 家投標。「真實值」是 95% 信賴區間——樣本越少區間越寬,不能只看前面那個百分比`,
   };
 }
