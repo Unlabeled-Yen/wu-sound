@@ -113,9 +113,42 @@ export function createSttClient(): SttClient {
         // 空白轉寫不能當成「使用者沒講話所以沒事」——要讓上層明確回「沒聽清楚」(handoff §8)
         return { ok: false, error_code: 'STT_EMPTY', message_zh: '沒有辨識到內容,請再說一次', attempts };
       }
+      if (prompt && looksLikePromptEcho(text, prompt)) {
+        return {
+          ok: false,
+          error_code: 'STT_PROMPT_ECHO',
+          message_zh: '沒聽清楚,請再說一次',
+          attempts,
+        };
+      }
       return { ok: true, text, model, attempts };
     },
   };
+}
+
+/**
+ * 判斷轉寫結果是不是模型在「回吐提示詞」而不是真的聽到內容。
+ *
+ * 實測的失敗樣態(Yen 2026-08-14 回報,已重現):音檔太短或聽不清時,
+ * gpt-4o-transcribe 會編造內容,而且明顯是從熱詞提示裡撈詞:
+ * - 只有「嗯」的音檔 → 回「木。」「喇叭」「混。」(都是提示詞裡的字)
+ * - 使用者實際講了一整句 → 畫面顯示「這個現場工程進度幾乎要到一個段落」,
+ *   正是從提示詞開頭「台灣音響工程公司的現場口述記錄」拼出來的
+ *
+ * 特徵很明確:**很短,而且用到的字全部出現在提示詞裡**。
+ * 只擋這種情況——長句就算用到熱詞也放行(那本來就是熱詞的用途),
+ * 「確認」「取消」這種短口令不在提示詞裡,也不會被誤擋。
+ *
+ * 擋掉之後回「沒聽清楚,請再說一次」,不是把編造的句子交給使用者。
+ * 寧可請他重講,也不要讓他看到一句自己沒講過的話被當成他講的。
+ */
+const ECHO_MAX_CHARS = 6;
+
+export function looksLikePromptEcho(text: string, prompt: string): boolean {
+  const stripped = text.replace(/[\s,。,.!!??、~～:：「」()()]/g, '');
+  if (!stripped || stripped.length > ECHO_MAX_CHARS) return false;
+  // 逐字檢查:每個字都在提示詞裡出現過,才算是回吐
+  return [...stripped].every((ch) => prompt.includes(ch));
 }
 
 // ---------- 熱詞表 ----------

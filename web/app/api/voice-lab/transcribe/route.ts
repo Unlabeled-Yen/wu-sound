@@ -18,11 +18,18 @@ export const dynamic = 'force-dynamic';
 const MAX_BYTES = 8 * 1024 * 1024;
 
 /**
- * 音檔大小下限。實測值:macOS 語音合成講「嗯」約 5.5KB、講「幫我」約 6.5KB,
- * 都短到會誘發模型編造。一句最短的有效指令(「磐頂記一筆」)約 15KB 起跳,
- * 取 10KB 當門檻——擋掉單字級的雜訊,不誤傷真的短句。
+ * 音檔大小下限。
+ *
+ * 訂這個值踩過一次坑(Yen 2026-08-14):原本用 macOS 語音合成的 AAC 檔推算,
+ * 取 10KB,結果真人用瀏覽器錄音(Opus 編碼)被誤擋,變成講什麼都說聽不到。
+ * 不同編碼的位元率差很多——Opus 語音約 6-8KB/秒,AAC 合成音檔則高得多。
+ *
+ * 現在取 4KB:大約是 Opus 半秒的量,足以擋掉單字級雜訊
+ * (實測會誘發模型編造的檔案是 5.5KB AAC ≈ 0.5 秒),
+ * 又不會誤殺真人講的短句。寧可讓邊緣案例通過,也不要讓使用者講不進去——
+ * 編造內容有前端與這裡兩道防線,誤擋卻會讓整個功能不能用。
  */
-const MIN_BYTES = 10 * 1024;
+const MIN_BYTES = 4 * 1024;
 
 export async function POST(req: Request) {
   const user = await getSession();
@@ -81,7 +88,9 @@ export async function POST(req: Request) {
     // 辨識失敗一律講清楚,不回一個空字串讓前端以為使用者沒講話
     return NextResponse.json(
       { error: result.message_zh, error_code: result.error_code },
-      { status: result.error_code === 'STT_EMPTY' ? 422 : 502 },
+      // 聽不清楚(空白、回吐提示詞)是「請使用者重講」,不是伺服器故障,用 422;
+      // 其餘(連不上、HTTP 錯誤)才是 502
+      { status: result.error_code === 'STT_EMPTY' || result.error_code === 'STT_PROMPT_ECHO' ? 422 : 502 },
     );
   }
 

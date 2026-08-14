@@ -57,7 +57,20 @@ const MAX_RECORD_MS = 60_000;
  */
 const SILENCE_MS = 2000;
 const MIN_SPEECH_MS = 300; // handoff §8:短於這個長度的觸發當噪音丟棄,不要偵測到就停
-const SPEECH_LEVEL = 0.02; // 音量閾值(0~1 的 RMS),環境噪音大時可能要調高
+
+/**
+ * 人聲音量門檻改成自動校準,不用寫死的絕對值。
+ *
+ * 實測教訓(Yen 2026-08-14):原本寫死 0.02,結果他的麥克風音量根本到不了,
+ * 系統判定「完全沒講話」,講什麼都被擋掉。麥克風靈敏度、系統音量、講話距離
+ * 每台機器都不同,寫死一個絕對值必定會在某些環境完全失效。
+ *
+ * 改法:錄音開始的前 400ms 當作環境背景音來量基準,人聲門檻取
+ * 「背景音的 2.5 倍」與一個很低的絕對下限之中較大者。
+ */
+const CALIBRATION_MS = 400;
+const NOISE_MULTIPLIER = 2.5;
+const ABSOLUTE_FLOOR = 0.004;
 
 /**
  * 一段錄音裡「真的有講話」的累計時間下限,低於這個就不送去辨識。
@@ -70,15 +83,28 @@ const SPEECH_LEVEL = 0.02; // 音量閾值(0~1 的 RMS),環境噪音大時可能
  */
 const MIN_UTTERANCE_MS = 800;
 
+/** 診斷數字的顯示格式(小數三位),讓錯誤訊息看得出實際量到多少 */
+const d3 = (n: number) => (n < 0 ? 'n/a' : n.toFixed(3));
+
 interface SilenceWatcher {
   cleanup: () => void;
   /** 累計偵測到人聲的毫秒數,用來判斷這段錄音值不值得送去辨識 */
   speechMs: () => number;
+  /** 診斷用:量到的峰值音量、背景噪音基準、實際採用的門檻 */
+  diagnostics: () => { peak: number; noiseFloor: number; threshold: number };
 }
 
 function watchSilence(stream: MediaStream, onSilence: () => void): SilenceWatcher {
   const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return { cleanup: () => {}, speechMs: () => Number.POSITIVE_INFINITY };
+  // 沒有 AudioContext 就不做偵測,speechMs 回無限大讓上層的長度檢查放行——
+  // 寧可放行讓後端的音檔大小檢查去擋,也不要因為量不到就把使用者的話全部擋掉
+  if (!Ctor) {
+    return {
+      cleanup: () => {},
+      speechMs: () => Number.POSITIVE_INFINITY,
+      diagnostics: () => ({ peak: -1, noiseFloor: -1, threshold: -1 }),
+    };
+  }
 
   const ctx = new Ctor();
   const source = ctx.createMediaStreamSource(stream);
@@ -87,10 +113,15 @@ function watchSilence(stream: MediaStream, onSilence: () => void): SilenceWatche
   source.connect(analyser);
   const data = new Uint8Array(analyser.frequencyBinCount);
 
+  const startedAt = performance.now();
   let speechStartedAt: number | null = null;
   let silenceStartedAt: number | null = null;
   let totalSpeechMs = 0;
-  let lastTickAt = performance.now();
+  let lastTickAt = startedAt;
+  let peak = 0;
+  let noiseSum = 0;
+  let noiseCount = 0;
+  let threshold = ABSOLUTE_FLOOR;
   let raf = 0;
   let stopped = false;
 
@@ -106,8 +137,21 @@ function watchSilence(stream: MediaStream, onSilence: () => void): SilenceWatche
     const now = performance.now();
     const delta = now - lastTickAt;
     lastTickAt = now;
+    if (level > peak) peak = level;
 
-    if (level > SPEECH_LEVEL) {
+    // 前 400ms 只量背景噪音,不判斷人聲——這段時間使用者通常還沒開口
+    if (now - startedAt < CALIBRATION_MS) {
+      noiseSum += level;
+      noiseCount += 1;
+      raf = requestAnimationFrame(tick);
+      return;
+    }
+    if (noiseCount > 0) {
+      threshold = Math.max((noiseSum / noiseCount) * NOISE_MULTIPLIER, ABSOLUTE_FLOOR);
+      noiseCount = 0; // 只算一次,之後沿用
+    }
+
+    if (level > threshold) {
       totalSpeechMs += delta;
       if (speechStartedAt === null) speechStartedAt = now;
       silenceStartedAt = null;
@@ -129,7 +173,15 @@ function watchSilence(stream: MediaStream, onSilence: () => void): SilenceWatche
   }
 
   raf = requestAnimationFrame(tick);
-  return { cleanup, speechMs: () => totalSpeechMs };
+  return {
+    cleanup,
+    speechMs: () => totalSpeechMs,
+    diagnostics: () => ({
+      peak,
+      noiseFloor: noiseCount > 0 ? noiseSum / Math.max(noiseCount, 1) : threshold / NOISE_MULTIPLIER,
+      threshold,
+    }),
+  };
 }
 
 function pickMimeType(): string | undefined {
@@ -226,6 +278,7 @@ export function useVoice(onTranscript: (text: string) => void): VoiceState {
         if (timerRef.current) clearTimeout(timerRef.current);
 
         const speechMs = silenceRef.current?.speechMs() ?? Number.POSITIVE_INFINITY;
+        const diag = silenceRef.current?.diagnostics();
         if (silenceRef.current) {
           silenceRef.current.cleanup();
           silenceRef.current = null;
@@ -235,10 +288,23 @@ export function useVoice(onTranscript: (text: string) => void): VoiceState {
         const blob = new Blob(chunksRef.current, { type });
         chunksRef.current = [];
 
-        // 講太少就別送去辨識——模型拿到聽不清的音檔會編造內容(見 MIN_UTTERANCE_MS)。
-        // 寧可請使用者重講,也不要讓他看到一句他沒講過的話被當成他講的。
-        if (blob.size < 2000 || speechMs < MIN_UTTERANCE_MS) {
-          setError('沒有聽到完整的話,請按麥克風再說一次');
+        /**
+         * 擋掉太短的錄音,避免模型編造內容(見 MIN_UTTERANCE_MS)。
+         *
+         * 主要判準是**音檔大小**,不是人聲偵測時間——大小是客觀的,
+         * 人聲偵測會受麥克風靈敏度影響(實測踩過:門檻寫死導致某些麥克風
+         * 永遠判定「沒講話」,使用者講什麼都被擋)。
+         * 人聲時間只在「大小勉強及格但幾乎沒偵測到人聲」時當輔助判斷,
+         * 而且門檻放很寬,寧可放行讓後端去擋,也不要誤殺真的講話。
+         */
+        const tooSmall = blob.size < 4000;
+        const noSpeechAtAll = speechMs < 200 && blob.size < 8000;
+        if (tooSmall || noSpeechAtAll) {
+          const d = diag
+            ? `(錄到 ${(blob.size / 1024).toFixed(1)}KB、人聲 ${Math.round(speechMs)}ms、` +
+              `音量峰值 ${d3(diag.peak)}、門檻 ${d3(diag.threshold)})`
+            : `(錄到 ${(blob.size / 1024).toFixed(1)}KB)`;
+          setError(`沒有聽到完整的話,請按麥克風再說一次 ${d}`);
           return;
         }
         void upload(blob, type);
