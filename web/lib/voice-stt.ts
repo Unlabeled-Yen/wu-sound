@@ -113,7 +113,7 @@ export function createSttClient(): SttClient {
         // 空白轉寫不能當成「使用者沒講話所以沒事」——要讓上層明確回「沒聽清楚」(handoff §8)
         return { ok: false, error_code: 'STT_EMPTY', message_zh: '沒有辨識到內容,請再說一次', attempts };
       }
-      if (prompt && looksLikePromptEcho(text, prompt)) {
+      if (prompt && looksLikePromptEcho(text, prompt, audio.size)) {
         return {
           ok: false,
           error_code: 'STT_PROMPT_ECHO',
@@ -144,11 +144,44 @@ export function createSttClient(): SttClient {
  */
 const ECHO_MAX_CHARS = 6;
 
-export function looksLikePromptEcho(text: string, prompt: string): boolean {
-  const stripped = text.replace(/[\s,。,.!!??、~～:：「」()()]/g, '');
-  if (!stripped || stripped.length > ECHO_MAX_CHARS) return false;
-  // 逐字檢查:每個字都在提示詞裡出現過,才算是回吐
-  return [...stripped].every((ch) => prompt.includes(ch));
+/** 整份清單級的回吐:沒有人會一口氣唸出 20 個字的專有名詞清單 */
+const ECHO_FULL_LIST_CHARS = 20;
+
+/**
+ * 「講了很久卻只吐出一個詞彙」的判斷基準。
+ * Opus 語音約 6-8KB/秒,中文約每秒 4 字 → 大約每字 1.5-2KB。
+ * 錄音長度遠超過該句子應有的長度,就代表模型沒在轉寫,是在回吐。
+ */
+const BYTES_PER_CHAR = 1500;
+const ECHO_LENGTH_RATIO = 3;
+
+const stripPunct = (s: string) => s.replace(/[\s,。,.!!??、~～:：「」()()]/g, '');
+
+export function looksLikePromptEcho(text: string, prompt: string, audioBytes?: number): boolean {
+  const t = stripPunct(text);
+  const p = stripPunct(prompt);
+  if (!t || !p) return false;
+
+  // 輸出的內容完全來自提示詞才有嫌疑;有自己的字就是真的在轉寫
+  const fromPrompt = p.includes(t) || [...t].every((ch) => p.includes(ch));
+  if (!fromPrompt) return false;
+
+  // 長到不像人一口氣講的話 → 回吐整份清單,不用看錄音長度
+  if (t.length >= ECHO_FULL_LIST_CHARS) return true;
+
+  /**
+   * 剩下的靠「錄音長度 vs 輸出長度」判斷,不能只看字數。
+   * 因為使用者回答「要記到哪個專案?」時,講「磐頂長老教會」是完全合法的——
+   * 誤擋這種會讓對話卡死,比偶爾放過一個回吐嚴重得多。
+   *
+   * 判準:講了十幾秒卻只吐出幾個字,代表模型沒在轉寫而是在回吐。
+   */
+  if (audioBytes) {
+    return audioBytes > t.length * BYTES_PER_CHAR * ECHO_LENGTH_RATIO;
+  }
+
+  // 沒有錄音長度可參考時,只擋很短的(單詞級),長一點的放行讓下游判斷
+  return t.length <= ECHO_MAX_CHARS;
 }
 
 // ---------- 熱詞表 ----------
@@ -210,27 +243,25 @@ export async function buildHotwordPrompt(): Promise<HotwordPrompt> {
 
   return {
     /**
-     * **只給詞彙表,絕對不要寫敘述句。**
+     * 提示詞的寫法是拿真人錄音實測出來的,不能隨意改。三種寫法的實測結果:
      *
-     * 這是實測踩出來的(Yen 2026-08-14 回報「他完全沒聽對我說的話」):
-     * 原本的提示開頭寫「這是台灣音響工程公司的現場口述記錄,請用繁體中文轉寫」,
-     * 結果那句敘述變成模型的**內容範本**——音訊聽不清時它照著範本編一句像樣的工地記錄:
+     * | 寫法 | 真人錄音(11秒) | 清楚合成句 | 完全無聲 |
+     * |---|---|---|---|
+     * | 裸詞彙表(無指示) | **整份清單原封不動吐回來** | 磐頂長老教會 ✓ | 「木作」 |
+     * | 「不要輸出這串清單」 | 測試麥克風音量 ✓ | 磐頂長老教會 ✓ | **連指示帶清單一起吐回** |
+     * | **「請只轉寫實際聽到的內容」**(採用) | 測試錄音機…藍牙麥克風 ✓ | 磐頂長老教會 ✓ | 「THE HOPE Taipei」 |
+     * | 完全不給提示 | 測試麥克風的設定 ✓ | **壇**頂長老教會 ✗ | 「Audiência.」 |
      *
-     *   完全無聲的音檔 + 敘述句提示 → 「這個是 THE HOPE Taipei 的音響工程。」
-     *   完全無聲的音檔 + 只給詞彙表 → 「木作」
-     *   完全無聲的音檔 + 完全沒提示 → 「Sınıfın」
+     * 兩個教訓:
+     * 1. **詞彙表要用指示句框住**。裸清單會被模型當成「要輸出的內容」直接複製,
+     *    這正是 Yen 講了 11 秒話卻收到整份詞彙表的原因。
+     * 2. 指示句要講「只轉寫聽到的」,不要講「不要輸出清單」——後者反而讓模型
+     *    把整段指示也吐出來(它把指示當成內容了)。
      *
-     * 而清楚的音檔在三種寫法下辨識結果一樣好(都正確辨出「磐頂長老教會」),
-     * 沒提示才會錯成「壇頂」。也就是說:**詞彙表有用,敘述句只有害。**
-     *
-     * 差別在失敗的樣子:敘述句會讓失敗長得像真的工作記錄(使用者不會發現,
-     * 假資料就這樣進系統);只給詞彙表則會吐出零散單詞,一看就知道不對,
-     * 而且會被 looksLikePromptEcho 接住擋掉。
-     *
-     * 繁體不用特別交代——詞彙表本身就是繁體,已經足夠引導,
-     * 而且辨識結果還會再過一次 toTw() 保險。
+     * 詞彙表本身不能省:沒有它,清楚的音檔會把「磐頂」辨成「壇頂」。
+     * 剩下的回吐(無聲時吐單一詞彙)由 looksLikePromptEcho 接住。
      */
-    prompt: parts.join('、'),
+    prompt: `請只轉寫音訊中實際聽到的內容。可能出現的專有名詞供參考:${parts.join('、')}`,
     siteCount: names.length,
     truncated,
   };

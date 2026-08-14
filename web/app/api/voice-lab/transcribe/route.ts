@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from 'node:fs/promises';
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { AgentConfigError } from '@/lib/voice-agent-tools';
@@ -30,6 +31,35 @@ const MAX_BYTES = 8 * 1024 * 1024;
  * 編造內容有前端與這裡兩道防線,誤擋卻會讓整個功能不能用。
  */
 const MIN_BYTES = 4 * 1024;
+
+/**
+ * 診斷模式:把真人錄的音檔與辨識結果留在磁碟上。
+ *
+ * 為什麼需要:我(開發時)只能用 macOS 語音合成的音檔測試,那跟真人講話的
+ * 音量、節奏、編碼特性差很多——這是前幾輪一直修不到點上的原因。
+ * 真實錄音留下來才能對照「使用者實際講了什麼」與「模型聽成什麼」。
+ *
+ * 預設關閉。要用就在 .env.local 設 VOICE_DEBUG_DIR=/path/to/dir。
+ * 錄音檔含人聲,是敏感資料,絕不預設開啟、也不要指向 repo 內的目錄。
+ */
+async function saveDebugCapture(
+  audio: Blob,
+  filename: string,
+  meta: Record<string, unknown>,
+): Promise<void> {
+  const dir = process.env.VOICE_DEBUG_DIR;
+  if (!dir) return;
+  try {
+    await mkdir(dir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const ext = filename.split('.').pop() || 'webm';
+    await writeFile(`${dir}/${stamp}.${ext}`, Buffer.from(await audio.arrayBuffer()));
+    await writeFile(`${dir}/${stamp}.json`, JSON.stringify(meta, null, 2));
+  } catch (e) {
+    // 診斷失敗不能影響正常流程,但要看得見——不要靜默吞掉
+    console.error('[voice-debug] 存檔失敗:', e);
+  }
+}
 
 export async function POST(req: Request) {
   const user = await getSession();
@@ -83,6 +113,16 @@ export async function POST(req: Request) {
   const filename = typeof form.get('filename') === 'string' ? String(form.get('filename')) : 'audio.webm';
   const hotwords = await buildHotwordPrompt();
   const result = await stt.transcribe(file, filename, hotwords.prompt);
+
+  await saveDebugCapture(file, filename, {
+    bytes: file.size,
+    mime: file.type,
+    model: stt.model,
+    hotword_prompt: hotwords.prompt,
+    result: result.ok
+      ? { ok: true, text: result.text, attempts: result.attempts }
+      : { ok: false, error_code: result.error_code, message: result.message_zh, attempts: result.attempts },
+  });
 
   if (!result.ok) {
     // 辨識失敗一律講清楚,不回一個空字串讓前端以為使用者沒講話

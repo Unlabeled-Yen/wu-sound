@@ -12,17 +12,36 @@ import { looksLikePromptEcho } from '@/lib/voice-stt';
  * 那個代價比偶爾放過一句編造的還高。
  */
 
-// 提示詞現在只有詞彙表,沒有敘述句——敘述句被證實是編造的元兇,已移除
-const PROMPT =
-  '磐頂長老教會、北屯旌旗、恩光堂、木作、放樣、監工、進場、收邊、天花、線槽、' +
-  '音響定位、喇叭、擴大機、混音器、訊號線、吊掛、陣列、調音、驗收';
+const VOCAB =
+  'THE HOPE Taipei、北屯旌旗、恩光堂、斗六旌旗、新竹旌旗、磐頂長老教會、豐原旌旗、' +
+  '木作、放樣、監工、進場、收邊、天花、線槽、音響定位、喇叭、擴大機、混音器、訊號線、吊掛、陣列、調音、驗收';
+const PROMPT = `請只轉寫音訊中實際聽到的內容。可能出現的專有名詞供參考:${VOCAB}`;
+
+/** 真人講 11 秒的錄音大約這個大小(Opus 約 7KB/秒) */
+const ELEVEN_SEC = 168_276;
+/** 講一句短案名大約 2 秒 */
+const TWO_SEC = 14_000;
 
 describe('回吐提示詞偵測', () => {
   it('擋掉實測抓到的編造樣本(短,且每個字都來自提示詞)', () => {
-    // 拿掉敘述句之後,聽不清的音檔會吐零散單詞而不是編成句子——正是這裡要接住的
     for (const echo of ['木。', '喇叭', '混。', '收邊', '天花', '木作', '音響']) {
       expect(looksLikePromptEcho(echo, PROMPT), echo).toBe(true);
     }
+  });
+
+  it('擋掉整份詞彙表被原封不動吐回來——Yen 講 11 秒卻收到這個', () => {
+    // 這是最初的事故:裸詞彙表提示讓模型直接複製貼上整份清單當轉寫結果
+    expect(looksLikePromptEcho(VOCAB, PROMPT, ELEVEN_SEC)).toBe(true);
+    // 沒有音檔大小資訊時也要擋——清單長到不可能是人講的話
+    expect(looksLikePromptEcho(VOCAB, PROMPT)).toBe(true);
+  });
+
+  it('講了很久卻只吐出一個案名 → 回吐;真的講那個案名 → 放行', () => {
+    // 同樣的輸出,靠錄音長度分辨是「模型沒在聽」還是「使用者真的只講了案名」
+    expect(looksLikePromptEcho('THE HOPE Taipei', PROMPT, ELEVEN_SEC)).toBe(true);
+    // 回答「這是要記到哪個專案?」時只講案名是合法的,不能擋
+    expect(looksLikePromptEcho('THE HOPE Taipei', PROMPT, TWO_SEC)).toBe(false);
+    expect(looksLikePromptEcho('磐頂長老教會', PROMPT, TWO_SEC)).toBe(false);
   });
 
   it('不擋語音確認口令——那些字不在提示詞裡,而且是寫入流程的關鍵', () => {
