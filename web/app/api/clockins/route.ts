@@ -57,6 +57,17 @@ export async function POST(req: Request) {
   if (error) {
     return NextResponse.json({ error: `打卡失敗: ${error.message}` }, { status: 500 });
   }
+
+  if (isBackfill) {
+    await supabase.from('audit_log').insert({
+      actor_id: session.id,
+      action: 'clockin.backfill',
+      target_table: 'clockins',
+      target_id: data.id,
+      diff: { after: data },
+    });
+  }
+
   return NextResponse.json({ ok: true, clockin: data });
 }
 

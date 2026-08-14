@@ -141,6 +141,11 @@ export default function StaffClockinPage() {
       setBfError('請填寫補打卡原因');
       return;
     }
+    const deltaHours = Math.abs(Date.now() - new Date(bfTs).getTime()) / 3_600_000;
+    const deltaLabel = deltaHours >= 1 ? `約 ${deltaHours.toFixed(1)} 小時` : `約 ${Math.round(deltaHours * 60)} 分鐘`;
+    if (!window.confirm(`這筆補打卡時間跟現在差${deltaLabel},確定要送出嗎?`)) {
+      return;
+    }
     setBfSubmitting(true);
     try {
       const res = await fetch('/api/clockins', {

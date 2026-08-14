@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { pairClockinsByDay } from '@/lib/hours';
 import AllocationEditor from './AllocationEditor';
+import ClockinEntry from './ClockinEntry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,11 +25,6 @@ function parseMonth(v: string | undefined): { ym: string; y: number; m: number }
   const ym = v && /^\d{4}-\d{2}$/.test(v) ? v : fallback;
   const [y, m] = ym.split('-').map((x) => parseInt(x, 10));
   return { ym, y, m };
-}
-
-function fmtTime(iso: string) {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 function localDay(iso: string) {
@@ -214,23 +210,14 @@ export default async function BossClockinsPage({
                         ) : (
                           <div className="space-y-0.5">
                             {entries.map((e) => (
-                              <div key={e.id} className="flex items-center justify-center gap-1">
-                                <span
-                                  style={{ color: e.type === 'in' ? 'var(--nm-success-glass-text)' : 'var(--nm-warning-glass-text)' }}
-                                  title={e.type === 'in' ? '上班' : '下班'}
-                                >
-                                  {e.type === 'in' ? '入' : '出'} {fmtTime(e.ts)}
-                                </span>
-                                {e.is_backfill && (
-                                  <span
-                                    className="nm-pill nm-pill-warning"
-                                    style={{ padding: '1px 6px', fontSize: 11 }}
-                                    title={e.backfill_reason || '補登'}
-                                  >
-                                    補
-                                  </span>
-                                )}
-                              </div>
+                              <ClockinEntry
+                                key={e.id}
+                                id={e.id}
+                                type={e.type}
+                                ts={e.ts}
+                                isBackfill={e.is_backfill}
+                                backfillReason={e.backfill_reason}
+                              />
                             ))}
                           </div>
                         )}
@@ -247,7 +234,9 @@ export default async function BossClockinsPage({
       <div className="mt-8">
         <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--nm-text-primary)' }}>案場歸屬</h2>
         <p className="text-[13px] mb-3" style={{ color: 'var(--nm-text-secondary)' }}>
-          工時口徑為每對上下班配對相加(暫定,未經正式拍板);未分攤的日子會在專案損益報表列為「內勤/庫房」,不會硬塞進任何專案。
+          工時口徑為每對上下班配對相加(暫定,未經正式拍板)。這裡記的案場歸屬目前只作紀錄用,
+          尚未接進任何報表的損益計算——專案管理系統的協作紀錄與工時分攤正在重新設計,
+          等新機制上線後才會有真正的損益依據。
         </p>
         <AllocationEditor sites={activeSites} rows={allocationRows} initial={initialAllocations} />
       </div>
