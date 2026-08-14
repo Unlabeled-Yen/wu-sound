@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useAssistantReturn } from '@/app/_shared/useAssistantShortcut';
 
 /**
  * Realtime 最小驗證客戶端(spec §1 連線流程)。
@@ -20,6 +21,7 @@ interface LogLine {
 }
 
 export function LiveTest() {
+  useAssistantReturn();
   const [status, setStatus] = useState<'idle' | 'connecting' | 'live' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState('');
