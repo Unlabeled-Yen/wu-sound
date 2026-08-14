@@ -244,7 +244,7 @@ export async function ReceivablesView({
                   {r.status === 'voided' && <span className="nm-pill nm-pill-muted line-through">已作廢</span>}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
-                  <StatusButtons id={r.id} status={r.status} />
+                  <StatusButtons id={r.id} status={r.status} remainingTwd={r.remaining_twd} direction={direction} />
                 </td>
               </tr>
             ))}

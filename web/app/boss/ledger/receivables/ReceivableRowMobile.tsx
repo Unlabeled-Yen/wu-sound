@@ -42,7 +42,7 @@ export default function ReceivableRowMobile({ row }: { row: ReceivableWithRemain
       )}
 
       <div className="pt-1">
-        <StatusButtons id={row.id} status={row.status} />
+        <StatusButtons id={row.id} status={row.status} remainingTwd={row.remaining_twd} direction={row.direction} />
       </div>
     </div>
   );

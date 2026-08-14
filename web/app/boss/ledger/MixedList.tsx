@@ -65,7 +65,7 @@ export function MixedList({ title, tone, unsettledItems, settledItems }: {
                   <span className="text-[16px] font-semibold tabular-nums shrink-0" style={{ color: r.overpaid ? 'var(--nm-danger-glass-text)' : 'var(--nm-warning-glass-text)' }}>
                     {r.overpaid ? `超收 $${fmt(Math.abs(r.remaining_twd))}` : `$${fmt(r.remaining_twd)}`}
                   </span>
-                  <div className="shrink-0"><StatusButtons id={r.id} status={r.status} /></div>
+                  <div className="shrink-0"><StatusButtons id={r.id} status={r.status} remainingTwd={r.remaining_twd} direction={tone === 'income' ? 'receivable' : 'payable'} /></div>
                 </div>
               );
             })}
@@ -88,7 +88,7 @@ export function MixedList({ title, tone, unsettledItems, settledItems }: {
                 </div>
                 <div className="flex items-center justify-between pt-0.5">
                   <span className="nm-pill nm-pill-warning">{unsettledLabel}</span>
-                  <StatusButtons id={item.row.id} status={item.row.status} />
+                  <StatusButtons id={item.row.id} status={item.row.status} remainingTwd={item.row.remaining_twd} direction={tone === 'income' ? 'receivable' : 'payable'} />
                 </div>
               </div>
             ))}
