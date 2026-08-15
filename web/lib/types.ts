@@ -355,3 +355,65 @@ export type VoiceTaskStatus = 'open' | 'done';
 export type VoiceSource = 'voice' | 'text' | 'web';
 export interface VoiceTask { id:string; site_id:string; title:string; description:string|null; due_date:string|null; status:VoiceTaskStatus; created_by:string; source:VoiceSource; created_at:string; updated_at:string; }
 export interface WriteProposal { token:string; action:'create_task'|'log_note'; payload:Record<string,unknown>; payload_hash:string; actor_id:string; source:'voice'|'text'; transcript_ref:string|null; capture_ref:string|null; created_at:string; expires_at:string; used_at:string|null; result:Record<string,unknown>|null; }
+
+// 專案管理一案一工作面(06-project-board.md)。11a 桌機案子詳情:四欄看板 + 場地知識帶 + 案子動態軌。
+export interface Venue { id: string; name: string; notes: string | null; created_at: string }
+
+export type TaskStatus = 'boss_decision' | 'todo' | 'blocked' | 'done';
+
+export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
+  boss_decision: '要老闆決定',
+  todo: '待辦',
+  blocked: '卡住・等料',
+  done: '完成',
+};
+
+export const TASK_STATUS_ORDER: TaskStatus[] = ['boss_decision', 'todo', 'blocked', 'done'];
+
+// 四欄本來就可任意互轉(不像設備/報價單有終態),這裡保留 QUOTE_STATUS_TRANSITIONS
+// 同款寫法只是留一個收緊的掛鉤,現在每一欄都能轉去其他三欄。
+export const TASK_STATUS_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
+  boss_decision: ['todo', 'blocked', 'done'],
+  todo: ['boss_decision', 'blocked', 'done'],
+  blocked: ['boss_decision', 'todo', 'done'],
+  done: ['boss_decision', 'todo', 'blocked'],
+};
+
+export const TASK_TAGS = ['急', '叫料', '施工', '客訴', '報價', '保養'] as const;
+export type TaskTag = typeof TASK_TAGS[number];
+
+export interface TaskChecklistItem { label: string; done: boolean }
+
+export interface Task {
+  id: string;
+  site_id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  status: TaskStatus;
+  created_by: string;
+  source: VoiceSource;
+  tags: string[];
+  cover_photo_path: string | null;
+  waiting_reason: string | null;
+  stuck_since: string | null;
+  checklist: TaskChecklistItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SiteKnowledge {
+  id: string;
+  venue_id: string;
+  source_site_id: string | null;
+  content: string;
+  area_label: string | null;
+  pinned: boolean;
+  promoted_to_checklist: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  last_viewed_at: string | null;
+}
+
+export const SITE_KNOWLEDGE_PIN_LIMIT = 5;

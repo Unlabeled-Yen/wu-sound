@@ -27,19 +27,35 @@ export async function createSite(formData: FormData) {
   if (!name) throw new Error('專案名稱不得為空');
   const categoryId = (formData.get('category_id') as string || '').trim() || null;
   const customerName = (formData.get('customer_name') as string || '').trim() || null;
+  const venueId = (formData.get('venue_id') as string || '').trim() || null;
+  const newVenueName = (formData.get('new_venue_name') as string || '').trim() || null;
+
+  if (!venueId && !newVenueName) throw new Error('請選擇既有場館,或填新場館名稱');
+  if (venueId && newVenueName) throw new Error('場館只能擇一:選既有的,或填新的');
 
   const sb = getSupabaseAdmin();
   const dup = await sb.from('sites').select('id').eq('name', name).maybeSingle();
   if (dup.error) throw new Error(dup.error.message);
   if (dup.data) throw new Error(`已有專案「${name}」`);
 
+  let resolvedVenueId = venueId;
+  if (newVenueName) {
+    const venueDup = await sb.from('venues').select('id').eq('name', newVenueName).maybeSingle();
+    if (venueDup.error) throw new Error(venueDup.error.message);
+    if (venueDup.data) throw new Error(`已有場館「${newVenueName}」,請改用下拉選單選它`);
+
+    const venueIns = await sb.from('venues').insert({ name: newVenueName }).select('id').single();
+    if (venueIns.error) throw new Error(venueIns.error.message);
+    resolvedVenueId = venueIns.data.id as string;
+  }
+
   const ins = await sb
     .from('sites')
-    .insert({ name, active: true, category_id: categoryId, customer_name: customerName })
+    .insert({ name, active: true, category_id: categoryId, customer_name: customerName, venue_id: resolvedVenueId })
     .select('id')
     .single();
   if (ins.error) throw new Error(ins.error.message);
-  await audit(actor.id, 'site.create', ins.data.id as string, { name, category_id: categoryId, customer_name: customerName });
+  await audit(actor.id, 'site.create', ins.data.id as string, { name, category_id: categoryId, customer_name: customerName, venue_id: resolvedVenueId });
   revalidatePath('/boss/sites');
 }
 

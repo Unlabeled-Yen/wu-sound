@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -14,7 +15,13 @@ interface Row {
   created_at: string;
   category_id: string | null;
   customer_name: string | null;
+  venue_id: string;
   in_use: number;
+}
+
+interface VenueRow {
+  id: string;
+  name: string;
 }
 
 export default async function BossSitesPage() {
@@ -23,13 +30,16 @@ export default async function BossSitesPage() {
   if (session.role !== 'boss') redirect('/staff');
 
   const sb = getSupabaseAdmin();
-  const [{ data: sitesData, error }, { data: eqRefs }, { data: categoriesData }] = await Promise.all([
-    sb.from('sites').select('id, name, active, created_at, category_id, customer_name').order('active', { ascending: false }).order('name'),
+  const [{ data: sitesData, error }, { data: eqRefs }, { data: categoriesData }, { data: venuesData }] = await Promise.all([
+    sb.from('sites').select('id, name, active, created_at, category_id, customer_name, venue_id').order('active', { ascending: false }).order('name'),
     sb.from('equipment').select('current_site_id').eq('status', 'on_site'),
     sb.from('site_categories').select('id, name, active').eq('active', true).order('name'),
+    sb.from('venues').select('id, name').order('name'),
   ]);
 
   const categories = (categoriesData ?? []) as SiteCategory[];
+  const venues = (venuesData ?? []) as VenueRow[];
+  const venueNameById = new Map(venues.map((v) => [v.id, v.name]));
 
   const refCount = new Map<string, number>();
   for (const r of (eqRefs || []) as { current_site_id: string | null }[]) {
@@ -75,7 +85,7 @@ export default async function BossSitesPage() {
         </form>
       </div>
 
-      <form action={createSite} className="flex gap-2 items-center mb-6 max-w-lg flex-wrap">
+      <form action={createSite} className="flex gap-2 items-center mb-6 max-w-2xl flex-wrap">
         <input
           name="name"
           required
@@ -93,6 +103,16 @@ export default async function BossSitesPage() {
           className="nm-input text-[13px]"
           style={{ width: 140 }}
         />
+        <select name="venue_id" className="nm-input text-[13px]" style={{ width: 'auto' }} defaultValue="">
+          <option value="">場館:新建 →</option>
+          {venues.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+        </select>
+        <input
+          name="new_venue_name"
+          placeholder="新場館名稱(選現有場館時留空)"
+          className="nm-input text-[13px]"
+          style={{ width: 200 }}
+        />
         <button
           type="submit"
           className="nm-btn-solid text-[13px]"
@@ -100,12 +120,16 @@ export default async function BossSitesPage() {
           新增
         </button>
       </form>
+      <p className="text-[12px] -mt-4 mb-6 max-w-2xl" style={{ color: 'var(--nm-text-faint)' }}>
+        場館 = 場地知識跟著走的地點(如「中壢藝術館」),同一場館可能被好幾個不同案子重複進場。新案子若在既有場館舉辦,請從下拉選單選它,場地知識才會累積在一起;要建全新地點才填新場館名稱。
+      </p>
 
       <div className="rounded-2xl nm-raised overflow-x-auto overflow-y-auto">
         <table className="w-full text-[13px]" style={{ minWidth: 780, borderCollapse: 'collapse' }}>
           <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
             <tr style={{ color: 'var(--nm-text-muted)' }}>
               <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">名稱</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">場館</th>
               <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">類別</th>
               <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">客戶</th>
               <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">狀態</th>
@@ -117,18 +141,26 @@ export default async function BossSitesPage() {
             {sites.map((s) => (
               <tr key={s.id} style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
                 <td className="py-2 px-3.5 whitespace-nowrap">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Link href={`/boss/sites/${s.id}`} className="text-[13px] underline nm-focus" style={{ color: 'var(--nm-text-primary)' }}>
+                      {s.name}
+                    </Link>
+                  </div>
                   <form action={renameSite} className="flex items-center gap-2">
                     <input type="hidden" name="id" value={s.id} />
                     <input
                       name="name"
                       defaultValue={s.name}
-                      className="border-b outline-none bg-transparent nm-focus"
-                      style={{ borderColor: 'transparent', color: 'var(--nm-text-body)' }}
+                      className="border-b outline-none bg-transparent nm-focus text-xs"
+                      style={{ borderColor: 'transparent', color: 'var(--nm-text-muted)' }}
                     />
                     <button type="submit" className="text-xs nm-focus" style={{ color: 'var(--nm-text-muted)' }}>
                       存
                     </button>
                   </form>
+                </td>
+                <td className="py-2 px-3.5 whitespace-nowrap">
+                  <span style={{ color: 'var(--nm-text-secondary)' }}>{venueNameById.get(s.venue_id) ?? '—'}</span>
                 </td>
                 <td className="py-2 px-3.5 whitespace-nowrap">
                   <form action={updateSiteMeta} className="flex items-center gap-2">

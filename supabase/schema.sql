@@ -41,16 +41,27 @@ create table site_categories (
   created_at timestamptz not null default now()
 );
 
+-- 場館/場地。sites(案子)引用它——同一場館可能被好幾個不同案子重複進場,
+-- 場地知識(見下方 site_knowledge)跟著場館走,不跟著案子走。見 migrations/018。
+create table venues (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 create table sites (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
   active boolean not null default true,
   category_id uuid references site_categories(id),
   customer_name text,
+  venue_id uuid not null references venues(id),
   created_at timestamptz not null default now()
 );
 
 create index sites_category_idx on sites (category_id);
+create index sites_venue_idx on sites (venue_id);
 
 -- voice-lab Lab 2 案場模糊搜尋:trigram 相似度接住跳字省略的口語講法
 -- (例:講「磐頂教會」要能搜到「磐頂長老教會」)。見 migrations/016。
@@ -158,15 +169,21 @@ create table audit_log (
 create index audit_log_ts_idx on audit_log (ts desc);
 
 -- voice-lab Lab 1:語音/打字介面,任務(派工最小版)。見 voice-lab/lab1-wu-adapter-spec-v1.md §3。
+-- 看板化(四欄)+ 卡片欄位見 06-project-board.md 11a §4、migrations/019。
 create table tasks (
   id uuid primary key default gen_random_uuid(),
   site_id uuid not null references sites(id),
   title text not null,
   description text,
   due_date date,
-  status text not null default 'open' check (status in ('open', 'done')),
+  status text not null default 'todo' check (status in ('boss_decision', 'todo', 'blocked', 'done')),
   created_by uuid not null references users(id),
   source text not null default 'web' check (source in ('voice', 'text', 'web')),
+  tags text[] not null default '{}',
+  cover_photo_path text,
+  waiting_reason text,
+  stuck_since timestamptz,
+  checklist jsonb not null default '[]',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -192,6 +209,25 @@ create table write_proposals (
 
 create index write_proposals_expiry_idx on write_proposals (expires_at);
 
+-- 場地知識:跨案子、掛場館(不掛案子)的長效筆記。見 06-project-board.md 11c、migrations/020。
+-- 進場必讀上限 5 條是刻意的摩擦,app 層強制(validatePin),不下 DB constraint。
+create table site_knowledge (
+  id uuid primary key default gen_random_uuid(),
+  venue_id uuid not null references venues(id),
+  source_site_id uuid references sites(id),
+  content text not null,
+  area_label text,
+  pinned boolean not null default false,
+  promoted_to_checklist boolean not null default false,
+  created_by uuid not null references users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  last_viewed_at timestamptz
+);
+
+create index site_knowledge_venue_idx on site_knowledge (venue_id);
+create index site_knowledge_venue_pinned_idx on site_knowledge (venue_id) where pinned = true;
+
 -- updated_at 自動維護
 create or replace function bump_updated_at() returns trigger as $$
 begin new.updated_at = now(); return new; end $$ language plpgsql;
@@ -201,6 +237,9 @@ before update on expenses for each row execute function bump_updated_at();
 
 create trigger tasks_bump_updated
 before update on tasks for each row execute function bump_updated_at();
+
+create trigger site_knowledge_bump_updated
+before update on site_knowledge for each row execute function bump_updated_at();
 
 -- Phase 2:大型設備位置追蹤
 create type equipment_category as enum (
@@ -554,6 +593,7 @@ create index quote_lines_quote_idx on quote_lines (quote_id, sort_order);
 -- RLS: 用 app 層以 users.id 通過 service role 存取(Phase 1 不用 Supabase Auth,
 -- 應用端 server actions 帶 user_id 過來,靠 service key + 明確 where 條件把關)。
 alter table users enable row level security;
+alter table venues enable row level security;
 alter table sites enable row level security;
 alter table expenses enable row level security;
 alter table worklogs enable row level security;
@@ -577,6 +617,7 @@ alter table bundle_lines enable row level security;
 alter table line_bind_codes enable row level security;
 alter table tasks enable row level security;
 alter table write_proposals enable row level security;
+alter table site_knowledge enable row level security;
 -- 只有 service_role 能存取(anon 全部拒絕),應用端一律由 server 走。
 -- 若日後改用 Supabase Auth,改為以 auth.uid() 比對 users.id 即可。
 -- user_pay_profiles/monthly_cost_rates 額外強調:即使 service_role 繞過 RLS,
