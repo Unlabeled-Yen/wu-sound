@@ -43,7 +43,7 @@ export function NetBand({
         </div>
       </div>
       <div style={{ flex: 1, minWidth: 280, maxWidth: 400 }}>
-        <div className="text-[13px] mb-3" style={{ color: 'var(--nm-warning-glass-text)' }}>
+        <div className="text-[13px] mb-3 tabular-nums" style={{ color: 'var(--nm-warning-glass-text)' }}>
           {gap >= 0 ? '還沒進帳的差距' : '實收超過帳面的差距'}　${fmt(Math.abs(gap))}
         </div>
         {gapBasis > 0 && (
@@ -62,7 +62,7 @@ export function NetBand({
             )}
           </div>
         )}
-        <div className="text-[12.5px] leading-[1.75]" style={{ color: 'var(--nm-text-secondary)' }}>
+        <div className="text-[12.5px] leading-[1.75] tabular-nums" style={{ color: 'var(--nm-text-secondary)' }}>
           應收未收 ${fmt(incomeUnsettled)} · 應付未付 ${fmt(expenseUnsettled)}(空心＝錢還沒動,分開計算)
         </div>
       </div>

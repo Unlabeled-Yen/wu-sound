@@ -358,7 +358,17 @@ function TenderCard({ hit }: { hit: TenderHit }) {
         </span>
       </div>
 
-      <p className="mb-2 text-[13px]" style={{ color: 'var(--nm-text-body)' }}>{hit.title}</p>
+      <p className="mb-2 text-[13px]" style={{ color: 'var(--nm-text-body)' }}>
+        {hit.title}
+        {hit.notice_type.includes('更正') && (
+          <span
+            className="ml-1.5 text-[10px] px-1 py-px rounded align-middle"
+            style={{ color: 'var(--nm-warning-glass-text)', background: 'rgba(217,181,107,0.12)', border: '1px solid rgba(217,181,107,0.26)' }}
+          >
+            有更正公告
+          </span>
+        )}
+      </p>
 
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         {hit.nature && (

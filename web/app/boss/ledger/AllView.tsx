@@ -98,8 +98,16 @@ export async function AllView({
     direction: r.direction,
     remaining_twd: r.remaining_twd,
     agreed_due_date: r.agreed_due_date,
+    label: r.party + (r.sites?.name ? `（${r.sites.name}）` : ''),
+    overdue: !!(r.agreed_due_date && r.agreed_due_date < taipeiTodayStr()),
   }));
-  const forecast = buildCashForecast(forecastRows, taipeiTodayStr());
+
+  const settingsRes = await sb.from('app_settings').select('key, value').in('key', ['cash_start_balance', 'cash_safety_level']);
+  const settingsMap = new Map((settingsRes.data ?? []).map((s: { key: string; value: string }) => [s.key, s.value]));
+  const cashStartBalance = Number(settingsMap.get('cash_start_balance') ?? '0');
+  const cashSafetyLevel = Number(settingsMap.get('cash_safety_level') ?? '150000');
+
+  const forecast = buildCashForecast(forecastRows, taipeiTodayStr(), cashStartBalance);
 
   const overdueReceivables = openReceivables.filter((r) => r.agreed_due_date && r.agreed_due_date < taipeiTodayStr() && r.remaining_twd > 0);
   const insight = generateLedgerInsight({
@@ -138,7 +146,7 @@ export async function AllView({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
-        <CashForecastTimeline forecast={forecast} />
+        <CashForecastTimeline forecast={forecast} startBalance={cashStartBalance} safetyLevel={cashSafetyLevel} />
         <AiInsightCard insight={insight} />
       </div>
 

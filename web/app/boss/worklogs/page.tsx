@@ -125,8 +125,8 @@ function EntryCard({ row, showSite = true, showDate = false }: { row: Row; showS
         {showSite && (
           <span style={{ color: 'var(--nm-text-secondary)' }}>· {row.sites?.name || '(未指定專案)'}</span>
         )}
-        {showDate && <span style={{ color: 'var(--nm-text-muted)' }}>· {row.logged_on}</span>}
-        <span className="ml-auto text-xs" style={{ color: 'var(--nm-text-faint)' }}>
+        {showDate && <span className="tabular-nums" style={{ color: 'var(--nm-text-muted)' }}>· {row.logged_on}</span>}
+        <span className="ml-auto text-xs tabular-nums" style={{ color: 'var(--nm-text-faint)' }}>
           {new Date(row.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>

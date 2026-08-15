@@ -61,7 +61,9 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'sites',
     label: '專案管理',
-    items: [{ href: '/boss/sites', label: '專案管理' }],
+    items: [
+      { href: '/boss/sites', label: '專案管理' },
+    ],
   },
   {
     key: 'ops',

@@ -11,6 +11,15 @@ export interface ForecastReceivable {
   direction: 'receivable' | 'payable';
   remaining_twd: number;
   agreed_due_date: string | null; // 'YYYY-MM-DD'
+  label?: string;
+  overdue?: boolean;
+}
+
+export interface WeekItem {
+  label: string;
+  amount: number;
+  direction: 'receivable' | 'payable';
+  overdue: boolean;
 }
 
 export interface WeekBucket {
@@ -19,6 +28,7 @@ export interface WeekBucket {
   to: string;
   incomeTwd: number;
   expenseTwd: number;
+  items: WeekItem[];
 }
 
 export interface CashForecast {
@@ -37,6 +47,8 @@ export interface CashForecast {
   unscheduledExpenseTwd: number;
   unscheduledIncomeCount: number;
   unscheduledExpenseCount: number;
+  /** 每週結束時的累計餘額(起點 + 各週淨流入),需要呼叫端提供起點。 */
+  balanceTrajectory: number[];
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -53,13 +65,14 @@ function diffDays(fromStr: string, toStr: string): number {
   return Math.round((b - a) / 86400000);
 }
 
-export function buildCashForecast(rows: ForecastReceivable[], today: string): CashForecast {
+export function buildCashForecast(rows: ForecastReceivable[], today: string, startBalance = 0): CashForecast {
   const weeks: WeekBucket[] = [0, 1, 2, 3].map((i) => ({
     weekIndex: i as 0 | 1 | 2 | 3,
     from: addDays(today, i * 7),
     to: addDays(today, i * 7 + 6),
     incomeTwd: 0,
     expenseTwd: 0,
+    items: [],
   }));
 
   let overdueIncomeTwd = 0;
@@ -70,8 +83,9 @@ export function buildCashForecast(rows: ForecastReceivable[], today: string): Ca
   const isIncome = (dir: 'receivable' | 'payable') => dir === 'receivable';
 
   for (const r of rows) {
-    if (r.remaining_twd <= 0) continue; // 超收/超付不計入現金時間軸(那是另一個警訊,見淨額帶)
+    if (r.remaining_twd <= 0) continue;
     const income = isIncome(r.direction);
+    const itemLabel = r.label ?? (income ? '應收' : '應付');
 
     if (!r.agreed_due_date) {
       if (income) { unscheduledIncomeTwd += r.remaining_twd; unscheduledIncomeCount++; }
@@ -81,9 +95,9 @@ export function buildCashForecast(rows: ForecastReceivable[], today: string): Ca
 
     const offset = diffDays(today, r.agreed_due_date);
     if (offset < 0) {
-      // 已逾期:併入第 0 週的收付金額(仍是「近期會發生的錢」),另外累計逾期額供標紅。
       if (income) { weeks[0].incomeTwd += r.remaining_twd; overdueIncomeTwd += r.remaining_twd; }
       else { weeks[0].expenseTwd += r.remaining_twd; overdueExpenseTwd += r.remaining_twd; }
+      weeks[0].items.push({ label: itemLabel, amount: r.remaining_twd, direction: r.direction, overdue: true });
       continue;
     }
     if (offset > 27) {
@@ -95,6 +109,14 @@ export function buildCashForecast(rows: ForecastReceivable[], today: string): Ca
     const weekIndex = Math.floor(offset / 7) as 0 | 1 | 2 | 3;
     if (income) weeks[weekIndex].incomeTwd += r.remaining_twd;
     else weeks[weekIndex].expenseTwd += r.remaining_twd;
+    weeks[weekIndex].items.push({ label: itemLabel, amount: r.remaining_twd, direction: r.direction, overdue: false });
+  }
+
+  const balanceTrajectory: number[] = [];
+  let running = startBalance;
+  for (const w of weeks) {
+    running += w.incomeTwd - w.expenseTwd;
+    balanceTrajectory.push(running);
   }
 
   return {
@@ -110,5 +132,6 @@ export function buildCashForecast(rows: ForecastReceivable[], today: string): Ca
     unscheduledExpenseTwd,
     unscheduledIncomeCount,
     unscheduledExpenseCount,
+    balanceTrajectory,
   };
 }
