@@ -377,13 +377,13 @@ select
   r.total_amount_twd,
   r.memo,
   r.status,
-  r.agreed_due_date,
   r.created_by,
   r.created_at,
   r.updated_at,
   coalesce(settled.settled_twd, 0) as settled_twd,
   r.total_amount_twd - coalesce(settled.settled_twd, 0) as remaining_twd,
-  coalesce(settled.settled_twd, 0) > r.total_amount_twd as overpaid
+  coalesce(settled.settled_twd, 0) > r.total_amount_twd as overpaid,
+  r.agreed_due_date
 from receivables r
 left join (
   -- 只認 posted 為已結——draft 尚未確認、voided 已作廢,兩者都不算已結金額。見 migrations/017。

@@ -8,9 +8,14 @@
 --     假裝有資料,一樣違反「缺資料就 loud」的原則。
 --
 -- ⚠️ 尚未在真 postgres 環境跑過,套用前依專案慣例先在含代表性資料的副本演練。
+--
+-- 修正記錄:第一版把 agreed_due_date 插在既有欄位中間,PostgreSQL 的
+-- CREATE OR REPLACE VIEW 只允許在原本欄位「後面」追加新欄位,插在中間會讓後面
+-- 欄位的序位跟著挪動,報 42P16(cannot change name of view column)。改成
+-- add column if not exists(可重跑)+ agreed_due_date 放到 select 清單最後面。
 
 alter table receivables
-  add column agreed_due_date date;
+  add column if not exists agreed_due_date date;
 
 comment on column receivables.agreed_due_date is
   '約定收款日(應收)或到期日(應付)。可為 NULL——2026-08 前建立的約定全部是 NULL,
@@ -18,7 +23,8 @@ comment on column receivables.agreed_due_date is
    把 NULL 明確列成獨立一組,不可預設塞進最近一週。';
 
 -- receivable_payment_state 是明確列欄位的 view(見 015),不是 select *,
--- 加欄位後要重建才會出現在讀取端。
+-- 加欄位後要重建才會出現在讀取端。agreed_due_date 放在最後一欄——
+-- CREATE OR REPLACE VIEW 只能在既有欄位「後面」加欄位,不能插在中間。
 create or replace view receivable_payment_state as
 select
   r.id,
@@ -28,13 +34,13 @@ select
   r.total_amount_twd,
   r.memo,
   r.status,
-  r.agreed_due_date,
   r.created_by,
   r.created_at,
   r.updated_at,
   coalesce(settled.settled_twd, 0) as settled_twd,
   r.total_amount_twd - coalesce(settled.settled_twd, 0) as remaining_twd,
-  coalesce(settled.settled_twd, 0) > r.total_amount_twd as overpaid
+  coalesce(settled.settled_twd, 0) > r.total_amount_twd as overpaid,
+  r.agreed_due_date
 from receivables r
 left join (
   -- 只認 posted 為已結,對齊 017 對這個 view 的粒度修正。
