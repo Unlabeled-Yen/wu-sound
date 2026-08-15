@@ -1,10 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import type { PlacebookData, PlaceRow, WeekSlot } from '@/lib/placebook-data';
-
-const fmt = (n: number) => n.toLocaleString('zh-TW');
+import type { PlacebookData, PlaceRow, SiteCategoryOption, WeekSlot } from '@/lib/placebook-data';
+import { createSite, createSiteCategory, renameSite, setSiteActive, updateSiteMeta } from './actions';
 
 function relDate(dateStr: string, today: string): string {
   if (dateStr === today) return '今天';
@@ -26,26 +24,127 @@ function statusSentence(p: PlaceRow): { text: string; color: string } | null {
   return null;
 }
 
-function PlaceSubRow({ project }: { project: PlaceRow['projects'][number] }) {
+// 新增案子面板——原本「全部專案」分頁的表單整批搬進地點簿本身(2026-08-15
+// 決定:地點簿取代全部專案,不再是兩個分頁,新增/管理類別也收進這裡)。
+function NewProjectPanel({ categories }: { categories: SiteCategoryOption[] }) {
+  const [open, setOpen] = useState(false);
+  const [manageCategories, setManageCategories] = useState(false);
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="nm-btn-solid text-[13px] shrink-0">
+        ＋ 新增案子
+      </button>
+    );
+  }
+
   return (
-    <div style={{ padding: '9px 0 9px 14px', borderLeft: '1px solid rgba(255,255,255,.12)' }} className="flex items-center gap-2.5 flex-wrap">
-      <span className="text-[12.5px]" style={{ color: 'var(--nm-text-body)' }}>{project.name}</span>
-      {project.categoryName && (
-        <span className="text-[10px]" style={{ padding: '3px 8px', borderRadius: 5, background: 'rgba(255,255,255,.07)', color: 'var(--nm-text-secondary)' }}>
-          {project.categoryName}
-        </span>
-      )}
-      {!project.active && (
-        <span className="text-[11.5px]" style={{ color: 'var(--nm-text-faint)' }}>已停用</span>
-      )}
-      {project.pendingTaskCount !== null && project.pendingTaskCount > 0 && (
-        <span className="text-[11.5px]" style={{ color: 'var(--nm-warning-glass-text)' }}>{project.pendingTaskCount} 件未完成</span>
+    <div className="rounded-2xl nm-raised-sm p-3.5 mb-4">
+      <form action={createSite} className="flex gap-2 items-center flex-wrap mb-2.5">
+        <input name="name" required placeholder="案子名稱" className="flex-1 nm-input text-[13px]" style={{ minWidth: 160 }} />
+        <select name="category_id" className="nm-input text-[13px]" style={{ width: 'auto' }}>
+          <option value="">類別:未設</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <input name="customer_name" placeholder="客戶(選填)" className="nm-input text-[13px]" style={{ width: 140 }} />
+        <button type="submit" className="nm-btn-solid text-[13px]">新增</button>
+        <button type="button" onClick={() => setOpen(false)} className="nm-btn text-[13px]">取消</button>
+      </form>
+      <button
+        type="button"
+        onClick={() => setManageCategories((v) => !v)}
+        className="text-[12px] underline"
+        style={{ color: 'var(--nm-text-muted)' }}
+      >
+        {manageCategories ? '收起類別管理' : '管理類別'}
+      </button>
+      {manageCategories && (
+        <div className="mt-2.5 pt-2.5" style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {categories.length === 0 ? (
+              <span className="text-[12px]" style={{ color: 'var(--nm-text-faint)' }}>還沒有類別</span>
+            ) : (
+              categories.map((c) => <span key={c.id} className="nm-pill nm-pill-neutral">{c.name}</span>)
+            )}
+          </div>
+          <form action={createSiteCategory} className="flex gap-2 items-center max-w-sm">
+            <input name="name" required placeholder="新增類別名稱" className="flex-1 nm-input text-[13px]" />
+            <button type="submit" className="nm-btn text-[13px]">新增類別</button>
+          </form>
+        </div>
       )}
     </div>
   );
 }
 
-function PlaceListRow({ place, today, defaultExpanded }: { place: PlaceRow; today: string; defaultExpanded: boolean }) {
+function PlaceSubRow({ project, categories }: { project: PlaceRow['projects'][number]; categories: SiteCategoryOption[] }) {
+  const [editing, setEditing] = useState(false);
+  const cannotDeactivate = project.active && project.onSiteEquipmentQty > 0;
+
+  return (
+    <div style={{ padding: '9px 0 9px 14px', borderLeft: '1px solid rgba(255,255,255,.12)' }}>
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <span className="text-[12.5px]" style={{ color: 'var(--nm-text-body)' }}>{project.name}</span>
+        {project.categoryName && (
+          <span className="text-[10px]" style={{ padding: '3px 8px', borderRadius: 5, background: 'rgba(255,255,255,.07)', color: 'var(--nm-text-secondary)' }}>
+            {project.categoryName}
+          </span>
+        )}
+        {!project.active && (
+          <span className="text-[11.5px]" style={{ color: 'var(--nm-text-faint)' }}>已停用</span>
+        )}
+        {project.pendingTaskCount !== null && project.pendingTaskCount > 0 && (
+          <span className="text-[11.5px]" style={{ color: 'var(--nm-warning-glass-text)' }}>{project.pendingTaskCount} 件未完成</span>
+        )}
+        <button
+          type="button"
+          onClick={() => setEditing((e) => !e)}
+          className="text-[11px] underline ml-auto shrink-0"
+          style={{ color: 'var(--nm-text-muted)' }}
+        >
+          {editing ? '收起' : '編輯'}
+        </button>
+      </div>
+
+      {editing && (
+        <div className="mt-2 flex flex-col gap-2 max-w-md">
+          <form action={renameSite} className="flex items-center gap-2">
+            <input type="hidden" name="id" value={project.id} />
+            <input name="name" defaultValue={project.name} className="flex-1 nm-input text-[12.5px]" />
+            <button type="submit" className="nm-btn text-[12px] shrink-0">存名稱</button>
+          </form>
+          <form action={updateSiteMeta} className="flex items-center gap-2 flex-wrap">
+            <input type="hidden" name="id" value={project.id} />
+            <select name="category_id" defaultValue={project.categoryId ?? ''} className="nm-input text-[12.5px]" style={{ width: 'auto' }}>
+              <option value="">類別:未設</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <input name="customer_name" defaultValue={project.customerName ?? ''} placeholder="客戶" className="nm-input text-[12.5px]" style={{ width: 110 }} />
+            <button type="submit" className="nm-btn text-[12px] shrink-0">存類別/客戶</button>
+          </form>
+          <form action={setSiteActive}>
+            <input type="hidden" name="id" value={project.id} />
+            <input type="hidden" name="active" value={project.active ? 'false' : 'true'} />
+            <button
+              type="submit"
+              disabled={cannotDeactivate}
+              className="nm-btn text-[12px] disabled:opacity-40"
+              title={cannotDeactivate ? '有設備在此案場,請先把設備移回庫房再停用' : ''}
+            >
+              {project.active ? '停用此案子' : '啟用此案子'}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlaceListRow({ place, today, defaultExpanded, categories }: { place: PlaceRow; today: string; defaultExpanded: boolean; categories: SiteCategoryOption[] }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const sentence = statusSentence(place);
 
@@ -84,7 +183,7 @@ function PlaceListRow({ place, today, defaultExpanded }: { place: PlaceRow; toda
       </button>
       {expanded && (
         <div style={{ padding: '0 16px 10px 16px' }}>
-          {place.projects.map((p) => <PlaceSubRow key={p.id} project={p} />)}
+          {place.projects.map((p) => <PlaceSubRow key={p.id} project={p} categories={categories} />)}
         </div>
       )}
     </div>
@@ -133,14 +232,14 @@ export function PlacebookBoard({ data }: { data: PlacebookData }) {
     return (
       <div className="rounded-2xl nm-raised p-8 text-center">
         <p className="text-[13.5px] mb-3" style={{ color: 'var(--nm-text-secondary)' }}>還沒有任何地點</p>
-        <Link href="/boss/sites?tab=all" className="nm-btn-solid text-[13px]">＋ 新增案子</Link>
+        <NewProjectPanel categories={data.categories} />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex items-center gap-2.5 mb-4">
+      <div className="flex items-center gap-2.5 mb-4 flex-wrap">
         <div className="nm-inset flex-1" style={{ borderRadius: 12, minHeight: 38, display: 'flex', alignItems: 'center', padding: '0 12px', maxWidth: 320 }}>
           <SearchIcon />
           <input
@@ -152,6 +251,7 @@ export function PlacebookBoard({ data }: { data: PlacebookData }) {
             style={{ color: 'var(--nm-text-body)' }}
           />
         </div>
+        <NewProjectPanel categories={data.categories} />
       </div>
 
       <ThisWeekRow slots={data.weekSlots} today={today} />
@@ -170,13 +270,13 @@ export function PlacebookBoard({ data }: { data: PlacebookData }) {
         </div>
 
         {active.map((p) => (
-          <PlaceListRow key={p.key} place={p} today={today} defaultExpanded={p.todayHere} />
+          <PlaceListRow key={p.key} place={p} today={today} defaultExpanded={p.todayHere} categories={data.categories} />
         ))}
 
         {dormant.length > 0 && (
           <div style={{ borderTop: '1px solid rgba(255,255,255,.05)' }}>
             {dormantOpen ? (
-              dormant.map((p) => <PlaceListRow key={p.key} place={p} today={today} defaultExpanded={false} />)
+              dormant.map((p) => <PlaceListRow key={p.key} place={p} today={today} defaultExpanded={false} categories={data.categories} />)
             ) : (
               <button
                 type="button"
