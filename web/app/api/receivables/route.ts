@@ -41,6 +41,7 @@ export async function POST(req: Request) {
     site_id: body.site_id ? String(body.site_id) : null,
     total_amount_twd: Number(body.total_amount_twd),
     memo: body.memo ? String(body.memo).trim() || null : null,
+    agreed_due_date: body.agreed_due_date ? String(body.agreed_due_date) : null,
   };
 
   const err = validateReceivable(input);
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
       site_id: input.site_id,
       total_amount_twd: input.total_amount_twd,
       memo: input.memo,
+      agreed_due_date: input.agreed_due_date,
       created_by: session.id,
     })
     .select('*')

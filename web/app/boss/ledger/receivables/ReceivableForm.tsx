@@ -12,6 +12,7 @@ export default function ReceivableForm() {
   const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -32,6 +33,7 @@ export default function ReceivableForm() {
       site_id: siteId || null,
       total_amount_twd: Number(amount),
       memo: memo.trim() || null,
+      agreed_due_date: dueDate || null,
     };
     const err = validateReceivable(input);
     if (err) { setError(err); return; }
@@ -86,6 +88,15 @@ export default function ReceivableForm() {
       <div>
         <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>約定總額(元)</label>
         <input type="number" inputMode="numeric" min={1} step={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="nm-input" required />
+      </div>
+      <div>
+        <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+          約定{direction === 'receivable' ? '收款日' : '到期日'}(選填)
+        </label>
+        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="nm-input" />
+        <p className="text-xs mt-1" style={{ color: 'var(--nm-text-faint)' }}>
+          留空會顯示在帳務首頁「未排定」——不會被系統猜成任何一週。
+        </p>
       </div>
       <div>
         <label className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>備註</label>
