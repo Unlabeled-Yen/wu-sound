@@ -3,14 +3,14 @@ import { notFound } from 'next/navigation';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import {
   EQUIPMENT_CATEGORY_LABEL,
-  EQUIPMENT_STATUS_LABEL,
-  formatEquipmentLocation,
   type EquipmentCategory,
   type EquipmentStatus,
 } from '@/lib/types';
+import { REPAIR_STUCK_DAYS, SITE_STUCK_DAYS, daysSince, formatDateTime } from '@/lib/equipment-view';
 import { updateEquipment } from './actions';
 import MoveDialog from './MoveDialog';
-import RetireButton from './RetireButton';
+import HistoryList, { type HistoryItem } from './HistoryList';
+import { PositionTrackLg } from '../_shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +31,7 @@ interface EquipmentDetail {
   sites: { name: string } | null;
 }
 
-interface Movement {
+interface MovementRow {
   id: number;
   moved_at: string;
   from_status: EquipmentStatus;
@@ -73,90 +73,140 @@ export default async function EquipmentDetailPage({
     .eq('equipment_id', id)
     .order('moved_at', { ascending: false })
     .limit(200);
-  const movements = (mv.data as unknown as Movement[]) || [];
+  const movementError = !!mv.error;
+  const movements = movementError ? [] : ((mv.data as unknown as MovementRow[]) || []);
+
+  const historyItems: HistoryItem[] = movements.map((m) => ({
+    id: m.id,
+    moved_at: m.moved_at,
+    from_status: m.from_status,
+    to_status: m.to_status,
+    from_site_name: m.from_site?.name ?? null,
+    to_site_name: m.to_site?.name ?? null,
+    mover_name: m.users?.name ?? null,
+    notes: m.notes,
+  }));
+
+  const latest = movements[0] ?? null;
+  const stuckDays = latest ? daysSince(latest.moved_at) : null;
+  const isStuck =
+    (data.status === 'in_repair' && stuckDays !== null && stuckDays >= REPAIR_STUCK_DAYS) ||
+    (data.status === 'on_site' && stuckDays !== null && stuckDays >= SITE_STUCK_DAYS);
 
   async function saveAction(formData: FormData) {
     'use server';
     await updateEquipment(id, formData);
   }
 
+  const titleLabel = data.status === 'in_repair' ? '維修中' : data.status === 'on_site' ? `在案場　${data.sites?.name ?? '(未知)'}` : '在庫房';
+  const statusColor = data.status === 'in_repair' ? 'var(--nm-danger-glass-text)' : data.status === 'on_site' ? 'var(--nm-warning-glass-text)' : 'var(--nm-text-primary)';
+
+  let explanation: string;
+  if (!latest) {
+    explanation = '無移動記錄——不知道這台是何時進入目前狀態的。';
+  } else {
+    const { date } = formatDateTime(latest.moved_at);
+    const who = latest.users?.name || '(未知)';
+    const noteFrag = latest.notes ? `　·　備註「${latest.notes}」` : '';
+    if (data.status === 'in_repair') {
+      explanation = `已經 ${stuckDays} 天沒有進度　·　${date} 由 ${who} 送出${noteFrag}`;
+    } else if (data.status === 'on_site') {
+      explanation = `在此案場 ${stuckDays} 天　·　${date} 由 ${who} 帶去${noteFrag}`;
+    } else {
+      explanation = `${date} 由 ${who} 回庫${noteFrag}`;
+    }
+  }
+
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link href="/boss/equipment" className="text-[13px] underline nm-focus" style={{ color: 'var(--nm-text-muted)' }}>← 大型設備</Link>
-          <h1 className="text-xl font-semibold mt-1" style={{ color: 'var(--nm-text-primary)' }}>{data.name}</h1>
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ flex: '1 1 560px', minWidth: 0, borderRadius: 18, background: 'rgba(19,19,23,.7)', border: '1px solid rgba(255,255,255,.12)', overflow: 'hidden' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+          <Link href="/boss/equipment" className="nm-focus" style={{ font: '400 12px/1 "Noto Sans TC",sans-serif', color: 'var(--nm-text-muted)', textDecoration: 'none', marginBottom: 9, display: 'inline-block' }}>
+            ← 設備庫存
+          </Link>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ font: '600 19px/1 "Noto Sans TC",sans-serif', color: 'var(--nm-text-primary)', marginBottom: 8 }}>{data.name}</div>
+              <div style={{ font: '400 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace', color: 'var(--nm-text-muted)' }}>
+                {[data.brand, data.model_number, data.serial_number ? `SN ${data.serial_number}` : 'SN 缺'].filter(Boolean).join('　')}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <a
+                href="#edit-panel"
+                className="nm-focus"
+                style={{ listStyle: 'none', minHeight: 40, display: 'inline-flex', alignItems: 'center', padding: '0 14px', borderRadius: 12, background: 'rgba(40,40,46,.4)', border: '1px solid rgba(255,255,255,.2)', font: '400 12.5px/1 "Noto Sans TC",sans-serif', color: 'var(--nm-text-body)', textDecoration: 'none' }}
+              >
+                編輯資料
+              </a>
+              {data.status !== 'retired' && (
+                <MoveDialog equipmentId={data.id} currentStatus={data.status} currentSiteId={data.current_site_id} quantity={data.quantity} unit={data.unit} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,.07)', background: 'rgba(8,8,10,.3)', display: 'flex', alignItems: 'center', gap: 26, flexWrap: 'wrap' }}>
+          <PositionTrackLg status={data.status} />
+          <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+            <div style={{ font: '500 15px/1 "Noto Sans TC",sans-serif', color: statusColor, marginBottom: 8 }}>{titleLabel}</div>
+            <div style={{ font: '400 12.5px/1.6 "Noto Sans TC",sans-serif', color: isStuck ? 'var(--nm-danger-glass-text)' : 'var(--nm-text-secondary)' }}>{explanation}</div>
+          </div>
+          <div style={{ flex: 'none', display: 'flex', alignItems: 'baseline', gap: 7 }}>
+            <span className="tabular-nums" style={{ font: '600 15px/1 ui-monospace,SFMono-Regular,Menlo,monospace', color: 'var(--nm-text-body)' }}>{data.quantity}</span>
+            <span style={{ font: '400 12px/1 "Noto Sans TC",sans-serif', color: 'var(--nm-text-muted)' }}>{data.unit}</span>
+            {data.quantity > 1 && (
+              <span style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,.07)', font: '400 10px/1.3 "Noto Sans TC",sans-serif', color: 'var(--nm-text-muted)', marginLeft: 4 }}>
+                整批移動
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ padding: '20px 22px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+            <span style={{ font: '500 13px/1 "Noto Sans TC",sans-serif', color: 'var(--nm-text-body)' }}>履歷　{movements.length} 次移動</span>
+            <span style={{ font: '400 11.5px/1 "Noto Sans TC",sans-serif', color: 'var(--nm-text-faint)' }}>最新在上　·　每一列都是一次跳線</span>
+          </div>
+          {movementError ? (
+            <div className="rounded-xl nm-inset p-3 text-[13px]" style={{ color: 'var(--nm-danger)' }}>履歷讀取失敗:{mv.error?.message}</div>
+          ) : (
+            <HistoryList items={historyItems} />
+          )}
         </div>
       </div>
 
-      <section className="rounded-2xl nm-raised p-4 space-y-3">
-        <h2 className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>基本資料</h2>
-        <form action={saveAction} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <F label="名稱 *"><input name="name" defaultValue={data.name} required className={inp} /></F>
-            <F label="分類">
-              <div className="nm-inset-sm rounded-lg px-2 py-1.5 text-[13.5px]" style={{ color: 'var(--nm-text-secondary)' }}>
-                {EQUIPMENT_CATEGORY_LABEL[data.category]}
+      <div style={{ width: 400, flex: 'none', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <details id="edit-panel" className="rounded-2xl nm-raised p-4 space-y-3">
+          <summary className="font-semibold cursor-pointer nm-focus" style={{ color: 'var(--nm-text-primary)' }}>編輯資料</summary>
+          <form action={saveAction} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <F label="名稱 *"><input name="name" defaultValue={data.name} required className={inp} /></F>
+              <F label="分類">
+                <div className="nm-inset-sm rounded-lg px-2 py-1.5 text-[13.5px]" style={{ color: 'var(--nm-text-secondary)' }}>
+                  {EQUIPMENT_CATEGORY_LABEL[data.category]}
+                </div>
+              </F>
+              <F label="品牌"><input name="brand" defaultValue={data.brand ?? ''} className={inp} /></F>
+              <F label="型號"><input name="model_number" defaultValue={data.model_number ?? ''} className={inp} /></F>
+              <F label="序號 · 系統不檢查是否重複"><input name="serial_number" defaultValue={data.serial_number ?? ''} className={inp} /></F>
+              <div className="grid grid-cols-2 gap-2">
+                <F label="數量 · 整批一起移動,不支援部分調度"><input name="quantity" type="number" min={1} defaultValue={data.quantity} className={inp} /></F>
+                <F label="單位"><input name="unit" defaultValue={data.unit} className={inp} /></F>
               </div>
-            </F>
-            <F label="品牌"><input name="brand" defaultValue={data.brand ?? ''} className={inp} /></F>
-            <F label="型號"><input name="model_number" defaultValue={data.model_number ?? ''} className={inp} /></F>
-            <F label="序號 · 系統不檢查是否重複"><input name="serial_number" defaultValue={data.serial_number ?? ''} className={inp} /></F>
-            <div className="grid grid-cols-2 gap-2">
-              <F label="數量 · 整批一起移動,不支援部分調度"><input name="quantity" type="number" min={1} defaultValue={data.quantity} className={inp} /></F>
-              <F label="單位"><input name="unit" defaultValue={data.unit} className={inp} /></F>
             </div>
-          </div>
-          <F label="備註"><textarea name="notes" defaultValue={data.notes ?? ''} rows={3} className={inp} /></F>
-          <button type="submit" className="nm-btn-solid text-[13.5px]">
-            儲存基本資料
-          </button>
-        </form>
-      </section>
-
-      <section className="rounded-2xl nm-raised p-4 space-y-3">
-        <h2 className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>目前狀態</h2>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>狀態 · 位置</div>
-            <div className="text-lg" style={{ color: 'var(--nm-text-body)' }}>{formatEquipmentLocation(data.status, data.sites?.name)}</div>
-          </div>
-          {/* 已淘汰是終態,不提供移動入口——想再啟用要重新登記,不是「移動」回來。 */}
-          {data.status !== 'retired' && (
-            <MoveDialog equipmentId={data.id} currentStatus={data.status} currentSiteId={data.current_site_id} />
+            <F label="備註"><textarea name="notes" defaultValue={data.notes ?? ''} rows={3} className={inp} /></F>
+            <button type="submit" className="nm-btn-solid text-[13.5px]">
+              儲存基本資料
+            </button>
+          </form>
+          {data.status === 'retired' && (
+            <div className="text-[12.5px]" style={{ color: 'var(--nm-text-muted)' }}>
+              已淘汰是終態，不提供移動入口——想再啟用要重新登記一筆新的設備。
+            </div>
           )}
-        </div>
-      </section>
-
-      <section className="rounded-2xl nm-raised p-4 space-y-3">
-        <h2 className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>移動歷史 ({movements.length})</h2>
-        {movements.length === 0 ? (
-          <div className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>目前沒有移動記錄</div>
-        ) : (
-          <ol className="space-y-3">
-            {movements.map((m) => (
-              <li key={m.id} className="pl-3" style={{ borderLeft: '2px solid var(--nm-border-hair)' }}>
-                <div className="text-xs" style={{ color: 'var(--nm-text-muted)' }}>
-                  {new Date(m.moved_at).toLocaleString('zh-Hant')} · {m.users?.name || '(未知)'}
-                </div>
-                <div className="text-[13px]" style={{ color: 'var(--nm-text-body)' }}>
-                  {formatEquipmentLocation(m.from_status, m.from_site?.name)}
-                  {' → '}
-                  <strong>{formatEquipmentLocation(m.to_status, m.to_site?.name)}</strong>
-                </div>
-                {m.notes && <div className="text-[13px] mt-1" style={{ color: 'var(--nm-text-secondary)' }}>備註:{m.notes}</div>}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-
-      {data.status !== 'retired' && (
-        <section className="rounded-2xl nm-raised p-4 space-y-2" style={{ borderColor: 'rgba(224, 122, 122, 0.28)' }}>
-          <h2 className="font-semibold" style={{ color: 'var(--nm-danger)' }}>危險區</h2>
-          <RetireButton id={data.id} />
-        </section>
-      )}
+        </details>
+      </div>
     </div>
   );
 }
