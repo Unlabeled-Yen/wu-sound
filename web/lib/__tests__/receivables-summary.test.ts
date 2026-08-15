@@ -11,7 +11,6 @@ function row(overrides: Partial<ReceivableWithRemaining>): ReceivableWithRemaini
     total_amount_twd: 1000,
     memo: null,
     status: 'open',
-    agreed_due_date: null,
     created_by: 'u1',
     created_at: '2026-08-01T00:00:00Z',
     updated_at: '2026-08-01T00:00:00Z',

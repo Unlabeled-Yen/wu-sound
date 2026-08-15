@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ToastProvider } from './Toast';
 import { BrandLockup, BrandMark } from '@/app/_shared/BrandLogo';
-import { useAssistantLauncher } from '@/app/_shared/useAssistantShortcut';
 import {
   NAV_SECTIONS,
   SETTINGS_SECTION,
@@ -24,8 +23,6 @@ const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/close', '/boss/ledger
 function useBossShellData() {
   const router = useRouter();
   const [pendingCount, setPendingCount] = useState(0);
-
-  useAssistantLauncher();
 
   useEffect(() => {
     // Prefetch hot routes so nav feels instant

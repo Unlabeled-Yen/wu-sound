@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
   // 缺配置一律 loud 503,不靜默降級成「AI 剛好答不出來」
   let deps: AgentDeps;
-  let provider: 'anthropic' | 'openai' | 'kimi';
+  let provider: 'anthropic' | 'kimi';
   try {
     const picked = createLlmClient();
     provider = picked.provider;
