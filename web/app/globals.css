@@ -48,6 +48,10 @@
   --color-foreground: var(--nm-text-body);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-lg:  13px;   /* 對到 --nm-radius */
+  --radius-xl:  13px;
+  --radius-2xl: 20px;   /* 對到 --nm-radius-lg */
+  --radius-3xl: 28px;   /* 對到 --nm-radius-xl */
 }
 
 html {
