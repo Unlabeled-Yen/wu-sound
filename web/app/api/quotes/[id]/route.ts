@@ -97,6 +97,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       if (missing > 0) {
         return NextResponse.json({ error: `尚有 ${missing} 項待設定售價,無法送出` }, { status: 400 });
       }
+      // 只在第一次送出時記錄——來回切換不洗掉「已經拖多久」的事實。
+      if (before.sent_at === null) patch.sent_at = new Date().toISOString();
+    }
+    if (st === 'won' && before.won_at === null) {
+      patch.won_at = new Date().toISOString();
     }
     patch.status = st;
   }

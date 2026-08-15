@@ -522,6 +522,10 @@ create table quotes (
   note text,
   site_id uuid references sites(id),
   tax_rate numeric(4,3) not null default 0.05 check (tax_rate >= 0 and tax_rate <= 1),
+  -- 狀態第一次轉為 sent/won 的時間,由 API 寫入(見 018)。updated_at 會被任何編輯
+  -- 污染,不能拿來算「已送出幾天」或篩選「近 90 天成交」。
+  sent_at timestamptz,
+  won_at timestamptz,
   created_by uuid not null references users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

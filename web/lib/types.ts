@@ -333,7 +333,7 @@ export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost';
 export type QuoteLineSection = '器材' | '安裝';
 export type AmpPowerMode = 'rms' | 'burst';
 export interface CatalogItem { id:string; brand:string|null; name:string; item_type:string|null; unit:string; cost_price_twd:number|null; sell_price_twd:number|null; category:string|null; note:string|null; active:boolean; created_at:string; updated_at:string; max_spl_db?:number|null; spl_ref_distance_m?:number|null; sensitivity_db_1w1m?:number|null; amp_power_w?:number|null; speaker_impedance_ohm?:number|null; amp_power_mode?:AmpPowerMode|null; coverage_h_deg?:number|null; coverage_v_deg?:number|null; }
-export interface Quote { id:string; client_name:string; project_name:string|null; status:QuoteStatus; need_text:string|null; ai_rationale:string|null; note:string|null; site_id:string|null; tax_rate:number; created_by:string; created_at:string; updated_at:string; }
+export interface Quote { id:string; client_name:string; project_name:string|null; status:QuoteStatus; need_text:string|null; ai_rationale:string|null; note:string|null; site_id:string|null; tax_rate:number; sent_at:string|null; won_at:string|null; created_by:string; created_at:string; updated_at:string; }
 
 // 報價單狀態合法轉移。won/lost 是終態——已成交/未成交的單不該再被切回草稿或
 // 互轉,要重新報價就開一張新單。draft/sent 之間可以自由來回(送出前改內容很常見)。
