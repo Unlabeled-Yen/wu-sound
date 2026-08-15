@@ -85,15 +85,19 @@ describe('訊息結構轉換', () => {
 });
 
 describe('工具定義轉換', () => {
-  it('8 個工具都轉成 function 格式,input_schema 原樣當 parameters', () => {
+  it('10 個工具都轉成 function 格式,input_schema 原樣當 parameters', () => {
     // 2026-08-14 回退:民生救難三個工具(get_now/get_weather/emergency_info)
     // 移除後準確度回到 Yen 親自肯定過的水準,見 voice-agent-tools.ts 的 READ_TOOLS 註解
+    // 2026-08-15(Lab 4 Phase A)加入 search_equipment/get_today_clockins——AGENT_TOOLS
+    // 是全集,不代表單一情境會一次看到全部 10 個,見 voice-agent.test.ts 的情境子集測試
     const tools = toOpenAiTools(AGENT_TOOLS);
-    expect(tools).toHaveLength(8);
+    expect(tools).toHaveLength(10);
     expect(tools.map((t) => t.function.name)).toEqual([
       'search_projects',
       'get_project_summary',
       'list_tasks',
+      'search_equipment',
+      'get_today_clockins',
       'ask_clarification',
       'respond',
       'decline',

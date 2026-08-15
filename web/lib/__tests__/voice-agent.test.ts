@@ -5,6 +5,7 @@ import {
   formatDueDate,
   handleVoiceCommand,
   matchVoiceCommand,
+  resolveContext,
   toTraditional,
   runAgentTurn,
   todayInTaipei,
@@ -535,6 +536,58 @@ describe('語音口令確認(Lab 3 雙軌的 B 軌)', () => {
     expect(r.reply).toContain('已記錄');
     expect(tools.calls.map((c) => c.tool)).toEqual(['log_note']);
     expect(s.pending).toBeNull();
+  });
+});
+
+describe('情境式工具子集(Lab 4 §3)', () => {
+  it('resolveContext:來源頁面對到情境,對不到就退回 default', () => {
+    expect(resolveContext('/boss/equipment')).toBe('equipment');
+    expect(resolveContext('/boss/equipment/123')).toBe('equipment');
+    expect(resolveContext('/boss/clockins')).toBe('clockins');
+    expect(resolveContext('/boss/ledger')).toBe('default');
+    expect(resolveContext(undefined)).toBe('default');
+    expect(resolveContext(null)).toBe('default');
+  });
+
+  it('equipment 情境:模型看不到 search_projects 以外的讀取工具或任何 propose_*', async () => {
+    const llm = fakeLlm([
+      [{ type: 'tool_use', id: 't1', name: 'search_equipment', input: { query: 'JBL' } }],
+      [{ type: 'text', text: '找到了' }],
+    ]);
+    const tools = fakeTools({
+      search_equipment: () => ({ ok: true, data: { candidates: [{ id: 'e1', name: 'JBL 喇叭', site_name: '磐頂' }] } }),
+    });
+    await runAgentTurn(session(), 'JBL 喇叭在哪', deps(llm.client, tools.client), 'equipment');
+
+    const toolNames = (llm.seen[0].tools ?? []).map((t) => t.name);
+    expect(toolNames).toContain('search_equipment');
+    expect(toolNames).not.toContain('list_tasks');
+    expect(toolNames).not.toContain('propose_create_task');
+    expect(toolNames).not.toContain('get_today_clockins');
+  });
+
+  it('clockins 情境:模型只看得到 get_today_clockins 這個讀取工具,拿不到寫入工具', async () => {
+    const llm = fakeLlm([[{ type: 'text', text: '今天沒有人打卡' }]]);
+    const tools = fakeTools({});
+    await runAgentTurn(session(), '今天誰打卡了', deps(llm.client, tools.client), 'clockins');
+
+    const toolNames = (llm.seen[0].tools ?? []).map((t) => t.name);
+    expect(toolNames).toContain('get_today_clockins');
+    expect(toolNames).not.toContain('search_equipment');
+    expect(toolNames).not.toContain('propose_log_note');
+  });
+
+  it('default 情境(未傳 context)維持 Lab 2 原本的工具清單,不受 Lab 4 影響', async () => {
+    const llm = fakeLlm([[{ type: 'text', text: '(閒聊擋下)' }]]);
+    const tools = fakeTools({});
+    await runAgentTurn(session(), '你好', deps(llm.client, tools.client));
+
+    const toolNames = (llm.seen[0].tools ?? []).map((t) => t.name);
+    expect(toolNames).toEqual(
+      expect.arrayContaining(['search_projects', 'get_project_summary', 'list_tasks', 'propose_create_task', 'propose_log_note']),
+    );
+    expect(toolNames).not.toContain('search_equipment');
+    expect(toolNames).not.toContain('get_today_clockins');
   });
 });
 

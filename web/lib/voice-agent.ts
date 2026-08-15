@@ -2,12 +2,13 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import * as OpenCC from 'opencc-js';
 import {
-  AGENT_TOOLS,
   AgentConfigError,
   DECLINE_TEXT,
   PROPOSE_ACTION,
   READ_TOOLS,
   TERMINAL_TOOLS,
+  toolsForContext,
+  type AgentContext,
   type LlmClient,
   type LlmContentBlock,
   type LlmMessage,
@@ -20,6 +21,7 @@ import { trimMessages } from '@/lib/voice-agent-session';
 import type { AgentSession, PendingField, PendingWrite } from '@/lib/voice-agent-session';
 
 export type {
+  AgentContext,
   LlmClient,
   LlmContentBlock,
   LlmMessage,
@@ -28,6 +30,7 @@ export type {
   ToolSchema,
   VoiceToolClient,
 } from '@/lib/voice-agent-tools';
+export { resolveContext } from '@/lib/voice-agent-tools';
 
 /**
  * voice-lab Lab 2 — Agent runtime。
@@ -81,8 +84,20 @@ export function todayInTaipei(now: number): string {
   }).format(new Date(now));
 }
 
-export function buildSystemPrompt(now: number): string {
-  return `你是 wu 音響工程公司的現場助理,用繁體中文口語跟員工/老闆對話,幫他們把口述的事情記進系統。
+/**
+ * 每個情境只換這一段身分/工具說明,16 條硬規則不變(Lab 4 spec §5)——
+ * prompt 總長度控制在 50 行以內,這是 Lab 2 實測的甜蜜點上限,見 voice-agent-tools.ts C1 教訓。
+ */
+const CONTEXT_BLURB: Record<AgentContext, string> = {
+  default: '你是 wu 音響工程公司的現場助理,用繁體中文口語跟員工/老闆對話,幫他們把口述的事情記進系統。',
+  equipment:
+    '你是 wu 音響工程公司的設備管理助理,用繁體中文口語回答設備位置與狀態查詢。\n你現在沒有寫入工具,不能記錄設備異動——使用者若要求搬遷/異動記錄,用 decline(reason=\'unsupported_action\')回覆,請他用系統介面處理。',
+  clockins:
+    '你是 wu 音響工程公司的打卡查詢助理,用繁體中文口語回答今天的打卡狀況。\n你現在沒有寫入工具,不能補打卡——使用者若要求補打卡,用 decline(reason=\'unsupported_action\')回覆,請他用系統介面處理。',
+};
+
+export function buildSystemPrompt(now: number, context: AgentContext = 'default'): string {
+  return `${CONTEXT_BLURB[context]}
 
 硬規則(不是建議,是限制):
 1. 絕對不能自己編造 project_id,一律用 search_projects 回傳的 id。
@@ -271,6 +286,7 @@ export async function runAgentTurn(
   session: AgentSession,
   userText: string,
   deps: AgentDeps,
+  context: AgentContext = 'default',
 ): Promise<AgentTurnResult> {
   const now = deps.now ?? Date.now;
   const trace: AgentTurnResult['toolTrace'] = [];
@@ -288,7 +304,9 @@ export async function runAgentTurn(
   session.messages.push({ role: 'user', content: [{ type: 'text', text: userText }] });
   // 修剪在推入新訊息之後、送給模型之前——這樣切割點一定落在完整的一輪邊界上
   session.messages = trimMessages(session.messages);
-  const system = buildSystemPrompt(now());
+  const system = buildSystemPrompt(now(), context);
+  // 這一輪能用的工具子集,按來源頁面情境挑選(Lab 4 §3)——不是全部 AGENT_TOOLS 一次灌給模型
+  const tools = toolsForContext(context);
   // 這一輪有沒有查過東西。閒聊的共同特徵是「不需要查任何資料」,
   // 所以這個布林值就是「模型現在有沒有事實可講」的機械判準,不靠語意理解
   let didRead = false;
@@ -297,7 +315,7 @@ export async function runAgentTurn(
     const res = await deps.llm.createMessage({
       system,
       messages: session.messages,
-      tools: AGENT_TOOLS,
+      tools,
       toolChoice: 'any',
     });
     session.messages.push({ role: 'assistant', content: res.content });

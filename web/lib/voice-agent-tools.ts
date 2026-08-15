@@ -75,8 +75,18 @@ export const TERMINAL_TOOLS = new Set([
  * 工具從 8 個變 11 個、prompt 從 39 行變 50 行,模型判斷「該用哪個工具」的空間變大,
  * 準確度就掉了。回退到「只做 wu 現場記錄」是還原到 Yen 親自肯定過的品質,不是功能倒退。
  * 若日後真的需要民生/救難,規劃另做獨立入口的 agent,不要塞回這裡。
+ *
+ * 2026-08-15(Lab 4 Phase A)加入 search_equipment / get_today_clockins——
+ * 同一條教訓仍然適用,所以這兩個新工具不會跟舊三個工具一起全部塞給模型,
+ * 而是靠 CONTEXT_TOOL_NAMES 按來源頁面挑子集,見下方說明。
  */
-export const READ_TOOLS = new Set(['search_projects', 'get_project_summary', 'list_tasks']);
+export const READ_TOOLS = new Set([
+  'search_projects',
+  'get_project_summary',
+  'list_tasks',
+  'search_equipment',
+  'get_today_clockins',
+]);
 
 /** 不經 Lab 1 端點、由 runtime 自己執行的工具。回退民生救難後暫時清空,結構保留給日後其他 local 工具用 */
 export const LOCAL_TOOLS = new Set<string>();
@@ -92,11 +102,10 @@ export const AGENT_TOOLS: ToolSchema[] = [
   {
     name: 'search_projects',
     description:
-      '用關鍵字搜尋專案(工地/案場)。回傳最多 5 筆候選。任何寫入動作之前都必須先用這個工具確認專案,不可以憑記憶或猜測填 project_id。',
+      '用關鍵字搜尋專案(工地/案場),回傳最多 5 筆候選。使用者問「有哪些專案」這種要列全部的問法,query 給空字串,會回最近的專案清單與總數。任何寫入動作之前都必須先用這個工具確認專案,不可以憑記憶或猜測填 project_id。',
     input_schema: {
       type: 'object',
-      properties: { query: { type: 'string', description: '使用者講的專案名稱片段' } },
-      required: ['query'],
+      properties: { query: { type: 'string', description: '使用者講的專案名稱片段;要列全部時給空字串' } },
     },
   },
   {
@@ -119,6 +128,21 @@ export const AGENT_TOOLS: ToolSchema[] = [
       },
       required: ['project_id'],
     },
+  },
+  {
+    name: 'search_equipment',
+    description:
+      '用關鍵字搜尋設備(名稱/品牌/型號),回傳目前狀態與所在案場。設備情境下,回答「某某設備在哪裡」之前必須先呼叫這個工具,不可以憑記憶回答。',
+    input_schema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: '使用者講的設備名稱片段' } },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'get_today_clockins',
+    description: '查詢今天的打卡記錄(誰、幾點、上班或下班)。只回今天,不接受日期參數。',
+    input_schema: { type: 'object', properties: {} },
   },
   {
     name: 'ask_clarification',
@@ -204,6 +228,39 @@ export const PROPOSE_ACTION: Record<string, 'create_task' | 'log_note'> = {
   propose_create_task: 'create_task',
   propose_log_note: 'log_note',
 };
+
+// ---------- 情境式工具子集(Lab 4 §3) ----------
+
+/**
+ * AI 助理是獨立分頁,使用者從 ERP 哪個頁面 ⌘K 跳過來就決定這一輪能看到哪些工具。
+ * 這不是權限管控(所有情境背後都是同一個 actor、同一組 RLS),純粹是為了守住 C1 教訓:
+ * 工具一多,模型判斷「該用哪個」的空間變大,準確度就掉。每個情境固定在 7-9 個工具內。
+ *
+ * 三個控制工具(ask_clarification / respond / decline)每個情境都留著——它們是
+ * 「模型只能透過工具講話」這條鐵律的出口,拿掉任何一個情境的控制工具會讓 respond 閘門失靈。
+ */
+export type AgentContext = 'default' | 'equipment' | 'clockins';
+
+const CONTROL_TOOLS = ['ask_clarification', 'respond', 'decline'] as const;
+
+export const CONTEXT_TOOL_NAMES: Record<AgentContext, string[]> = {
+  default: ['search_projects', 'get_project_summary', 'list_tasks', ...CONTROL_TOOLS, 'propose_create_task', 'propose_log_note'],
+  equipment: ['search_projects', 'search_equipment', ...CONTROL_TOOLS],
+  clockins: ['search_projects', 'get_today_clockins', ...CONTROL_TOOLS],
+};
+
+/** 來源頁面路徑 → 情境。查不到就退回 default,不 loud——沒對到規則只是少載入專用工具,不是壞掉。 */
+export function resolveContext(returnPath: string | undefined | null): AgentContext {
+  if (!returnPath) return 'default';
+  if (returnPath.startsWith('/boss/equipment')) return 'equipment';
+  if (returnPath.startsWith('/boss/clockins')) return 'clockins';
+  return 'default';
+}
+
+export function toolsForContext(context: AgentContext): ToolSchema[] {
+  const names = new Set(CONTEXT_TOOL_NAMES[context] ?? CONTEXT_TOOL_NAMES.default);
+  return AGENT_TOOLS.filter((t) => names.has(t.name));
+}
 
 // ---------- Lab 1 端點轉發 ----------
 

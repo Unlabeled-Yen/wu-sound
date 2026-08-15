@@ -6,6 +6,7 @@ import {
   confirmPending,
   createLlmClient,
   handleVoiceCommand,
+  resolveContext,
   runAgentTurn,
   type AgentDeps,
   type AgentTurnResult,
@@ -57,6 +58,10 @@ export async function POST(req: Request) {
   if (action === 'message' && !message) return bad('訊息是空的', 400);
   if (action === 'voice_command' && !message) return bad('沒有辨識到任何語音內容', 400);
 
+  // 情境是使用者從哪個 ERP 頁面 ⌘K 跳過來(Lab 4 §3)。查不到就退回 default,
+  // 不是必填欄位——舊的前端沒帶這個欄位一樣能跑,只是拿不到情境專用工具。
+  const context = resolveContext(typeof body.return_path === 'string' ? body.return_path : undefined);
+
   // 缺配置一律 loud 503,不靜默降級成「AI 剛好答不出來」
   let deps: AgentDeps;
   let provider: 'anthropic' | 'openai' | 'kimi';
@@ -83,7 +88,7 @@ export async function POST(req: Request) {
       if (action === 'cancel') return cancelPending(session);
       // 語音口令:白名單比對在 runtime 做,不讓 LLM 判斷使用者是否同意(Lab 3 §1)
       if (action === 'voice_command') return handleVoiceCommand(session, message, deps);
-      return runAgentTurn(session, message, deps);
+      return runAgentTurn(session, message, deps, context);
     });
   } catch (e) {
     if (e instanceof AgentConfigError) {
@@ -102,6 +107,8 @@ export async function POST(req: Request) {
     state: result.state,
     // 現在是誰在講話——驗證對話品質時,換供應商的差異要看得見,不能猜
     provider,
+    // 這一輪用的是哪個情境的工具子集——驗證「情境有沒有正確切換」時要看得見,不能猜
+    context,
     ...(result.options ? { options: result.options } : {}),
     ...(result.pending ? { pending: result.pending } : {}),
     ...(result.warning ? { warning: result.warning } : {}),

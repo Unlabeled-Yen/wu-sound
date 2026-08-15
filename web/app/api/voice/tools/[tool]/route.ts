@@ -40,7 +40,26 @@ async function parseBody(req: Request): Promise<Json | null> {
  */
 async function searchProjects(sb: SupabaseClient, body: Json): Promise<NextResponse> {
   const query = typeof body.query === 'string' ? body.query.trim() : '';
-  if (!query) return voiceError('BAD_REQUEST', '請提供搜尋關鍵字', 400);
+
+  // 空關鍵字 = 「我有哪些專案」這種列表型問法(2026-08-15 語音實測發現的缺口):
+  // 回最近的啟用案場,附 total 讓模型能講「共 N 個,以下是最近 5 個」。
+  // 不另開 list_projects 工具——工具數每加一個辨答率就掉一格(C1 教訓)。
+  if (!query) {
+    const { data, count, error } = await sb
+      .from('sites')
+      .select('id, name', { count: 'exact' })
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    if (error) return dbErrorResponse(error);
+    const candidates = ((data ?? []) as { id: string; name: string }[]).map((r) => ({
+      id: r.id,
+      name: r.name,
+      status: 'active',
+      client_name: null,
+    }));
+    return ok({ candidates, total: count ?? candidates.length });
+  }
 
   const { data, error } = await sb.rpc('search_sites_by_query', { q: query });
   if (error) {
@@ -137,6 +156,85 @@ async function listTasks(sb: SupabaseClient, body: Json): Promise<NextResponse> 
   if (error) return dbErrorResponse(error);
 
   return ok({ tasks: data ?? [], total: count ?? (data ?? []).length });
+}
+
+/**
+ * 設備搜尋。目前只比對 name 欄位的子字串,不是像 sites 那樣的相似度搜尋——
+ * 這是刻意的簡化(Lab 4 Phase A 時間盒內先求有,等實測發現「講一半找不到」的
+ * 真實案例再比照 migration 016 的模式加 pg_trgm,不要沒證據就先蓋一層複雜度)。
+ */
+async function searchEquipment(sb: SupabaseClient, body: Json): Promise<NextResponse> {
+  const query = typeof body.query === 'string' ? body.query.trim() : '';
+  if (!query) return voiceError('BAD_REQUEST', '請提供搜尋關鍵字', 400);
+  // 使用者講的內容裡若剛好有 % 或 _,不該被解讀成 SQL 萬用字元,逐字比對就好
+  const escaped = query.replace(/[%_]/g, (c) => `\\${c}`);
+
+  const { data, error } = await sb
+    .from('equipment')
+    .select('id, name, brand, model_number, status, current_site_id')
+    .ilike('name', `%${escaped}%`)
+    .order('name')
+    .limit(5);
+  if (error) return dbErrorResponse(error);
+
+  const rows = (data ?? []) as {
+    id: string;
+    name: string;
+    brand: string | null;
+    model_number: string | null;
+    status: string;
+    current_site_id: string | null;
+  }[];
+  if (rows.length === 0) return ok({ candidates: [] });
+
+  // 分開查案場名稱,不用巢狀 select——current_site_id 可能是 null(在倉庫的設備沒有案場)
+  const siteIds = [...new Set(rows.map((r) => r.current_site_id).filter((v): v is string => Boolean(v)))];
+  const siteNames: Record<string, string> = {};
+  if (siteIds.length > 0) {
+    const { data: sites, error: siteErr } = await sb.from('sites').select('id, name').in('id', siteIds);
+    if (siteErr) return dbErrorResponse(siteErr);
+    for (const s of (sites ?? []) as { id: string; name: string }[]) siteNames[s.id] = s.name;
+  }
+
+  const candidates = rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    brand: r.brand,
+    model_number: r.model_number,
+    status: r.status,
+    site_name: r.current_site_id ? (siteNames[r.current_site_id] ?? null) : null,
+  }));
+  return ok({ candidates });
+}
+
+/**
+ * 今天的打卡記錄。時間邊界用 Taipei 時區明算,不看伺服器本地時區——
+ * 部署環境的系統時區不一定是 Asia/Taipei,算錯的話「今天」會少幾筆或多幾筆。
+ */
+async function getTodayClockins(sb: SupabaseClient): Promise<NextResponse> {
+  const todayTpe = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const dayStart = `${todayTpe}T00:00:00+08:00`;
+  const dayEnd = `${todayTpe}T23:59:59.999+08:00`;
+
+  const { data, error } = await sb
+    .from('clockins')
+    .select('user_id, ts, type, users(name)')
+    .gte('ts', dayStart)
+    .lte('ts', dayEnd)
+    .order('ts', { ascending: true });
+  if (error) return dbErrorResponse(error);
+
+  const rows = (data ?? []) as { user_id: string; ts: string; type: string; users: { name: string }[] | { name: string } | null }[];
+  const clockins = rows.map((r) => {
+    const user = Array.isArray(r.users) ? r.users[0] : r.users;
+    return { user_name: user?.name ?? '(使用者已停用或查無姓名)', ts: r.ts, type: r.type };
+  });
+  return ok({ date: todayTpe, clockins });
 }
 
 // ---------- 寫入:propose ----------
@@ -342,7 +440,13 @@ async function commitWrite(
 
 // ---------- dispatch ----------
 
-const READ_TOOLS = new Set(['search_projects', 'get_project_summary', 'list_tasks']);
+const READ_TOOLS = new Set([
+  'search_projects',
+  'get_project_summary',
+  'list_tasks',
+  'search_equipment',
+  'get_today_clockins',
+]);
 const WRITE_TOOLS = new Set(['create_task', 'log_note']);
 
 export async function POST(req: Request, ctx: { params: Promise<{ tool: string }> }) {
@@ -358,6 +462,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ tool: string }
   if (tool === 'search_projects') return searchProjects(sb, body);
   if (tool === 'get_project_summary') return getProjectSummary(sb, body);
   if (tool === 'list_tasks') return listTasks(sb, body);
+  if (tool === 'search_equipment') return searchEquipment(sb, body);
+  if (tool === 'get_today_clockins') return getTodayClockins(sb);
   if (tool === 'propose_write') return proposeWrite(sb, actorId, body);
   if (tool === 'create_task' || tool === 'log_note') return commitWrite(sb, actorId, tool, body);
 
