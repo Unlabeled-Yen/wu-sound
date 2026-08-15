@@ -34,6 +34,7 @@ describe('導覽結構完整性', () => {
   it('區塊只剩一個可見項目時,側欄顯示的是區塊名', () => {
     // 側欄在 visible=1 時畫 section.label,所以那個名字必須是使用者該看到的
     const single = ALL_SECTIONS.filter((s) => visibleItems(s).length === 1);
+    expect(single.map((s) => s.label)).toContain('財務');
     expect(single.map((s) => s.label)).toContain('報價系統');
     expect(single.map((s) => s.label)).toContain('聲學計算');
     expect(single.map((s) => s.label)).toContain('設備庫存');
@@ -46,7 +47,6 @@ describe('findActiveSection / findActiveItemLabel', () => {
     // 路徑, 區塊名(小標), 頁面名(大標)
     ['/boss', '總覽', 'Dashboard'],
     ['/boss/expenses', '財務', '零用金管理'],
-    ['/boss/close', '財務', '薪資結算'],
     ['/boss/ledger/abc', '財務', '帳務管理'],
     ['/boss/quotes', '報價系統', '報價系統'],
     ['/boss/quotes/abc/print', '報價系統', '報價系統'],

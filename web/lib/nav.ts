@@ -31,8 +31,12 @@ export const NAV_SECTIONS: NavSection[] = [
     key: 'finance',
     label: '財務',
     items: [
-      { href: '/boss/expenses', label: '零用金管理' },
-      { href: '/boss/close', label: '薪資結算' },
+      // 零用金審核維持獨立頁面(手機底部「審核」分頁靠它),但不畫在側欄——
+      // 入口改成帳務首頁的待審 pill 與月結模式的阻擋卡連結。薪資結算原本
+      // 是獨立頁,現在併進帳務管理的「月結」模式(?mode=payroll),
+      // /boss/close 轉址過去,不再需要側欄項目。見
+      // docs/payroll-pettycash-merge-spec.md。
+      { href: '/boss/expenses', label: '零用金管理', hidden: true },
       { href: '/boss/ledger', label: '帳務管理' },
     ],
   },
@@ -156,7 +160,6 @@ const MOBILE_TITLES: Record<string, MobileTitle> = {
   '/boss/clockins': { title: '打卡', subtitle: '出勤記錄' },
   '/boss/more': { title: '更多', subtitle: '其他管理與設定' },
   '/boss/ledger': { title: '帳務管理' },
-  '/boss/close': { title: '薪資結算' },
   '/boss/equipment': { title: '設備庫存' },
   '/boss/sites': { title: '專案管理' },
   '/boss/tenders/monitor': { title: '標案監測', subtitle: '標案' },

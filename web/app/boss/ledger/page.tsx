@@ -5,6 +5,7 @@ import ImportBatchDialog from './ImportBatchDialog';
 import ExportCsvDialog from './ExportCsvDialog';
 import { AllView } from './AllView';
 import { SettledView, ReceivablesView } from './SettledReceivablesViews';
+import { PayrollView } from './PayrollView';
 import { LedgerFilterBar } from './LedgerFilterBar';
 import { buildHref, currentMonth, shiftMonth, NO_SITE, type Mode, type SP } from './ledger-page-helpers';
 
@@ -12,8 +13,12 @@ export const dynamic = 'force-dynamic';
 
 export default async function LedgerHomePage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = (await searchParams) ?? {};
-  const mode: Mode = sp.mode === 'receivable' || sp.mode === 'payable' || sp.mode === 'settled' ? sp.mode : 'all';
-  const month = sp.month === 'all' || (sp.month && /^\d{4}-\d{2}$/.test(sp.month)) ? sp.month! : currentMonth();
+  const mode: Mode = sp.mode === 'receivable' || sp.mode === 'payable' || sp.mode === 'settled' || sp.mode === 'payroll' ? sp.mode : 'all';
+  // 月結沒有「不限月份」的概念,一定要是某個真實月份——跟其他模式共用同一個
+  // ?month= 參數,但這裡強制正規化,不讓 mode=payroll&month=all 這種組合存在。
+  const month = mode === 'payroll'
+    ? (sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : currentMonth())
+    : (sp.month === 'all' || (sp.month && /^\d{4}-\d{2}$/.test(sp.month)) ? sp.month! : currentMonth());
   const siteId = sp.site_id;
   const kind = sp.kind && sp.kind in LEDGER_KIND_LABEL ? (sp.kind as LedgerKind) : undefined;
   const invoice = sp.invoice && sp.invoice in INVOICE_STATUS_LABEL ? (sp.invoice as InvoiceStatus) : undefined;
@@ -48,7 +53,7 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>帳務</h1>
         <div className="flex items-center gap-2">
-          {mode === 'settled' && (
+          {(mode === 'settled' || mode === 'payroll') && (
             <div className="flex items-center gap-2 text-[13px]">
               <Link href={buildHref(base, { month: shiftMonth(month === 'all' ? currentMonth() : month, -1) })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto' }}>← 上月</Link>
               <span className="font-semibold min-w-[6rem] text-center" style={{ color: 'var(--nm-text-primary)' }}>
@@ -89,6 +94,7 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
             ['settled', '已收付'],
             ['receivable', '應收款'],
             ['payable', '應付款'],
+            ['payroll', '月結'],
           ] as const).map(([m, label]) => (
             <Link
               key={m}
@@ -119,7 +125,7 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
 
       {/* v2:mode=all 的篩選列已搬進 AllView(只作用於下方列表,監測帶永遠不篩選),
           這裡只給 settled/receivable/payable 用共用的 LedgerFilterBar。 */}
-      {mode !== 'all' && (
+      {mode !== 'all' && mode !== 'payroll' && (
         <LedgerFilterBar mode={mode} month={month} siteId={siteId} kind={kind} invoice={invoice} ext={ext} sites={sites} base={base} showKindInvoiceExt={mode === 'settled'} />
       )}
 
@@ -144,11 +150,16 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
       {(mode === 'receivable' || mode === 'payable') && (
         <ReceivablesView sb={sb} direction={mode === 'receivable' ? 'receivable' : 'payable'} siteId={siteId} />
       )}
+      {mode === 'payroll' && (
+        <PayrollView sb={sb} month={month} />
+      )}
 
-      <div className="flex flex-wrap gap-3 items-center pt-2">
-        <ImportBatchDialog />
-        {(mode === 'settled' || mode === 'all') && <ExportCsvDialog defaultMonth={month === 'all' ? currentMonth() : month} />}
-      </div>
+      {mode !== 'payroll' && (
+        <div className="flex flex-wrap gap-3 items-center pt-2">
+          <ImportBatchDialog />
+          {(mode === 'settled' || mode === 'all') && <ExportCsvDialog defaultMonth={month === 'all' ? currentMonth() : month} />}
+        </div>
+      )}
     </div>
   );
 }
