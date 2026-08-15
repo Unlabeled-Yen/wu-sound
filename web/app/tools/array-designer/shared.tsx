@@ -72,7 +72,7 @@ export function InfoTip({ text }: { text: string }) {
         <span
           role="tooltip"
           className="fixed pointer-events-none -translate-x-1/2 -translate-y-full z-50 w-[240px] text-[11px] leading-relaxed rounded-lg p-2.5 shadow-lg"
-          style={{ top: pos.top, left: pos.left, background: '#1a1c20', color: 'var(--nm-text-secondary)', border: '1px solid var(--nm-border)' }}
+          style={{ top: pos.top, left: pos.left, background: '#1a1c20', color: 'var(--nm-text-secondary)', border: '1px solid var(--nm-border-glass)' }}
         >
           {text}
         </span>,
@@ -141,7 +141,7 @@ const LEGEND_ITEMS: { label: string; color: string; text: string }[] = [
 
 export function Legend() {
   return (
-    <div className="rounded-xl p-3 space-y-1.5" style={{ border: '1px solid var(--nm-border)' }}>
+    <div className="rounded-xl p-3 space-y-1.5" style={{ border: '1px solid var(--nm-border-glass)' }}>
       <div className="text-[11px] font-semibold mb-1" style={{ color: 'var(--nm-text-secondary)' }}>圖例說明</div>
       {LEGEND_ITEMS.map((item) => (
         <div key={item.label} className="text-[11px] flex gap-1.5" style={{ color: 'var(--nm-text-muted)' }}>
@@ -172,7 +172,7 @@ export function ResultPanel({
             <Stat key={s.label} label={s.label} value={s.value} danger={s.danger} tip={s.tip} />
           ))}
         </div>
-        <div className="pt-3 mt-3 border-t" style={{ borderColor: 'var(--nm-border)' }}>
+        <div className="pt-3 mt-3 border-t" style={{ borderColor: 'var(--nm-border-hair)' }}>
           <div className="text-[11px] inline-flex items-center" style={{ color: 'var(--nm-text-muted)' }}>
             有效覆蓋範圍
             <InfoTip text="這組陣列配置真正好聲音的深度區間。觀眾席距離只要落在這個區間裡就是及格的設計;離開這個區間,不是縫隙沒接上,就是開始重疊出問題。" />
@@ -184,7 +184,7 @@ export function ResultPanel({
         <p className="text-[12px] pt-2" style={{ color: 'var(--nm-text-muted)' }}>
           此為自由場等腰弧列幾何理論值,未計入場地反射、器材規格誤差等現場變因,實際佈點仍需現場覆核。
         </p>
-        <div className="pt-3 mt-3 border-t" style={{ borderColor: 'var(--nm-border)' }}>
+        <div className="pt-3 mt-3 border-t" style={{ borderColor: 'var(--nm-border-hair)' }}>
           <Legend />
         </div>
       </div>
