@@ -59,11 +59,11 @@ export function generateLedgerInsight(input: LedgerInsightInput): LedgerInsight 
 
   let action: LedgerInsightAction | null = null;
   if (input.overdueIncomeCount > 0) {
-    action = { label: `處理 ${input.overdueIncomeCount} 筆已逾期應收 ›`, href: '/boss/ledger?mode=receivable' };
+    action = { label: `處理 ${input.overdueIncomeCount} 筆已逾期應收`, href: '/boss/ledger?mode=receivable' };
   } else if (input.toIssueCount > 0) {
-    action = { label: `開立 ${input.toIssueCount} 筆待開發票 ›`, href: '/boss/ledger?mode=settled&month=all&invoice=to_issue' };
+    action = { label: `開立 ${input.toIssueCount} 筆待開發票`, href: '/boss/ledger?mode=settled&month=all&invoice=to_issue' };
   } else if (input.toCheckCount > 0) {
-    action = { label: `覆核 ${input.toCheckCount} 筆 AI 待確認帳目 ›`, href: '/boss/ledger?mode=settled&month=all&to_check=1' };
+    action = { label: `覆核 ${input.toCheckCount} 筆 AI 待確認帳目`, href: '/boss/ledger?mode=settled&month=all&to_check=1' };
   }
 
   const basisNote = `規則式摘要(非生成式模型),已收與未收分別計算、未合併。依據 ${input.month === 'all' ? '不限月份' : input.month} · ${input.entryCount} 筆分錄與 ${input.unsettledCount} 筆未結約定。`;
