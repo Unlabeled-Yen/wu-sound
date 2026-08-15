@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
-import ViewportLock from '@/app/_shared/ViewportLock';
 import { fetchTenderRadar } from '@/lib/tender-radar';
 import {
   PRICE_ORDER,
@@ -11,13 +10,13 @@ import {
   buildHref,
   type TenderHit,
   type AgencyCompetition,
-  type RatioStats,
   type BasePriceField,
 } from './shared';
 import SignalRow from './SignalRow';
 import TrackedList from './TrackedList';
 import RivalDossier from './RivalDossier';
 import TenderRadar from './TenderRadar';
+import { PriceBand } from './PriceBands';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -137,33 +136,6 @@ function agencyRadarText(a: AgencyCompetition): { text: string; hint: string } {
   };
 }
 
-// 比例轉百分比字串,跟後端 base-price.ts 的 formatPct 同規則(1 位小數,
-// 整數時不留 .0 尾巴)——前端這裡是為了展開細節裡的原始比值(raw tier)
-// 才需要自己格式化,headline 本身已經是後端組好的完整字串,不用再處理。
-function formatRatioPct(ratio: number): string {
-  const p = Math.round(ratio * 1000) / 10;
-  return `${Number.isInteger(p) ? p : p.toFixed(1)}%`;
-}
-
-function RatioGroupDetail({ label, stats }: { label: string; stats: RatioStats }) {
-  if (stats.tier === 'none') return null; // n=0 的分組不佔版面
-  return (
-    <p className="text-[12px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>
-      <span style={{ color: 'var(--nm-text-primary)' }}>{label}</span>
-      {'　'}
-      {stats.tier === 'raw' ? (
-        <span>{stats.ratios!.map(formatRatioPct).join('、')}(僅 {stats.n} 筆,非統計量)</span>
-      ) : (
-        <span>
-          {stats.n} 筆 · 範圍 {formatRatioPct(stats.min!)}–{formatRatioPct(stats.max!)} · 中位{' '}
-          {formatRatioPct(stats.median!)}
-          {stats.tier === 'quartile' && ` · Q1 ${formatRatioPct(stats.q1!)} / Q3 ${formatRatioPct(stats.q3!)}`}
-        </span>
-      )}
-    </p>
-  );
-}
-
 // 歷史決標參考卡片(A 計劃前端,docs/handoff-base-price-card.md §3)。
 // 三種異常態各自處理,不能混用同一種顯示(§1d):
 //   undefined → 舊版 Worker 沒有這欄位,整塊不渲染(跟 hasClassification
@@ -208,9 +180,9 @@ function BasePriceCard({ bp }: { bp: BasePriceField | null | undefined }) {
         <span className="ml-1" style={{ color: 'var(--nm-text-faint)' }}>▾</span>
       </summary>
       <div className="mt-1.5 space-y-1 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.05)' }}>
-        <RatioGroupDetail label={bp.group_labels.best_value} stats={bp.stats.best_value} />
-        <RatioGroupDetail label={bp.group_labels.lowest_bid} stats={bp.stats.lowest_bid} />
-        <RatioGroupDetail label={bp.group_labels.other} stats={bp.stats.other} />
+        <PriceBand label={bp.group_labels.best_value} stats={bp.stats.best_value} />
+        <PriceBand label={bp.group_labels.lowest_bid} stats={bp.stats.lowest_bid} />
+        <PriceBand label={bp.group_labels.other} stats={bp.stats.other} />
       </div>
     </details>
   );
@@ -518,7 +490,7 @@ export default async function BossTendersMonitorPage({
   ) : null;
 
   return (
-    <ViewportLock>
+    <div className="flex flex-col gap-3">
       <header className="shrink-0 flex flex-wrap items-center justify-between gap-3 pb-3" style={{ borderBottom: '1px solid var(--nm-border-hair)' }}>
         <div>
           <div className="flex items-center gap-2 text-[11px] leading-none uppercase" style={{ color: 'var(--nm-text-muted)', letterSpacing: '.18em' }}>
@@ -580,11 +552,14 @@ export default async function BossTendersMonitorPage({
         <SignalRow hits={hits} days={days} price={price} nature={nature} pool={pool} urgent={urgent} fresh={fresh} />
       </div>
 
-      {visible.length > 0 && (
-        <div className="shrink-0">
-          <TrackedList hits={visible} />
-        </div>
-      )}
+      {/* 桌機:雷達＋對手檔案固定在訊號列下方(兩欄),不進捲動區——之前把
+          它們塞進卡片捲動區,結果那塊區域只剩不到 24px 高、實質上看不到、
+          也捲不出東西(2026-08-15 上線後 Yen 回報畫面捲不動,查出來是這個)。
+          手機螢幕本來就不夠高擺兩欄,維持跟著清單一起捲。 */}
+      <div className="hidden lg:grid lg:grid-cols-2 lg:gap-3 shrink-0">
+        <TenderRadar hits={visible} />
+        <RivalDossier />
+      </div>
 
       {/* 桌機:分佈矩陣固定在上方(地圖不該跟著捲走);手機螢幕不夠高,
           矩陣跟著清單一起捲,不然清單只剩不到一張卡的高度 */}
@@ -623,28 +598,30 @@ export default async function BossTendersMonitorPage({
         </p>
       )}
 
-      {/* 卡片清單是唯一會捲動的區域——標題、篩選、分佈矩陣固定在上面,
-          頁面總高度不隨命中件數改變。底部漸層是「下面還有」的訊號。 */}
+      {/* 手機版的分佈矩陣＋雷達＋對手檔案跟著整頁捲(桌機版都在上面固定那份,
+          手機螢幕擺不下兩欄固定區塊)。這頁不再用 ViewportLock 鎖死視窗高度——
+          雷達＋對手檔案＋價格帶這些新區塊加進來後,固定區塊本身就超過一個
+          螢幕高,鎖死只會把清單捲動區壓成看不見的一條縫(2026-08-15 修過一次
+          這個 bug)。改成讓外層 main 既有的 lg:overflow-auto 整頁捲動,側欄
+          仍然固定,不受影響。 */}
+      <div className="lg:hidden">{filterPanel}</div>
+      <div className="lg:hidden">
+        <TenderRadar hits={visible} />
+      </div>
+      <div className="lg:hidden">
+        <RivalDossier />
+      </div>
+
       {visible.length > 0 && (
-        <div className="relative min-h-0 flex-1">
-          <div className="h-full space-y-3 overflow-y-auto pr-1 pb-6">
-            {/* 手機版的分佈矩陣在捲動區裡面(桌機版在上面固定那份) */}
-            <div className="lg:hidden">{filterPanel}</div>
-            <TenderRadar hits={visible} />
-            <RivalDossier />
-            <ul className="space-y-3">
-              {visible.map((hit) => (
-                <TenderCard key={hit.id} hit={hit} />
-              ))}
-            </ul>
-          </div>
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
-            style={{ background: 'linear-gradient(to top, var(--nm-bg-deep), transparent)' }}
-            aria-hidden
-          />
+        <div className="space-y-3">
+          <TrackedList hits={visible} />
+          <ul className="space-y-3">
+            {visible.map((hit) => (
+              <TenderCard key={hit.id} hit={hit} />
+            ))}
+          </ul>
         </div>
       )}
-    </ViewportLock>
+    </div>
   );
 }
