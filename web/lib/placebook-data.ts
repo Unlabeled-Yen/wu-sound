@@ -18,7 +18,10 @@ export interface PlaceProject {
   id: string;
   name: string;
   active: boolean;
+  categoryId: string | null;
   categoryName: string | null;
+  customerName: string | null;
+  onSiteEquipmentQty: number; // 該案場目前在場設備件數,用來擋「還有設備在場不能停用」
   pendingTaskCount: number | null; // null = tasks 表查不到/未接上
 }
 
@@ -45,12 +48,18 @@ export interface WeekSlot {
   userNames: string[];
 }
 
+export interface SiteCategoryOption {
+  id: string;
+  name: string;
+}
+
 export interface PlacebookData {
   places: PlaceRow[];
   activePlaceCount: number;
   activeProjectCount: number;
   totalKnowledgeCount: number;
   weekSlots: WeekSlot[];
+  categories: SiteCategoryOption[];
   error: string | null;
 }
 
@@ -81,7 +90,7 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
 
   const [sitesRes, categoriesRes, equipmentRes, knowledgeRes, worklogsRes, allocRes] = await Promise.all([
     sb.from('sites').select('id, name, active, category_id, customer_name').order('name'),
-    sb.from('site_categories').select('id, name'),
+    sb.from('site_categories').select('id, name, active').eq('active', true).order('name'),
     sb.from('equipment').select('current_site_id').eq('status', 'on_site'),
     sb.from('site_knowledge').select('site_id'),
     sb.from('worklogs').select('site_id, logged_on').order('logged_on', { ascending: false }),
@@ -90,7 +99,7 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
 
   const firstError = sitesRes.error || categoriesRes.error || equipmentRes.error || knowledgeRes.error || worklogsRes.error || allocRes.error;
   if (firstError) {
-    return { places: [], activePlaceCount: 0, activeProjectCount: 0, totalKnowledgeCount: 0, weekSlots: [], error: firstError.message };
+    return { places: [], activePlaceCount: 0, activeProjectCount: 0, totalKnowledgeCount: 0, weekSlots: [], categories: [], error: firstError.message };
   }
 
   // tasks 表獨立查、獨立防禦——失敗不擋其他欄位。
@@ -175,7 +184,10 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
         id: s.id,
         name: s.name,
         active: s.active,
+        categoryId: s.category_id,
         categoryName: s.category_id ? categories.get(s.category_id) ?? null : null,
+        customerName: s.customer_name,
+        onSiteEquipmentQty: onSiteQtyBySite.get(s.id) ?? 0,
         pendingTaskCount: tasksOk ? (pendingBySite.get(s.id) ?? 0) : null,
       })),
       activeCount,
@@ -224,6 +236,7 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
     activeProjectCount: sites.filter((s) => s.active).length,
     totalKnowledgeCount: Array.from(knowledgeCountBySite.values()).reduce((s, n) => s + n, 0),
     weekSlots,
+    categories: (categoriesRes.data ?? []) as SiteCategoryOption[],
     error: null,
   };
 }
