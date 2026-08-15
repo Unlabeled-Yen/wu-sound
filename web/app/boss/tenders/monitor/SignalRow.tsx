@@ -30,13 +30,13 @@ function Cell({
 }) {
   const body = (
     <>
-      <div className="text-[10px] uppercase" style={{ color: 'var(--nm-text-muted)', letterSpacing: '.18em' }}>
+      <div className="text-[11px] leading-none uppercase" style={{ color: 'var(--nm-text-muted)', letterSpacing: '.18em' }}>
         {label}
       </div>
       <div className="mt-1 text-[30px] font-semibold tabular-nums" style={{ color: 'var(--nm-text-primary)' }}>
         {value}
       </div>
-      <div className="mt-0.5 text-xs" style={{ color: 'var(--nm-text-muted)' }}>
+      <div className="mt-0.5 text-[11px] leading-[1.6]" style={{ color: 'var(--nm-text-muted)' }}>
         {sub}
       </div>
     </>
