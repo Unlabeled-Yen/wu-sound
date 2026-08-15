@@ -100,6 +100,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const dateParam = url.searchParams.get('date');
   const all = url.searchParams.get('all') === '1';
+  const siteId = url.searchParams.get('site_id');
+  const limitParam = url.searchParams.get('limit');
 
   const supabase = getSupabaseAdmin();
   let query = supabase
@@ -118,12 +120,24 @@ export async function GET(req: Request) {
     }
   }
 
-  if (all) {
+  // 案子動態軌(06-project-board.md 11a)要看該案子所有人的日誌,不只自己的——
+  // 比照 all=1 一樣要求 boss 角色,不開放員工看別人日誌。
+  if (siteId) {
+    if (session.role !== 'boss') {
+      return NextResponse.json({ error: '無權限' }, { status: 403 });
+    }
+    query = query.eq('site_id', siteId);
+  } else if (all) {
     if (session.role !== 'boss') {
       return NextResponse.json({ error: '無權限' }, { status: 403 });
     }
   } else {
     query = query.eq('user_id', session.id);
+  }
+
+  if (limitParam) {
+    const n = parseInt(limitParam, 10);
+    if (Number.isFinite(n) && n > 0 && n <= 200) query = query.limit(n);
   }
 
   const { data, error } = await query;

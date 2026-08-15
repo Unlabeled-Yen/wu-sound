@@ -158,15 +158,23 @@ create table audit_log (
 create index audit_log_ts_idx on audit_log (ts desc);
 
 -- voice-lab Lab 1:語音/打字介面,任務(派工最小版)。見 voice-lab/lab1-wu-adapter-spec-v1.md §3。
+-- 看板化(四欄)+ 卡片欄位見 06-project-board.md 11a §4、08-專案管理新建清單.md §1、
+-- migrations/020。site_id 可空:「先記,後歸案」,現場猜不出案子時掛 null。
 create table tasks (
   id uuid primary key default gen_random_uuid(),
-  site_id uuid not null references sites(id),
+  site_id uuid references sites(id),
   title text not null,
   description text,
   due_date date,
-  status text not null default 'open' check (status in ('open', 'done')),
+  status text not null default 'todo' check (status in ('decide', 'todo', 'blocked', 'done')),
   created_by uuid not null references users(id),
   source text not null default 'web' check (source in ('voice', 'text', 'web')),
+  tags text[] not null default '{}',
+  photos jsonb not null default '[]',
+  upload_pending boolean not null default false,
+  blocked_on text,
+  blocked_since timestamptz,
+  completed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -192,6 +200,25 @@ create table write_proposals (
 
 create index write_proposals_expiry_idx on write_proposals (expires_at);
 
+-- 場地知識:跨案子、掛地點(不掛案子)的長效筆記。見 06-project-board.md 11c、
+-- 08-專案管理新建清單.md §1、migrations/021。進場必讀上限 5 條是刻意的摩擦,
+-- app 層強制(validatePin),不下 DB constraint。
+create table site_knowledge (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references sites(id),
+  body text not null,
+  hall text,
+  pinned boolean not null default false,
+  promoted_to_checklist boolean not null default false,
+  author_id uuid not null references users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  last_viewed_at timestamptz
+);
+
+create index site_knowledge_site_idx on site_knowledge (site_id);
+create index site_knowledge_site_pinned_idx on site_knowledge (site_id) where pinned = true;
+
 -- updated_at 自動維護
 create or replace function bump_updated_at() returns trigger as $$
 begin new.updated_at = now(); return new; end $$ language plpgsql;
@@ -201,6 +228,9 @@ before update on expenses for each row execute function bump_updated_at();
 
 create trigger tasks_bump_updated
 before update on tasks for each row execute function bump_updated_at();
+
+create trigger site_knowledge_bump_updated
+before update on site_knowledge for each row execute function bump_updated_at();
 
 -- Phase 2:大型設備位置追蹤
 create type equipment_category as enum (
@@ -585,6 +615,7 @@ alter table bundle_lines enable row level security;
 alter table line_bind_codes enable row level security;
 alter table tasks enable row level security;
 alter table write_proposals enable row level security;
+alter table site_knowledge enable row level security;
 -- 只有 service_role 能存取(anon 全部拒絕),應用端一律由 server 走。
 -- 若日後改用 Supabase Auth,改為以 auth.uid() 比對 users.id 即可。
 -- user_pay_profiles/monthly_cost_rates 額外強調:即使 service_role 繞過 RLS,
