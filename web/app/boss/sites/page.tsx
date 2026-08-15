@@ -137,7 +137,7 @@ export default async function BossSitesPage() {
                     <select
                       name="category_id"
                       defaultValue={s.category_id ?? ''}
-                      className="nm-input text-xs"
+                      className="nm-input text-[12.5px]"
                       style={{ width: 'auto', minHeight: 30, padding: '2px 8px' }}
                     >
                       <option value="">未設</option>
