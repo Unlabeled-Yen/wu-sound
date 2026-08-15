@@ -56,7 +56,7 @@ export function QuoteListRow({ row }: { row: QuoteRowData }) {
   return (
     <Link
       href={`/boss/quotes/${q.id}`}
-      className="flex items-center gap-4.5 py-4 nm-lift"
+      className="flex items-center py-4 nm-lift"
       style={{ borderBottom: '1px solid var(--nm-border-hair)', background: missing > 0 ? 'rgba(217,181,107,.04)' : undefined, gap: 18 }}
     >
       <span className="shrink-0" style={{ width: 3, height: 36, background: barColor, borderRadius: 2 }} />

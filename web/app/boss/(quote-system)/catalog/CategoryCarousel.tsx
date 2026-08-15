@@ -144,14 +144,14 @@ function CategoryPanel({ title, hint, items, tone }: Omit<CarouselPanel, 'key'>)
               style={{ background: 'rgba(20,20,24,0.92)' }}
             >
               <tr style={{ color: 'var(--nm-text-muted)' }}>
-                <th className="text-left px-3.5 py-2.5 font-normal text-xs whitespace-nowrap">品牌</th>
-                <th className="text-left px-3.5 py-2.5 font-normal text-xs whitespace-nowrap">品名</th>
-                <th className="text-left px-3.5 py-2.5 font-normal text-xs whitespace-nowrap">類型</th>
-                <th className="text-left px-3.5 py-2.5 font-normal text-xs whitespace-nowrap">單位</th>
-                <th className="text-right px-3.5 py-2.5 font-normal text-xs whitespace-nowrap">進價</th>
-                <th className="text-right px-3.5 py-2.5 font-normal text-xs whitespace-nowrap">售價</th>
-                <th className="text-left px-3.5 py-2.5 font-normal text-xs whitespace-nowrap">分類</th>
-                <th className="text-right px-5 py-2.5 font-normal text-xs whitespace-nowrap">動作</th>
+                <th className="text-left px-3.5 py-2.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">品牌</th>
+                <th className="text-left px-3.5 py-2.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">品名</th>
+                <th className="text-left px-3.5 py-2.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">類型</th>
+                <th className="text-left px-3.5 py-2.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">單位</th>
+                <th className="text-right px-3.5 py-2.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">進價</th>
+                <th className="text-right px-3.5 py-2.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">售價</th>
+                <th className="text-left px-3.5 py-2.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">分類</th>
+                <th className="text-right px-5 py-2.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">動作</th>
               </tr>
             </thead>
             <tbody>
