@@ -222,7 +222,12 @@ export default function TenderRadar({ hits }: { hits: TenderHit[] }) {
                 zIndex: 30,
               }}
             >
-              <div className="text-[12px] font-medium truncate" style={{ color: 'var(--nm-text-primary)' }}>{active.hit.title}</div>
+              <div className="text-[12px] font-medium truncate" style={{ color: 'var(--nm-text-primary)' }}>
+                {active.hit.title}
+                {active.hit.notice_type.includes('更正') && (
+                  <span className="ml-1 text-[10px] px-1 py-px rounded" style={{ color: 'var(--nm-warning-glass-text)', background: 'rgba(217,181,107,0.12)' }}>更正</span>
+                )}
+              </div>
               <div className="mt-1 text-[11px] tabular-nums leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>
                 {roleStyle(active.role, false).label} · 還剩 {active.days} 天 · ${fmtBudget(active.budgetTwd)}
               </div>
