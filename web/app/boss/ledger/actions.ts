@@ -46,3 +46,20 @@ export async function voidEntry(id: string, reason?: string): Promise<Result> {
   revalidatePath('/boss/ledger');
   return { ok: true };
 }
+
+export async function updateCashSettings(formData: FormData): Promise<void> {
+  const { session, err } = await assertBoss();
+  if (!session) throw new Error(err ?? '未登入');
+
+  const sb = getSupabaseAdmin();
+  const start = Number(formData.get('cash_start_balance'));
+  const safety = Number(formData.get('cash_safety_level'));
+
+  if (!isFinite(start) || start < 0) throw new Error('起點餘額不合法');
+  if (!isFinite(safety) || safety < 0) throw new Error('安全水位不合法');
+
+  await sb.from('app_settings').upsert({ key: 'cash_start_balance', value: String(start), updated_at: new Date().toISOString() });
+  await sb.from('app_settings').upsert({ key: 'cash_safety_level', value: String(safety), updated_at: new Date().toISOString() });
+
+  revalidatePath('/boss/ledger');
+}

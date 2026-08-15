@@ -43,7 +43,7 @@ export function ColumnHeader({
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>帳面{label}</div>
-          <div className="text-2xl font-semibold mt-1" style={{ color: toneColor }}>${fmt(faceAmount)}</div>
+          <div className="text-2xl font-semibold mt-1 tabular-nums" style={{ color: toneColor }}>${fmt(faceAmount)}</div>
         </div>
         <span className="text-[10.5px] shrink-0 pt-1" style={{ color: 'var(--nm-text-faint)' }}>比例以本欄自身 100% 計</span>
       </div>
@@ -57,8 +57,8 @@ export function ColumnHeader({
           )}
         </div>
         <div className="flex justify-between text-[11px] leading-none tracking-[.14em] mt-1.5">
-          <Link href={settledHref} className="underline" style={{ color: 'var(--nm-text-secondary)' }}>{settledLabel} ${fmt(settledAmount)}</Link>
-          <Link href={unsettledHref} className="underline" style={{ color: 'var(--nm-text-secondary)' }}>{unsettledLabel} ${fmt(unsettledAmount)}</Link>
+          <Link href={settledHref} className="underline tabular-nums" style={{ color: 'var(--nm-text-secondary)' }}>{settledLabel} ${fmt(settledAmount)}</Link>
+          <Link href={unsettledHref} className="underline tabular-nums" style={{ color: 'var(--nm-text-secondary)' }}>{unsettledLabel} ${fmt(unsettledAmount)}</Link>
         </div>
       </div>
 

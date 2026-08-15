@@ -123,6 +123,9 @@ export default function IntelLog({ hits }: Props) {
                 style={{ color: 'var(--nm-text-body)' }}
               >
                 {e.hit.title}
+                {e.hit.notice_type.includes('更正') && (
+                  <span className="ml-1 text-[10px] px-1 py-px rounded" style={{ color: 'var(--nm-warning-glass-text)', background: 'rgba(217,181,107,0.12)' }}>更正</span>
+                )}
               </a>
             </div>
           </li>

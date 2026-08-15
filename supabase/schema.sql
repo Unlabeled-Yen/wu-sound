@@ -201,7 +201,7 @@ create table write_proposals (
 create index write_proposals_expiry_idx on write_proposals (expires_at);
 
 -- 場地知識:跨案子、掛地點(不掛案子)的長效筆記。見 06-project-board.md 11c、
--- 08-專案管理新建清單.md §1、migrations/021。進場必讀上限 5 條是刻意的摩擦,
+-- 08-專案管理新建清單.md §1、migrations/022。進場必讀上限 5 條是刻意的摩擦,
 -- app 層強制(validatePin),不下 DB constraint。
 create table site_knowledge (
   id uuid primary key default gen_random_uuid(),

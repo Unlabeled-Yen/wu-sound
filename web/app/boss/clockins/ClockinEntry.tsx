@@ -105,7 +105,7 @@ export default function ClockinEntry({
       className="flex items-center justify-center gap-1 nm-focus"
       title={isBackfill ? backfillReason || '補登' : '點擊編輯'}
     >
-      <span style={{ color: type === 'in' ? 'var(--nm-success-glass-text)' : 'var(--nm-warning-glass-text)' }}>
+      <span className="tabular-nums" style={{ color: type === 'in' ? 'var(--nm-success-glass-text)' : 'var(--nm-warning-glass-text)' }}>
         {type === 'in' ? '入' : '出'} {timeStr}
       </span>
       {isBackfill && (

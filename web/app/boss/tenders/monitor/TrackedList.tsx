@@ -108,6 +108,14 @@ export default function TrackedList({ hits }: Props) {
                   <td className="py-2 px-3">
                     <a href={`#tender-${h.id}`} className="hover:underline" style={{ color: 'var(--nm-text-body)' }}>
                       {h.title}
+                      {h.notice_type.includes('更正') && (
+                        <span
+                          className="ml-1 text-[10px] px-1 py-px rounded"
+                          style={{ color: 'var(--nm-warning-glass-text)', background: 'rgba(217,181,107,0.12)', border: '1px solid rgba(217,181,107,0.26)' }}
+                        >
+                          有更正公告
+                        </span>
+                      )}
                       <span className="ml-1.5 text-[11px] leading-none tracking-[.14em]" style={{ color: 'var(--nm-text-muted)' }}>
                         {h.unit_name || h.unit_id || '未知機關'}
                       </span>
