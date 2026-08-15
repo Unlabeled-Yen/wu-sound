@@ -92,4 +92,28 @@ describe('buildCashForecast', () => {
     expect(f.weeks[0].items[0].label).toBe('南方劇場');
     expect(f.weeks[0].items[0].overdue).toBe(true);
   });
+
+  it('delayedTrajectory 挑金額最大的開放應收延後 30 天,其餘不動', () => {
+    const rows: ForecastReceivable[] = [
+      { direction: 'receivable', remaining_twd: 86000, agreed_due_date: '2026-08-16', label: '南方劇場' },
+      { direction: 'receivable', remaining_twd: 20000, agreed_due_date: '2026-08-17', label: '小案子' },
+      { direction: 'payable', remaining_twd: 10000, agreed_due_date: '2026-08-16' },
+    ];
+    const f = buildCashForecast(rows, TODAY, 0);
+    expect(f.delayedReceivableLabel).toBe('南方劇場');
+    // week0 少了南方劇場的 86000(延到 +31 天,超出 4 週視窗變成 beyond),小案子跟應付仍在 week0
+    expect(f.delayedTrajectory).not.toBeNull();
+    expect(f.delayedTrajectory![0]).toBe(20000 - 10000);
+    // 如期軌跡不受影響
+    expect(f.balanceTrajectory[0]).toBe(86000 + 20000 - 10000);
+  });
+
+  it('沒有開放應收時 delayedTrajectory 為 null,不假裝有第二條線', () => {
+    const rows: ForecastReceivable[] = [
+      { direction: 'payable', remaining_twd: 10000, agreed_due_date: '2026-08-16' },
+    ];
+    const f = buildCashForecast(rows, TODAY);
+    expect(f.delayedTrajectory).toBeNull();
+    expect(f.delayedReceivableLabel).toBeNull();
+  });
 });

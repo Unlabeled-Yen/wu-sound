@@ -21,33 +21,26 @@ interface Props {
   safetyLevel: number;
 }
 
-const CHART_H = 160;
-const DOT_R = 6;
+// 視覺依 design_handoff_wu_sound/prototypes/7a.html「未來四週現金」逐值照抄:
+// Y 軸欄寬 88px、圖表高 140px、圓角方塊點 14×10、安全水位 1px 虛線、每週一根
+// 灰色垂直連桿把「如期收款」實心點跟「{最大應收}再延一個月」空心點連起來——
+// 不是畫一條跨週的趨勢線,原型裡的線是同一週內兩種情境的差距,不是週與週之間
+// 的走勢。唯一的刻意偏離:原型的 Y 軸是寫死 $0–$350K(配那份 demo 資料),
+// 這裡改成依實際資料動態抓一個「好看的整數」上限,否則真實金額一旦超過
+// $350K(已經在測試資料裡發生過)整張圖会截斷。
+const CHART_H = 140;
+const AXIS_W = 88;
+const DOT_W = 14;
+const DOT_H = 10;
 
-function balanceChart(
-  trajectory: number[],
-  startBalance: number,
-  safetyLevel: number,
-) {
-  const allValues = [startBalance, ...trajectory, safetyLevel];
-  const maxVal = Math.max(...allValues);
-  const minVal = Math.min(0, ...allValues);
-  const range = maxVal - minVal || 1;
-  const pad = range * 0.12;
-  const yMax = maxVal + pad;
-  const yMin = minVal - pad;
-  const yRange = yMax - yMin;
-
-  const toY = (val: number) => CHART_H - ((val - yMin) / yRange) * CHART_H;
-
-  const ticks: number[] = [];
-  const step = Math.pow(10, Math.floor(Math.log10(range)));
-  const niceStep = step >= range ? step / 2 : step;
-  for (let v = 0; v <= yMax; v += niceStep) ticks.push(v);
-  for (let v = -niceStep; v >= yMin; v -= niceStep) ticks.push(v);
-  if (safetyLevel > 0 && !ticks.includes(safetyLevel)) ticks.push(safetyLevel);
-
-  return { toY, ticks, yMax, yMin };
+function niceMax(value: number): number {
+  if (value <= 0) return 100000;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+  const steps = [1, 1.5, 2, 2.5, 5, 10];
+  for (const s of steps) {
+    if (value <= s * magnitude) return s * magnitude;
+  }
+  return 10 * magnitude;
 }
 
 export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Props) {
@@ -57,12 +50,19 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
   const hasBeyond = forecast.beyondIncomeTwd > 0 || forecast.beyondExpenseTwd > 0;
 
   const hasAnyData = forecast.weeks.some((w) => w.incomeTwd > 0 || w.expenseTwd > 0);
-  const { toY, ticks } = hasAnyData
-    ? balanceChart(forecast.balanceTrajectory, startBalance, safetyLevel)
-    : { toY: () => 0, ticks: [] };
+  const { delayedTrajectory, delayedReceivableLabel } = forecast;
 
-  const nearSafety = hasAnyData && forecast.balanceTrajectory.some((v) => v > 0 && v <= safetyLevel * 1.05);
-  const belowSafety = hasAnyData && forecast.balanceTrajectory.some((v) => v <= safetyLevel);
+  const yMax = hasAnyData
+    ? niceMax(Math.max(startBalance, safetyLevel, ...forecast.balanceTrajectory, ...(delayedTrajectory ?? [])))
+    : 0;
+  // top-based:0 在圖表頂端(=yMax),CHART_H 在底部(=0)
+  const yFromTop = (v: number) => CHART_H - (Math.max(0, v) / yMax) * CHART_H;
+
+  // 延遲情境第一次貼近/跌破安全水位的那一週——只在那一週標紅、標「已貼水位」,
+  // 其餘週維持黃色空心(有風險但還沒真的貼線),避免整條線一路標紅、警訊被稀釋。
+  const dangerWeekIndex = delayedTrajectory
+    ? delayedTrajectory.findIndex((v) => safetyLevel > 0 && v <= safetyLevel * 1.05)
+    : -1;
 
   return (
     <div className="rounded-2xl nm-raised p-5">
@@ -70,7 +70,7 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
         <div className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>未來四週現金</div>
         <div className="flex items-center gap-3">
           {hasAnyData && (
-            <div className="text-[12px] tabular-nums" style={{ color: 'var(--nm-text-muted)' }}>
+            <div className="text-[12px] leading-none tabular-nums" style={{ color: 'var(--nm-text-faint)' }}>
               起點 ${fmt(startBalance)} · 安全水位 ${fmt(safetyLevel)}
             </div>
           )}
@@ -84,7 +84,7 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
           </button>
         </div>
       </div>
-      <div className="text-[12.5px] leading-[1.7] mb-4" style={{ color: 'var(--nm-text-secondary)' }}>
+      <div className="text-[12.5px] leading-[1.7] mb-5" style={{ color: 'var(--nm-text-secondary)' }}>
         依未收帳款的約定收款日與未付款到期日排入週次,全是預估,不與已收付合計。
       </div>
 
@@ -109,118 +109,96 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
       {/* ---- 餘額水位瀑布圖 ---- */}
       {hasAnyData && (
         <>
-          <div className="flex items-center gap-5 mb-3 text-[11px]" style={{ color: 'var(--nm-text-secondary)' }}>
-            <span className="flex items-center gap-1.5">
-              <span style={{ width: 10, height: 10, background: 'var(--nm-success)', borderRadius: 2, display: 'inline-block' }} />
+          <div className="flex items-center gap-[22px] mb-4 text-[11.5px] leading-none" style={{ color: 'var(--nm-text-secondary)' }}>
+            <span className="flex items-center gap-[7px]">
+              <span style={{ width: 11, height: 11, background: '#a9e3c1', borderRadius: 2, display: 'inline-block' }} />
               如期收款
             </span>
+            {delayedTrajectory && (
+              <span className="flex items-center gap-[7px]">
+                <span style={{ width: 11, height: 11, border: '1.5px solid #d9b56b', borderRadius: 2, display: 'inline-block' }} />
+                {delayedReceivableLabel}再延一個月
+              </span>
+            )}
           </div>
 
-          <div className="flex mb-1">
-            {/* Y 軸標籤 */}
-            <div className="relative shrink-0" style={{ width: 56, height: CHART_H }}>
-              {ticks.map((v) => (
+          <div className="flex mb-6">
+            {/* Y 軸標籤:固定三個——上限、安全水位、$0,不畫一串刻度 */}
+            <div className="relative shrink-0" style={{ width: AXIS_W, height: CHART_H }}>
+              <div className="absolute right-3 text-[10.5px] leading-none" style={{ top: -5, color: 'var(--nm-text-faint)' }}>{fmtK(yMax)}</div>
+              {safetyLevel > 0 && safetyLevel <= yMax && (
                 <div
-                  key={v}
-                  className="absolute right-2 -translate-y-1/2 text-[10px] tabular-nums leading-none"
-                  style={{ top: toY(v), color: v === safetyLevel ? 'var(--nm-warning-glass-text)' : 'var(--nm-text-faint)' }}
+                  className="absolute right-3 text-right text-[10.5px] leading-[1.5]"
+                  style={{ top: yFromTop(safetyLevel) - 14, color: 'var(--nm-warning-glass-text)' }}
                 >
-                  {fmtK(v)}
-                </div>
-              ))}
-              {safetyLevel > 0 && (
-                <div
-                  className="absolute right-2 text-[10px] leading-none font-medium"
-                  style={{ top: toY(safetyLevel) + 10, color: 'var(--nm-warning-glass-text)' }}
-                >
-                  安全水位
+                  安全水位<br /><span className="font-semibold">{fmtK(safetyLevel)}</span>
                 </div>
               )}
+              <div className="absolute right-3 text-[10.5px] leading-none" style={{ bottom: -5, color: 'var(--nm-text-faint)' }}>$0</div>
             </div>
 
             {/* 圖表區 */}
             <div
-              className="relative flex-1 min-w-0 rounded-lg"
-              style={{ height: CHART_H, overflow: 'visible', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--nm-border-hair)' }}
+              className="relative flex-1 min-w-0"
+              style={{ height: CHART_H, borderLeft: '1px solid var(--nm-border-glass)', borderBottom: '1px solid var(--nm-border-glass)' }}
             >
-              {/* 刻度線 */}
-              {ticks.filter((v) => v !== safetyLevel).map((v) => (
-                <div
-                  key={v}
-                  className="absolute inset-x-0"
-                  style={{ top: toY(v), height: 1, background: 'var(--nm-border-hair)' }}
-                />
-              ))}
-
               {/* 安全水位虛線 */}
-              {safetyLevel > 0 && (
+              {safetyLevel > 0 && safetyLevel <= yMax && (
                 <div
                   className="absolute inset-x-0"
-                  style={{
-                    top: toY(safetyLevel),
-                    height: 0,
-                    borderTop: '2px dashed var(--nm-warning)',
-                    opacity: 0.5,
-                  }}
+                  style={{ top: yFromTop(safetyLevel), borderTop: '1px dashed rgba(217,181,107,.6)' }}
                 />
               )}
 
-              {/* 連線:用百分比座標的 SVG,避免 preserveAspectRatio=none 的 strokeWidth 變形 */}
-              <svg
-                className="absolute inset-0"
-                style={{ width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}
-              >
-                {/* 起點到第一週 */}
-                <line
-                  x1="0%" y1={toY(startBalance)}
-                  x2="12.5%" y2={toY(forecast.balanceTrajectory[0])}
-                  stroke="rgba(126,207,157,0.4)" strokeWidth="1.5"
-                />
-                {/* 週間連線 */}
-                {forecast.balanceTrajectory.slice(0, -1).map((val, i) => (
-                  <line
-                    key={i}
-                    x1={`${12.5 + i * 25}%`} y1={toY(val)}
-                    x2={`${12.5 + (i + 1) * 25}%`} y2={toY(forecast.balanceTrajectory[i + 1])}
-                    stroke="rgba(126,207,157,0.4)" strokeWidth="1.5"
-                  />
-                ))}
-              </svg>
-
-              {/* 餘額點 */}
               <div className="absolute inset-0 flex">
-                {forecast.balanceTrajectory.map((val, i) => {
-                  const isBelowSafe = safetyLevel > 0 && val <= safetyLevel;
-                  const dotColor = isBelowSafe ? 'var(--nm-warning)' : 'var(--nm-success)';
-                  const dotBg = isBelowSafe ? 'rgba(217,181,107,0.3)' : 'rgba(126,207,157,0.3)';
+                {forecast.balanceTrajectory.map((onTimeVal, i) => {
+                  const delayedVal = delayedTrajectory?.[i];
+                  const onTimeCenter = yFromTop(onTimeVal);
+                  const delayedCenter = delayedVal !== undefined ? yFromTop(delayedVal) : null;
+                  const isDanger = i === dangerWeekIndex;
+
                   return (
                     <div key={i} className="flex-1 relative">
+                      {/* 連桿:同一週兩種情境的差距,不是跨週趨勢線 */}
+                      {delayedCenter !== null && (
+                        <div
+                          className="absolute"
+                          style={{
+                            left: '50%', width: 1, transform: 'translateX(-50%)',
+                            top: Math.min(onTimeCenter, delayedCenter),
+                            height: Math.abs(onTimeCenter - delayedCenter),
+                            background: 'rgba(255,255,255,.14)',
+                          }}
+                        />
+                      )}
+
+                      {/* 如期收款:實心 */}
                       <div
                         className="absolute -translate-x-1/2 -translate-y-1/2"
-                        style={{
-                          left: '50%',
-                          top: toY(val),
-                          width: DOT_R * 2,
-                          height: DOT_R * 2,
-                          borderRadius: 3,
-                          background: dotBg,
-                          border: `2px solid ${dotColor}`,
-                        }}
+                        style={{ left: '50%', top: onTimeCenter, width: DOT_W, height: DOT_H, borderRadius: 2, background: '#a9e3c1' }}
                       />
-                      {/* 數值標籤 */}
-                      <div
-                        className="absolute -translate-x-1/2 text-[11px] tabular-nums font-semibold whitespace-nowrap"
-                        style={{
-                          left: '50%',
-                          top: toY(val) + (val >= startBalance ? -20 : 14),
-                          color: isBelowSafe ? 'var(--nm-warning-glass-text)' : 'var(--nm-success-glass-text)',
-                        }}
-                      >
-                        {fmtK(val)}
-                        {isBelowSafe && nearSafety && i === forecast.balanceTrajectory.findIndex((v) => v <= safetyLevel) && (
-                          <div className="text-[10px] font-normal mt-0.5" style={{ color: 'var(--nm-warning-glass-text)' }}>已貼水位</div>
-                        )}
-                      </div>
+
+                      {/* {label}再延一個月:空心,貼近/跌破安全水位時變紅並帶底色 */}
+                      {delayedCenter !== null && (
+                        <div
+                          className="absolute -translate-x-1/2 -translate-y-1/2"
+                          style={{
+                            left: '50%', top: delayedCenter, width: DOT_W, height: DOT_H, borderRadius: 2,
+                            border: isDanger ? '1.5px solid #e07a7a' : '1.5px solid #d9b56b',
+                            background: isDanger ? 'rgba(224,122,122,.2)' : 'transparent',
+                          }}
+                        />
+                      )}
+
+                      {/* 危險週才標紅字提示,其餘週不畫,避免整條線都在喊警報 */}
+                      {isDanger && delayedVal !== undefined && (
+                        <div
+                          className="absolute whitespace-nowrap text-[10px] font-semibold leading-[1.3]"
+                          style={{ left: '50%', marginLeft: DOT_W, top: delayedCenter! - 4, color: '#e5a0a0' }}
+                        >
+                          {fmtK(delayedVal)}<br />已貼水位
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -230,9 +208,20 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
 
           {/* 軌跡文字 */}
           <div className="flex mb-4">
-            <div style={{ width: 56, flexShrink: 0 }} />
-            <div className="flex-1 min-w-0 text-[11px] tabular-nums" style={{ color: 'var(--nm-text-muted)' }}>
+            <div style={{ width: AXIS_W, flexShrink: 0 }} />
+            <div className="flex-1 min-w-0 text-[12px] leading-[1.75] tabular-nums" style={{ color: 'var(--nm-text-muted)' }}>
               如期收款 {forecast.balanceTrajectory.map((v) => fmtK(v)).join(' › ')}
+              {delayedTrajectory && (
+                <>
+                  {'　·　延一個月 '}
+                  {delayedTrajectory.map((v, i) => (
+                    <span key={i}>
+                      {i > 0 && ' › '}
+                      <span style={i === dangerWeekIndex ? { color: 'var(--nm-danger-glass-text)', fontWeight: 600 } : undefined}>{fmtK(v)}</span>
+                    </span>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </>
@@ -240,7 +229,7 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
 
       {/* ---- 當週收付明細 ---- */}
       <div className="flex mb-3">
-        <div style={{ width: 56, flexShrink: 0, position: 'relative' }}>
+        <div style={{ width: AXIS_W, flexShrink: 0, position: 'relative' }}>
           <div style={{ fontSize: 10.5, color: 'var(--nm-text-faint)', textAlign: 'right', paddingRight: 8 }}>當週<br />進帳</div>
           <div style={{ fontSize: 10.5, color: 'var(--nm-text-faint)', textAlign: 'right', paddingRight: 8, marginTop: 8 }}>當週<br />付出</div>
         </div>
@@ -307,7 +296,7 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
 
       {/* 週標籤列 */}
       <div className="flex mb-3">
-        <div style={{ width: 56, flexShrink: 0 }} />
+        <div style={{ width: AXIS_W, flexShrink: 0 }} />
         <div className="flex-1 min-w-0 flex gap-1">
           {forecast.weeks.map((w, idx) => {
             const { title, range } = weekLabel(w, idx);

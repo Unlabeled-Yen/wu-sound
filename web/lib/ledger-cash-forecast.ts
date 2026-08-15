@@ -47,8 +47,17 @@ export interface CashForecast {
   unscheduledExpenseTwd: number;
   unscheduledIncomeCount: number;
   unscheduledExpenseCount: number;
-  /** 每週結束時的累計餘額(起點 + 各週淨流入),需要呼叫端提供起點。 */
+  /** 每週結束時的累計餘額(起點 + 各週淨流入,如期收款情境)。 */
   balanceTrajectory: number[];
+  /**
+   * 「最大一筆未結應收再延一個月」情境的餘額軌跡——對照 prototypes/7a.html 的
+   * 「南方劇場再延一個月」線。挑最大金額那筆不是預測它真的會延,是讓老闆一眼看到
+   * 「如果這筆最有份量的應收又拖了,對現金水位衝擊多大」,幫助判斷該不該催。
+   * 沒有任何開放應收時為 null,UI 必須能處理只有單一軌跡的情況,不能假裝有兩條。
+   */
+  delayedTrajectory: number[] | null;
+  /** 被挑中模擬延遲的那筆應收的顯示名稱,legend 與 tooltip 用。 */
+  delayedReceivableLabel: string | null;
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -65,7 +74,22 @@ function diffDays(fromStr: string, toStr: string): number {
   return Math.round((b - a) / 86400000);
 }
 
-export function buildCashForecast(rows: ForecastReceivable[], today: string, startBalance = 0): CashForecast {
+interface Bucketed {
+  weeks: WeekBucket[];
+  overdueIncomeTwd: number;
+  overdueExpenseTwd: number;
+  beyondIncomeTwd: number;
+  beyondExpenseTwd: number;
+  beyondIncomeCount: number;
+  beyondExpenseCount: number;
+  unscheduledIncomeTwd: number;
+  unscheduledExpenseTwd: number;
+  unscheduledIncomeCount: number;
+  unscheduledExpenseCount: number;
+  balanceTrajectory: number[];
+}
+
+function bucket(rows: ForecastReceivable[], today: string, startBalance: number): Bucketed {
   const weeks: WeekBucket[] = [0, 1, 2, 3].map((i) => ({
     weekIndex: i as 0 | 1 | 2 | 3,
     from: addDays(today, i * 7),
@@ -120,7 +144,6 @@ export function buildCashForecast(rows: ForecastReceivable[], today: string, sta
   }
 
   return {
-    today,
     weeks,
     overdueIncomeTwd,
     overdueExpenseTwd,
@@ -133,5 +156,34 @@ export function buildCashForecast(rows: ForecastReceivable[], today: string, sta
     unscheduledIncomeCount,
     unscheduledExpenseCount,
     balanceTrajectory,
+  };
+}
+
+/** 挑「延遲情境」要模擬的那一筆——目前開放應收裡金額最大的一筆。 */
+function pickDelayRisk(rows: ForecastReceivable[]): ForecastReceivable | null {
+  const candidates = rows.filter((r) => r.direction === 'receivable' && r.remaining_twd > 0);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((max, r) => (r.remaining_twd > max.remaining_twd ? r : max));
+}
+
+export function buildCashForecast(rows: ForecastReceivable[], today: string, startBalance = 0, delayDays = 30): CashForecast {
+  const base = bucket(rows, today, startBalance);
+
+  const risk = pickDelayRisk(rows);
+  let delayedTrajectory: number[] | null = null;
+  let delayedReceivableLabel: string | null = null;
+  if (risk) {
+    const shiftedRows = rows.map((r) =>
+      r === risk ? { ...r, agreed_due_date: addDays(r.agreed_due_date ?? today, delayDays) } : r,
+    );
+    delayedTrajectory = bucket(shiftedRows, today, startBalance).balanceTrajectory;
+    delayedReceivableLabel = risk.label ?? '最大應收';
+  }
+
+  return {
+    today,
+    ...base,
+    delayedTrajectory,
+    delayedReceivableLabel,
   };
 }
