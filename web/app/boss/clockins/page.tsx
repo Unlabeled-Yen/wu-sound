@@ -171,7 +171,7 @@ export default async function BossClockinsPage({
               {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => (
                 <th
                   key={d}
-                  className="p-1 text-center min-w-[3.5rem] whitespace-nowrap"
+                  className="p-1 text-center min-w-[3.5rem] whitespace-nowrap tabular-nums"
                   style={{ color: 'var(--nm-text-muted)', borderBottom: '1px solid var(--nm-border-hair)', borderLeft: '1px solid var(--nm-border-hair)' }}
                 >
                   {d}
