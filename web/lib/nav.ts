@@ -124,20 +124,16 @@ export function findActiveItemLabel(pathname: string): string {
   return (best?.item ?? section.items[0]).label;
 }
 
+// 手機底部 5 格分頁:總覽／零用金審核／專案管理備忘／財務／更多——這是老闆手機
+// 端的「只看三件事」原則(見交接紀錄)。報價系統、現場(工作記錄/打卡)、設備庫存、
+// 標案、聲學計算、使用者管理都不再各自佔一格,一律收進「更多」,不逐項砍功能。
 /** 手機底部 5 格分頁,回傳該亮起來的那一格 */
 export function findActiveMobileTab(pathname: string): string {
   if (pathname === '/boss/more' || pathname.startsWith('/boss/more/')) return 'more';
   if (pathname === '/boss') return 'overview';
   if (pathname.startsWith('/boss/expenses')) return 'review';
-  // 報價系統三頁同屬一個系統,底部分頁一起亮
-  if (
-    pathname.startsWith('/boss/quotes') ||
-    pathname.startsWith('/boss/bundles') ||
-    pathname.startsWith('/boss/catalog')
-  ) {
-    return 'quotes';
-  }
-  if (pathname.startsWith('/boss/worklogs') || pathname.startsWith('/boss/clockins')) return 'ops';
+  if (pathname.startsWith('/boss/sites')) return 'projects';
+  if (pathname.startsWith('/boss/ledger') || pathname.startsWith('/boss/close')) return 'finance';
   return 'more';
 }
 

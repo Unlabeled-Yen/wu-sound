@@ -81,18 +81,25 @@ describe('findActiveSection / findActiveItemLabel', () => {
 });
 
 describe('手機底部分頁', () => {
+  // 老闆手機只留三件事(零用金審核／專案管理備忘／財務)＋總覽／更多——
+  // 報價、現場、標案、設備、聲學計算、使用者管理不再各自佔一格,全收進「更多」。
   const cases: [string, string][] = [
     ['/boss', 'overview'],
     ['/boss/expenses', 'review'],
-    ['/boss/quotes', 'quotes'],
-    ['/boss/quotes/abc', 'quotes'],
-    ['/boss/bundles', 'quotes'],
-    ['/boss/catalog', 'quotes'],
-    ['/boss/worklogs', 'ops'],
-    ['/boss/clockins', 'ops'],
+    ['/boss/sites', 'projects'],
+    ['/boss/sites/abc', 'projects'],
+    ['/boss/ledger', 'finance'],
+    ['/boss/ledger/abc', 'finance'],
+    ['/boss/close', 'finance'],
     ['/boss/more', 'more'],
+    ['/boss/quotes', 'more'],
+    ['/boss/bundles', 'more'],
+    ['/boss/catalog', 'more'],
+    ['/boss/worklogs', 'more'],
+    ['/boss/clockins', 'more'],
     ['/boss/equipment', 'more'],
-    ['/boss/sites', 'more'],
+    ['/boss/tenders', 'more'],
+    ['/boss/users', 'more'],
   ];
   for (const [path, tab] of cases) {
     it(`${path} → ${tab}`, () => {
