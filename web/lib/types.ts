@@ -353,6 +353,19 @@ export const QUOTE_STATUS_LABEL: Record<QuoteStatus,string> = { draft:'草稿', 
 export interface BundleTemplate { id:string; name:string; applicable_to:string|null; note:string|null; active:boolean; created_at:string; updated_at:string; }
 export interface BundleLine { id:string; bundle_id:string; catalog_item_id:string|null; name:string; spec:string|null; qty:number; unit:string|null; section:QuoteLineSection; sort_order:number; created_at:string; }
 
+// 場地知識:案場累積的經驗筆記,依廳別分群,可釘選(上限 5),可升級為檢查表項目
+export interface SiteNote {
+  id: string;
+  site_id: string;
+  zone: string;
+  content: string;
+  is_pinned: boolean;
+  is_checklist: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // voice-lab Lab 1:語音/打字介面 — 任務(派工最小版)+ 兩階段寫入提案
 export type VoiceTaskStatus = 'open' | 'done';
 export type VoiceSource = 'voice' | 'text' | 'web';

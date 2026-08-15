@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { SiteCategory } from '@/lib/types';
-import { createSite, renameSite, setSiteActive, updateSiteMeta, createSiteCategory } from './actions';
+import { createSite, setSiteActive, updateSiteMeta, createSiteCategory } from './actions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,18 +118,13 @@ export default async function BossSitesPage() {
             {sites.map((s) => (
               <tr key={s.id} style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
                 <td className="py-2 px-3.5 whitespace-nowrap">
-                  <form action={renameSite} className="flex items-center gap-2">
-                    <input type="hidden" name="id" value={s.id} />
-                    <input
-                      name="name"
-                      defaultValue={s.name}
-                      className="border-b outline-none bg-transparent nm-focus"
-                      style={{ borderColor: 'transparent', color: 'var(--nm-text-body)' }}
-                    />
-                    <button type="submit" className="text-xs nm-focus" style={{ color: 'var(--nm-text-muted)' }}>
-                      存
-                    </button>
-                  </form>
+                  <Link
+                    href={`/boss/sites/${s.id}`}
+                    className="hover:underline nm-focus"
+                    style={{ color: 'var(--nm-text-body)' }}
+                  >
+                    {s.name}
+                  </Link>
                 </td>
                 <td className="py-2 px-3.5 whitespace-nowrap">
                   <form action={updateSiteMeta} className="flex items-center gap-2">
