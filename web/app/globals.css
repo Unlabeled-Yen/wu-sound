@@ -345,24 +345,3 @@ body::after {
 @media (prefers-reduced-motion: reduce) {
   .carousel-track { transition: none !important; }
 }
-
-/* Bridge for pages still using Tailwind neutral tokens.
-   Existing pages use bg-white / dark:bg-neutral-950 etc.; force them onto the glass palette. */
-.bg-white:not(.nm-btn-solid):not(.keep-light) {
-  background-color: rgba(30, 30, 36, 0.3) !important;
-}
-.dark\:bg-neutral-900,
-.dark\:bg-neutral-950 {
-  background-color: rgba(19, 19, 23, 0.32) !important;
-}
-.text-neutral-900:not(.keep-dark) { color: var(--nm-text-primary) !important; }
-.text-neutral-700 { color: var(--nm-text-secondary) !important; }
-.text-neutral-600 { color: var(--nm-text-secondary) !important; }
-.text-neutral-500 { color: var(--nm-text-secondary) !important; }
-.text-neutral-400 { color: var(--nm-text-muted) !important; }
-.border-neutral-200, .border-neutral-300 {
-  border-color: var(--nm-border-glass) !important;
-}
-.border-neutral-800 {
-  border-color: var(--nm-border-hair) !important;
-}

@@ -73,21 +73,22 @@ export default function LoginForm({ users }: Props) {
   if (!selected) {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-sm text-neutral-600 dark:text-neutral-400 text-center mb-2">
+        <p className="text-[13px] leading-[1.6] text-center mb-2" style={{ color: 'var(--nm-text-secondary)' }}>
           請選擇你的名字
         </p>
         {users.length === 0 ? (
-          <p className="text-center text-sm text-neutral-500">尚無啟用中的使用者</p>
+          <p className="text-center text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>尚無啟用中的使用者</p>
         ) : (
           users.map((u) => (
             <button
               key={u.id}
               type="button"
               onClick={() => setSelected(u)}
-              className="w-full min-h-[64px] rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-lg font-medium shadow-sm active:scale-[0.99] transition"
+              className="w-full min-h-[64px] rounded-2xl nm-raised nm-lift nm-focus text-lg font-medium active:scale-[0.99] transition"
+              style={{ color: 'var(--nm-text-primary)' }}
             >
               {u.name}
-              <span className="ml-2 text-xs text-neutral-500">
+              <span className="ml-2 text-[11px] leading-none tracking-[.14em]" style={{ color: 'var(--nm-text-muted)' }}>
                 {u.role === 'boss' ? '老闆' : '員工'}
               </span>
             </button>
@@ -109,14 +110,15 @@ export default function LoginForm({ users }: Props) {
             setPin('');
             setError(null);
           }}
-          className="text-sm text-neutral-500 underline"
+          className="text-[13px] leading-[1.6] underline nm-focus"
+          style={{ color: 'var(--nm-text-secondary)' }}
         >
           ← 換人
         </button>
-        <span className="text-base font-medium">{selected.name}</span>
+        <span className="text-base font-medium" style={{ color: 'var(--nm-text-primary)' }}>{selected.name}</span>
       </div>
 
-      <p className="text-center text-sm text-neutral-600 dark:text-neutral-400">
+      <p className="text-center text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>
         請輸入 4 位數 PIN
       </p>
 
@@ -124,21 +126,21 @@ export default function LoginForm({ users }: Props) {
         {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className={`w-12 h-12 rounded-xl border flex items-center justify-center text-2xl ${
-              pin.length > i
-                ? 'border-neutral-900 dark:border-neutral-100 bg-neutral-900 dark:bg-neutral-100'
-                : 'border-neutral-300 dark:border-neutral-700'
-            }`}
+            className="w-12 h-12 rounded-xl border flex items-center justify-center text-2xl"
+            style={{
+              borderColor: pin.length > i ? 'var(--nm-accent)' : 'var(--nm-border-glass)',
+              background: pin.length > i ? 'var(--nm-accent)' : 'transparent',
+            }}
           >
             {pin.length > i ? (
-              <span className="w-3 h-3 rounded-full bg-white dark:bg-neutral-900" />
+              <span className="w-3 h-3 rounded-full" style={{ background: 'var(--nm-bg-deep)' }} />
             ) : null}
           </div>
         ))}
       </div>
 
       {error ? (
-        <p className="text-center text-sm text-red-600 dark:text-red-400" role="alert">
+        <p className="text-center text-[13px] leading-[1.6]" style={{ color: 'var(--nm-danger)' }} role="alert">
           {error}
         </p>
       ) : null}
@@ -150,7 +152,7 @@ export default function LoginForm({ users }: Props) {
             type="button"
             onClick={() => handleDigit(d)}
             disabled={submitting}
-            className="min-h-[64px] rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-2xl font-medium shadow-sm active:scale-[0.97] transition disabled:opacity-50"
+            className="min-h-[64px] nm-btn text-2xl font-medium active:scale-[0.97] transition"
           >
             {d}
           </button>
@@ -160,7 +162,7 @@ export default function LoginForm({ users }: Props) {
           type="button"
           onClick={() => handleDigit('0')}
           disabled={submitting}
-          className="min-h-[64px] rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-2xl font-medium shadow-sm active:scale-[0.97] transition disabled:opacity-50"
+          className="min-h-[64px] nm-btn text-2xl font-medium active:scale-[0.97] transition"
         >
           0
         </button>
@@ -168,7 +170,7 @@ export default function LoginForm({ users }: Props) {
           type="button"
           onClick={handleBackspace}
           disabled={submitting || pin.length === 0}
-          className="min-h-[64px] rounded-2xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-base font-medium shadow-sm active:scale-[0.97] transition disabled:opacity-40"
+          className="min-h-[64px] nm-btn text-base font-medium active:scale-[0.97] transition"
           aria-label="刪除一位"
         >
           ⌫
@@ -176,7 +178,7 @@ export default function LoginForm({ users }: Props) {
       </div>
 
       {submitting ? (
-        <p className="text-center text-sm text-neutral-500">登入中…</p>
+        <p className="text-center text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-muted)' }}>登入中…</p>
       ) : null}
     </div>
   );
