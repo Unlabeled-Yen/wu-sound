@@ -2,7 +2,7 @@ import { type LedgerEntry, type LedgerKind, type InvoiceStatus } from '@/lib/typ
 import { summarizeEntries } from '@/lib/ledger-summary';
 import { fetchReceivablesWithRemaining } from '@/lib/receivables-query';
 import { buildCashForecast, type ForecastReceivable } from '@/lib/ledger-cash-forecast';
-import { generateLedgerInsight } from '@/lib/ledger-insight';
+import { generateLedgerInsight, buildLedgerInsightTodo } from '@/lib/ledger-insight';
 import { taipeiTodayStr } from '@/lib/tz';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import Link from 'next/link';
@@ -126,6 +126,19 @@ export async function AllView({
     topIncomeAmount: incomeRanking[0]?.amount ?? 0,
   });
 
+  const missingCustomerAmount = monitorIncomeEntries
+    .filter((r) => !r.party)
+    .reduce((max, r) => Math.max(max, r.amount_twd), 0);
+  const todo = buildLedgerInsightTodo({
+    netFace,
+    netSettled,
+    incomeUnsettled,
+    expenseUnsettled,
+    missingCustomerAmount: missingCustomerAmount > 0 ? missingCustomerAmount : null,
+    agingRows: [...openReceivables, ...openPayables].map((r) => ({ agreedDueDate: r.agreed_due_date })),
+    todayStr: taipeiTodayStr(),
+  });
+
   // ---- 列表資料整理(本月/篩選後的已收付) ----
   type Row = LedgerEntry & { sites?: { name: string } | null };
   const listEntries = (listEntriesRes.data ?? []) as Row[];
@@ -150,7 +163,7 @@ export async function AllView({
           <CashForecastTimeline forecast={forecast} startBalance={cashStartBalance} safetyLevel={cashSafetyLevel} />
         </div>
         <div className="min-w-0">
-          <AiInsightCard insight={insight} />
+          <AiInsightCard insight={insight} todo={todo} />
         </div>
       </div>
 

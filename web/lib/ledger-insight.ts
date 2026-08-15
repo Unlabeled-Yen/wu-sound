@@ -74,3 +74,71 @@ export function generateLedgerInsight(input: LedgerInsightInput): LedgerInsight 
 function fmt(n: number): string {
   return Math.round(n).toLocaleString('zh-TW');
 }
+
+/**
+ * 「待補」分頁的三張卡(design_handoff_wu_sound 10/14-cashflow-insight.md)。
+ * 殘差公式跟 NetBand.tsx 一致(同一份帳,不能算出兩個不同的殘差數字)。
+ * 「缺客戶名」「帳齡分佈」直接用呼叫端已經查好的 monitorEntries/receivables
+ * 算,不另外查表。
+ */
+export interface LedgerInsightTodoResidual {
+  amountTwd: number;
+  incomeUnsettled: number;
+  expenseUnsettled: number;
+}
+
+export interface LedgerInsightTodoMissingCustomer {
+  amountTwd: number;
+}
+
+export interface LedgerInsightTodoAging {
+  notDue: number;
+  within30: number;
+  overdue: number;
+}
+
+export interface LedgerInsightTodo {
+  residual: LedgerInsightTodoResidual | null;
+  missingCustomer: LedgerInsightTodoMissingCustomer | null;
+  aging: LedgerInsightTodoAging | null;
+}
+
+export function buildLedgerInsightTodo(input: {
+  netFace: number;
+  netSettled: number;
+  incomeUnsettled: number;
+  expenseUnsettled: number;
+  missingCustomerAmount: number | null;
+  agingRows: Array<{ agreedDueDate: string | null }>;
+  todayStr: string;
+}): LedgerInsightTodo {
+  const gap = input.netFace - input.netSettled;
+  const receivablePayableDiff = input.incomeUnsettled - input.expenseUnsettled;
+  const residualValue = gap - receivablePayableDiff;
+
+  const residual = Math.abs(residualValue) >= 1
+    ? { amountTwd: Math.abs(residualValue), incomeUnsettled: input.incomeUnsettled, expenseUnsettled: input.expenseUnsettled }
+    : null;
+
+  const missingCustomer = input.missingCustomerAmount && input.missingCustomerAmount > 0
+    ? { amountTwd: input.missingCustomerAmount }
+    : null;
+
+  const in30 = addDaysStr(input.todayStr, 30);
+  let notDue = 0, within30 = 0, overdue = 0;
+  for (const r of input.agingRows) {
+    if (!r.agreedDueDate) { notDue++; continue; }
+    if (r.agreedDueDate < input.todayStr) overdue++;
+    else if (r.agreedDueDate < in30) within30++;
+    else notDue++;
+  }
+  const aging = notDue + within30 + overdue > 0 ? { notDue, within30, overdue } : null;
+
+  return { residual, missingCustomer, aging };
+}
+
+function addDaysStr(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
