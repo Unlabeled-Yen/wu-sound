@@ -1,22 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import type { LedgerInsight, LedgerInsightTodo } from '@/lib/ledger-insight';
+import type { LedgerInsight, LedgerInsightTodo, LedgerInsightChange, LedgerInsightLinkCase } from '@/lib/ledger-insight';
 
 const fmt = (n: number) => Math.round(n).toLocaleString('zh-TW');
 
 // v2:收支分析卡改成三分頁(變化/關聯/待補),取代舊版單卡
 // (design_handoff_wu_sound 10/14-cashflow-insight.md、prototypes/18a.html·18b.html)。
-// commit 2 只做外殼＋待補分頁——變化/關聯需要新的月比月聚合、跨表關聯查詢,
-// 風險較高,留到之後的 commit 再做,這輪先顯示「尚未接上」而不是編資料出來。
-//
-// 預設分頁選「待補」而不是設計稿原本的「變化」,因為這輪只有待補分頁有真資料;
-// 之後變化/關聯做好了,可以把預設換回變化分頁。
 type Tab = 'change' | 'link' | 'todo';
 
-export function AiInsightCard({ insight, todo }: { insight: LedgerInsight; todo: LedgerInsightTodo }) {
-  const [tab, setTab] = useState<Tab>('todo');
+export function AiInsightCard({
+  insight, todo, change, link,
+}: {
+  insight: LedgerInsight;
+  todo: LedgerInsightTodo;
+  change: LedgerInsightChange;
+  link: LedgerInsightLinkCase | null;
+}) {
+  const [tab, setTab] = useState<Tab>('change');
   const todoCount = [todo.residual, todo.missingCustomer, todo.aging && todo.aging.overdue > 0 ? todo.aging : null].filter(Boolean).length;
 
   return (
@@ -58,8 +60,8 @@ export function AiInsightCard({ insight, todo }: { insight: LedgerInsight; todo:
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col">
-        {tab === 'change' && <NotWiredPanel text="這裡會顯示近六個月月比月的收支變化,需要新的月度聚合查詢,尚未接上。" />}
-        {tab === 'link' && <NotWiredPanel text="這裡會顯示帳務與現金水位之間的關聯(例如哪個案子的付款早於收款),需要跨表關聯查詢,尚未接上。" />}
+        {tab === 'change' && <ChangePanel change={change} />}
+        {tab === 'link' && <LinkPanel link={link} />}
         {tab === 'todo' && <TodoPanel todo={todo} />}
       </div>
 
@@ -81,11 +83,122 @@ export function AiInsightCard({ insight, todo }: { insight: LedgerInsight; todo:
   );
 }
 
-function NotWiredPanel({ text }: { text: string }) {
+function EmptyPanel({ text }: { text: string }) {
   return (
     <div className="flex-1 flex items-center justify-center text-center px-2">
-      <p className="text-[12.5px] leading-[1.8]" style={{ color: 'var(--nm-text-faint)' }}>尚未接上　·　{text}</p>
+      <p className="text-[12.5px] leading-[1.8]" style={{ color: 'var(--nm-text-faint)' }}>{text}</p>
     </div>
+  );
+}
+
+const MONTH_LABEL = (m: string) => m.slice(5, 7);
+
+function ChangePanel({ change }: { change: LedgerInsightChange }) {
+  if (change.months.length === 0) return <EmptyPanel text="沒有分錄可算近六個月變化。" />;
+
+  const maxPositive = Math.max(1, ...change.months.map((m) => Math.max(0, m.net)));
+  const latestMonth = change.months[change.months.length - 1]?.month;
+
+  const rows: Array<{ badge: string; badgeColor: string; text: ReactNode }> = [];
+  if (change.mom) {
+    const { latestIsHighest, diffTwd, pct } = change.mom;
+    const sign = diffTwd >= 0 ? '＋' : '−';
+    rows.push({
+      badge: pct !== null ? `${sign}${Math.abs(pct).toFixed(0)}%` : `${sign}$${fmt(Math.abs(diffTwd))}`,
+      badgeColor: diffTwd >= 0 ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)',
+      text: (
+        <>
+          {latestIsHighest ? '本月實收淨額是六個月最高，' : '本月實收淨額'}
+          較上月{diffTwd >= 0 ? '多' : '少'} <span style={{ fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace' }}>${fmt(Math.abs(diffTwd))}</span>
+        </>
+      ),
+    });
+  }
+  if (change.collectionDays) {
+    const { currentAvgDays, diffDays } = change.collectionDays;
+    rows.push({
+      badge: `${currentAvgDays} 天`,
+      badgeColor: 'var(--nm-text-body)',
+      text: diffDays !== null
+        ? `本月平均收款天數，比上月${diffDays >= 0 ? '多' : '少'} ${Math.abs(diffDays)} 天`
+        : '本月平均收款天數(還沒有上月樣本可比)',
+    });
+  }
+
+  return (
+    <>
+      <div className="text-[11px] leading-none tracking-[.16em] uppercase mb-3.5" style={{ color: 'var(--nm-text-muted)' }}>
+        實收淨額　近{change.months.length}個月
+      </div>
+
+      <div className="flex items-end gap-1.5 mb-2.5" style={{ height: 96 }}>
+        {change.months.map((m) => {
+          const isLatest = m.month === latestMonth;
+          const h = m.net > 0 ? Math.max(2, (m.net / maxPositive) * 100) : 0;
+          return (
+            <div key={m.month} className="flex-1 flex flex-col justify-end" style={{ height: '100%' }}>
+              <span className="block rounded-sm" style={{ height: `${h}%`, background: isLatest ? 'rgba(126,207,157,.6)' : 'rgba(126,207,157,.28)' }} />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-1.5 mb-4 tabular-nums text-[10px]" style={{ color: 'var(--nm-text-faint)' }}>
+        {change.months.map((m) => (
+          <span key={m.month} className="flex-1 text-center" style={{ color: m.month === latestMonth ? 'var(--nm-success-glass-text)' : undefined }}>
+            {MONTH_LABEL(m.month)}
+          </span>
+        ))}
+      </div>
+
+      {rows.length === 0 && <EmptyPanel text="這六個月的樣本還不夠算出比較。" />}
+      {rows.length > 0 && (
+        <div className="flex flex-col">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-baseline gap-2.5" style={{ padding: '12px 0', borderTop: '1px solid rgba(255,255,255,.09)', borderBottom: i === rows.length - 1 ? '1px solid rgba(255,255,255,.09)' : undefined }}>
+              <span className="flex-none tabular-nums font-semibold text-[15px]" style={{ width: 58, color: r.badgeColor }}>{r.badge}</span>
+              <span className="flex-1 text-[12.5px] leading-[1.6]" style={{ color: 'var(--nm-text-body)' }}>{r.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function LinkPanel({ link }: { link: LedgerInsightLinkCase | null }) {
+  if (!link) return <EmptyPanel text="目前沒有同一個案子「錢先出後進」的情形可看。" />;
+
+  return (
+    <>
+      <div className="text-[11px] leading-none tracking-[.16em] uppercase mb-1.5" style={{ color: 'var(--nm-text-muted)' }}>
+        同一個案子，錢先出後進
+      </div>
+      <div className="text-[11.5px] leading-[1.6] mb-4" style={{ color: 'var(--nm-text-secondary)' }}>{link.siteLabel}</div>
+
+      <div className="flex flex-col gap-2.5 mb-4">
+        <div className="rounded-[10px] flex items-center justify-between" style={{ padding: '10px 12px', border: '1.5px solid var(--nm-danger)', background: 'rgba(224,122,122,.1)' }}>
+          <span className="text-[11.5px]" style={{ color: 'var(--nm-danger-glass-text)' }}>應付到期　{link.payableDueDate}</span>
+          <span className="tabular-nums text-[13px] font-medium" style={{ color: 'var(--nm-danger-glass-text)' }}>${fmt(link.payableAmount)}</span>
+        </div>
+        <div className="text-center text-[11px]" style={{ color: 'var(--nm-warning-glass-text)' }}>缺口 {link.gapDays} 天</div>
+        <div className="rounded-[10px] flex items-center justify-between" style={{ padding: '10px 12px', border: '1.5px dashed var(--nm-warning)', background: 'rgba(217,181,107,.1)' }}>
+          <span className="text-[11.5px]" style={{ color: 'var(--nm-warning-glass-text)' }}>應收約定　{link.receivableDueDate}</span>
+          <span className="tabular-nums text-[13px] font-medium" style={{ color: 'var(--nm-warning-glass-text)' }}>${fmt(link.receivableAmount)}</span>
+        </div>
+      </div>
+
+      <div className="text-[12.5px] leading-[1.6] mb-4" style={{ color: 'var(--nm-text-body)' }}>
+        這個案子的應付到期日比應收約定收款日早 <span className="tabular-nums" style={{ color: 'var(--nm-warning-glass-text)' }}>{link.gapDays} 天</span>,要先付出去才收得到。
+      </div>
+
+      <Link
+        href={`/boss/ledger?site_id=${link.siteId}`}
+        className="flex items-center justify-between rounded-[13px] px-4 py-3.5 text-[13px]"
+        style={{ background: 'var(--nm-text-primary)', color: '#17171a' }}
+      >
+        <span>看{link.siteLabel}</span><span>›</span>
+      </Link>
+    </>
   );
 }
 

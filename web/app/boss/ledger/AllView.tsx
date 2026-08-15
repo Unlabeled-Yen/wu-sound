@@ -2,7 +2,7 @@ import { type LedgerEntry, type LedgerKind, type InvoiceStatus } from '@/lib/typ
 import { summarizeEntries } from '@/lib/ledger-summary';
 import { fetchReceivablesWithRemaining } from '@/lib/receivables-query';
 import { buildCashForecast, type ForecastReceivable } from '@/lib/ledger-cash-forecast';
-import { generateLedgerInsight, buildLedgerInsightTodo } from '@/lib/ledger-insight';
+import { generateLedgerInsight, buildLedgerInsightTodo, buildLedgerInsightChange, buildLedgerInsightLink } from '@/lib/ledger-insight';
 import { taipeiTodayStr } from '@/lib/tz';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import Link from 'next/link';
@@ -36,9 +36,11 @@ export async function AllView({
   sites: Array<{ id: string; name: string }>;
 }) {
   // ---- 監測資料:全帳戶、不受月份/篩選影響 ----
-  const [monitorEntriesRes, monitorReceivablesRes] = await Promise.all([
+  const [monitorEntriesRes, monitorReceivablesRes, receivableCreatedAtRes] = await Promise.all([
     sb.from('ledger_entries').select('*').eq('state', 'posted'),
     fetchReceivablesWithRemaining(sb, { status: 'open' }),
+    // 「變化」分頁的平均收款天數要用——不分開/結清狀態,全部應收約定的建立時間都要。
+    sb.from('receivables').select('id, created_at').eq('direction', 'receivable'),
   ]);
 
   // ---- 列表資料:受月份與篩選影響,只含已收付分錄(未結約定已搬到應收款/應付款) ----
@@ -57,10 +59,10 @@ export async function AllView({
   listQuery = listQuery.order('occurred_on', { ascending: false }).order('created_at', { ascending: false });
   const listEntriesRes = await listQuery;
 
-  if (monitorEntriesRes.error || monitorReceivablesRes.error || listEntriesRes.error) {
+  if (monitorEntriesRes.error || monitorReceivablesRes.error || listEntriesRes.error || receivableCreatedAtRes.error) {
     return (
       <div className="rounded-2xl px-4 py-3 text-[13px]" style={{ background: 'rgba(224,122,122,0.08)', border: '1px solid rgba(224,122,122,0.34)', color: 'var(--nm-danger-glass-text)' }}>
-        讀取失敗,以下數字不可信:{monitorEntriesRes.error?.message ?? monitorReceivablesRes.error ?? listEntriesRes.error?.message}
+        讀取失敗,以下數字不可信:{monitorEntriesRes.error?.message ?? monitorReceivablesRes.error ?? listEntriesRes.error?.message ?? receivableCreatedAtRes.error?.message}
       </div>
     );
   }
@@ -139,6 +141,30 @@ export async function AllView({
     todayStr: taipeiTodayStr(),
   });
 
+  const receivableCreatedAtById = new Map((receivableCreatedAtRes.data ?? []).map((r: { id: string; created_at: string }) => [r.id, r.created_at]));
+  const settledOnByReceivable = new Map<string, string>();
+  monitorIncomeEntries
+    .filter((r) => r.receivable_id)
+    .forEach((r) => {
+      const cur = settledOnByReceivable.get(r.receivable_id!);
+      if (!cur || r.occurred_on > cur) settledOnByReceivable.set(r.receivable_id!, r.occurred_on);
+    });
+  const collections = Array.from(settledOnByReceivable.entries())
+    .map(([receivableId, settledOn]) => ({ receivableCreatedAt: receivableCreatedAtById.get(receivableId), settledOn }))
+    .filter((c): c is { receivableCreatedAt: string; settledOn: string } => !!c.receivableCreatedAt);
+
+  const change = buildLedgerInsightChange({
+    entries: monitorEntries.map((r) => ({ occurred_on: r.occurred_on, direction: r.direction, amount_twd: r.amount_twd, fee_twd: r.fee_twd })),
+    collections,
+    monthsBack: 6,
+    todayStr: taipeiTodayStr(),
+  });
+
+  const link = buildLedgerInsightLink({
+    openPayables: openPayables.map((r) => ({ site_id: r.site_id, siteLabel: r.party + (r.sites?.name ? `（${r.sites.name}）` : ''), agreed_due_date: r.agreed_due_date, remaining_twd: r.remaining_twd })),
+    openReceivables: openReceivables.map((r) => ({ site_id: r.site_id, siteLabel: r.party + (r.sites?.name ? `（${r.sites.name}）` : ''), agreed_due_date: r.agreed_due_date, remaining_twd: r.remaining_twd })),
+  });
+
   // ---- 列表資料整理(本月/篩選後的已收付) ----
   type Row = LedgerEntry & { sites?: { name: string } | null };
   const listEntries = (listEntriesRes.data ?? []) as Row[];
@@ -163,7 +189,7 @@ export async function AllView({
           <CashForecastTimeline forecast={forecast} startBalance={cashStartBalance} safetyLevel={cashSafetyLevel} />
         </div>
         <div className="min-w-0">
-          <AiInsightCard insight={insight} todo={todo} />
+          <AiInsightCard insight={insight} todo={todo} change={change} link={link} />
         </div>
       </div>
 
