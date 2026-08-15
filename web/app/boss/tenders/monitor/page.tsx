@@ -30,6 +30,42 @@ async function loadRecentTenders(days: number): Promise<LoadResult> {
   return { hits: data?.hits ?? [], error };
 }
 
+interface SyncStatusResponse {
+  latest: { run_date: string; status: string; finished_at: string | null } | null;
+  last_success: { run_date: string; finished_at: string | null } | null;
+}
+
+interface SyncStatus {
+  failed: boolean;
+  lastSuccessLabel: string | null;
+}
+
+// 時間一律 14:07／昨 18:40 的絕對格式(見 07-視覺校正指南 §3.4 情資日誌同一條規則),
+// 同步這裡沒有精確到分鐘以上的必要就用「今日 14:07」/「MM-DD 14:07」,不用「3 小時前」。
+function formatSyncTime(iso: string): string {
+  const d = new Date(iso);
+  const taipei = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const today = todayInTaipei();
+  const y = taipei.getFullYear();
+  const m = String(taipei.getMonth() + 1).padStart(2, '0');
+  const day = String(taipei.getDate()).padStart(2, '0');
+  const hh = String(taipei.getHours()).padStart(2, '0');
+  const mm = String(taipei.getMinutes()).padStart(2, '0');
+  const dateKey = `${y}-${m}-${day}`;
+  return `${dateKey === today ? '今日' : `${m}-${day}`} ${hh}:${mm}`;
+}
+
+async function loadSyncStatus(): Promise<SyncStatus | null> {
+  const { data } = await fetchTenderRadar<SyncStatusResponse>('/api/status');
+  if (!data || !data.latest) return null;
+  const failed = data.latest.status === 'failed';
+  const successRun = failed ? data.last_success : data.latest;
+  return {
+    failed,
+    lastSuccessLabel: successRun?.finished_at ? formatSyncTime(successRun.finished_at) : null,
+  };
+}
+
 function formatBudget(hit: TenderHit): string {
   switch (hit.budget_status) {
     case 'value': {
@@ -420,6 +456,7 @@ export default async function BossTendersMonitorPage({
   const fresh = sp.fresh === '1';
 
   const { hits, error } = await loadRecentTenders(days);
+  const syncStatus = await loadSyncStatus();
 
   // 分類是 API 現算的,但舊版 Worker 尚未部署時欄位會是 undefined——
   // 那時不要假裝有分類,直接把篩選列藏起來,免得顯示「每類都 0 件」誤導。
@@ -509,18 +546,32 @@ export default async function BossTendersMonitorPage({
             </a>
           </div>
         </div>
-        <nav className="flex gap-1 rounded-2xl nm-inset p-1 text-[13px]">
-          {[1, 3, 7, 14, 30].map((d) => (
-            <a
-              key={d}
-              href={buildHref({ days: d, price, nature, pool })}
-              className={d === days ? 'nm-btn-solid' : 'nm-btn'}
-              style={{ padding: '6px 14px', minHeight: 'auto' }}
-            >
-              {d} 天
-            </a>
-          ))}
-        </nav>
+        <div className="flex flex-col items-end gap-2">
+          <div className="text-right text-[12px] leading-[1.6] tabular-nums" style={{ color: 'var(--nm-text-faint)' }}>
+            <div>來源 政府採購網</div>
+            {syncStatus === null ? (
+              <div>同步狀態未知</div>
+            ) : syncStatus.failed ? (
+              <div style={{ color: 'var(--nm-danger)' }}>
+                同步失敗{syncStatus.lastSuccessLabel ? `　上次成功 ${syncStatus.lastSuccessLabel}` : ''}
+              </div>
+            ) : (
+              <div>同步 {syncStatus.lastSuccessLabel ?? '—'}</div>
+            )}
+          </div>
+          <nav className="flex gap-1 rounded-2xl nm-inset p-1 text-[13px]">
+            {[1, 3, 7, 14, 30].map((d) => (
+              <a
+                key={d}
+                href={buildHref({ days: d, price, nature, pool })}
+                className={d === days ? 'nm-btn-solid' : 'nm-btn'}
+                style={{ padding: '6px 14px', minHeight: 'auto' }}
+              >
+                {d} 天
+              </a>
+            ))}
+          </nav>
+        </div>
       </header>
 
       <div className="shrink-0">
