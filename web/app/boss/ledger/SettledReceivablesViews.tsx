@@ -14,7 +14,6 @@ import { VoidDialog } from './VoidDialog';
 import LedgerRowMobile from './LedgerRowMobile';
 import ReceivableForm from './receivables/ReceivableForm';
 import StatusButtons from './receivables/StatusButtons';
-import ReceivableRowMobile from './receivables/ReceivableRowMobile';
 import { buildHref, fmt, monthRange, NO_SITE, type SP } from './ledger-page-helpers';
 
 // 收支兩欄的列表面板統一用這個高度——固定尺寸、內部捲動,篩選/切月份時版面不跳動。
@@ -198,6 +197,9 @@ export async function ReceivablesView({
     );
   }
 
+  const unsettledLabel = direction === 'receivable' ? '未收' : '未付';
+  const settledLabel = direction === 'receivable' ? '已收' : '已付';
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl nm-raised-sm p-3 text-[13px] max-w-xs">
@@ -205,51 +207,77 @@ export async function ReceivablesView({
         <div className="text-lg font-semibold mt-1" style={{ color: direction === 'receivable' ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)' }}>${fmt(total)}</div>
       </div>
 
-      {/* 手機:卡片流,固定高度、內部捲動 */}
-      <div className="lg:hidden flex flex-col gap-3 overflow-y-auto pr-1" style={{ height: LIST_PANEL_HEIGHT }}>
-        {rows.length === 0 && <p className="text-[13px] text-center py-6" style={{ color: 'var(--nm-text-secondary)' }}>沒有紀錄</p>}
-        {rows.map((r) => <ReceivableRowMobile key={r.id} row={r} />)}
+      {rows.length === 0 && <p className="text-[13px] text-center py-6" style={{ color: 'var(--nm-text-secondary)' }}>沒有紀錄</p>}
+
+      {/* 卡片形狀＝第二編碼:未結(open)＝空心黃框(不分收入/支出方向),
+          已結(closed)＝實心底卡走方向色,作廢＝灰底刪除線——與帳務首頁的
+          幾何編碼規則一致(見 SettledMonthList.tsx)。 */}
+
+      {/* 桌機:扁平列,左側 3px 色條 */}
+      <div className="hidden lg:flex flex-col">
+        {rows.map((r) => {
+          const voided = r.status === 'voided';
+          const closed = r.status === 'closed';
+          const barColor = closed ? (direction === 'receivable' ? 'var(--nm-success)' : 'var(--nm-danger)') : voided ? 'var(--nm-text-faint)' : 'var(--nm-warning)';
+          const amountColor = r.overpaid ? 'var(--nm-danger-glass-text)' : closed ? (direction === 'receivable' ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)') : 'var(--nm-warning-glass-text)';
+          const meta = [
+            r.sites?.name ?? '專案外',
+            `約定 $${fmt(r.total_amount_twd)}`,
+            r.settled_twd > 0 ? `${settledLabel} $${fmt(r.settled_twd)}` : null,
+            !closed && !voided ? (r.agreed_due_date ? `約定日 ${r.agreed_due_date}` : '未排定日期') : null,
+          ].filter(Boolean).join(' · ');
+          return (
+            <div key={r.id} className="flex items-center gap-3 py-[18px]" style={{ borderBottom: '1px solid var(--nm-border-hair)', opacity: voided ? 0.5 : 1 }}>
+              <span className="shrink-0" style={{ width: 3, height: 34, background: barColor, borderRadius: 2 }} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[14px] font-medium truncate" style={{ color: 'var(--nm-text-body)' }}>{r.party}</div>
+                <div className="text-xs mt-1" style={{ color: 'var(--nm-text-muted)' }}>{meta}</div>
+              </div>
+              <span className={`text-[16px] font-semibold tabular-nums shrink-0 ${voided ? 'line-through' : ''}`} style={{ color: amountColor }}>
+                {r.overpaid ? `超收 $${fmt(Math.abs(r.remaining_twd))}` : `$${fmt(r.remaining_twd)}`}
+              </span>
+              <span className="shrink-0">
+                {r.status === 'open' && <span className="nm-pill nm-pill-warning">{unsettledLabel}</span>}
+                {closed && <span className="nm-pill" style={{ color: 'var(--nm-success-glass-text)', background: 'rgba(126,207,157,0.1)', borderColor: 'rgba(126,207,157,0.28)' }}>已結清</span>}
+                {voided && <span className="nm-pill nm-pill-muted line-through">已作廢</span>}
+              </span>
+              <div className="shrink-0"><StatusButtons id={r.id} status={r.status} remainingTwd={r.remaining_twd} direction={direction} /></div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* 桌機:表格,固定高度、內部捲動 */}
-      <div className="hidden lg:block rounded-2xl nm-raised overflow-x-auto overflow-y-auto" style={{ height: LIST_PANEL_HEIGHT }}>
-        <table className="w-full text-[13px]" style={{ minWidth: 900, borderCollapse: 'collapse' }}>
-          <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
-            <tr style={{ color: 'var(--nm-text-muted)' }}>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">對象</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">歸屬</th>
-              <th className="text-right px-3 py-2 font-normal whitespace-nowrap">約定總額</th>
-              <th className="text-right px-3 py-2 font-normal whitespace-nowrap">已結</th>
-              <th className="text-right px-3 py-2 font-normal whitespace-nowrap">未結</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">狀態</th>
-              <th className="text-left px-3 py-2 font-normal whitespace-nowrap">動作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-6 text-center whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>沒有紀錄</td></tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.id} style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>{r.party}</td>
-                <td className="px-3 py-2 whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>{r.sites?.name ?? '專案外'}</td>
-                <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap" style={{ color: 'var(--nm-text-body)' }}>${fmt(r.total_amount_twd)}</td>
-                <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap" style={{ color: 'var(--nm-text-secondary)' }}>${fmt(r.settled_twd)}</td>
-                <td className="px-3 py-2 text-right font-mono tabular whitespace-nowrap" style={{ color: r.overpaid ? 'var(--nm-danger-glass-text)' : 'var(--nm-text-body)' }}>
+      {/* 手機:卡片流——open 用空心描邊卡,closed/voided 用實心卡 */}
+      <div className="lg:hidden flex flex-col gap-2">
+        {rows.map((r) => {
+          const voided = r.status === 'voided';
+          const closed = r.status === 'closed';
+          const open = r.status === 'open';
+          const amountColor = r.overpaid ? 'var(--nm-danger-glass-text)' : closed ? (direction === 'receivable' ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)') : 'var(--nm-warning-glass-text)';
+          const cardClass = open ? 'rounded-2xl p-3.5 flex flex-col gap-2' : 'nm-raised rounded-2xl p-3.5 flex flex-col gap-2';
+          const cardStyle = open ? { border: '1.5px solid var(--nm-warning)', background: 'transparent' } : { opacity: voided ? 0.5 : 1 };
+          return (
+            <div key={r.id} className={cardClass} style={cardStyle}>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[14px] font-medium truncate" style={{ color: 'var(--nm-text-body)' }}>{r.party}</span>
+                <span className={`text-[16px] font-semibold tabular-nums ${voided ? 'line-through' : ''}`} style={{ color: amountColor }}>
                   {r.overpaid ? `超收 $${fmt(Math.abs(r.remaining_twd))}` : `$${fmt(r.remaining_twd)}`}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  {r.status === 'open' && <span className="nm-pill nm-pill-warning">未結</span>}
-                  {r.status === 'closed' && <span className="nm-pill" style={{ color: 'var(--nm-success-glass-text)', background: 'rgba(126,207,157,0.1)', borderColor: 'rgba(126,207,157,0.28)' }}>已結清</span>}
-                  {r.status === 'voided' && <span className="nm-pill nm-pill-muted line-through">已作廢</span>}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <StatusButtons id={r.id} status={r.status} remainingTwd={r.remaining_twd} direction={direction} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </span>
+              </div>
+              <div className="text-xs flex flex-wrap gap-x-2 gap-y-1" style={{ color: 'var(--nm-text-secondary)' }}>
+                {r.sites?.name ? <span>{r.sites.name}</span> : <span style={{ color: 'var(--nm-text-faint)' }}>專案外</span>}
+                <span>約定 ${fmt(r.total_amount_twd)}</span>
+                {open && <span>{r.agreed_due_date ? `約定日 ${r.agreed_due_date}` : '未排定日期'}</span>}
+              </div>
+              <div className="flex items-center justify-between pt-0.5">
+                {open && <span className="nm-pill nm-pill-warning">{unsettledLabel}</span>}
+                {closed && <span className="nm-pill" style={{ color: 'var(--nm-success-glass-text)', background: 'rgba(126,207,157,0.1)', borderColor: 'rgba(126,207,157,0.28)' }}>已結清</span>}
+                {voided && <span className="nm-pill nm-pill-muted line-through">已作廢</span>}
+                <StatusButtons id={r.id} status={r.status} remainingTwd={r.remaining_twd} direction={direction} />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <ReceivableForm />

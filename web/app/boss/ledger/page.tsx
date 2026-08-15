@@ -5,19 +5,17 @@ import ImportBatchDialog from './ImportBatchDialog';
 import ExportCsvDialog from './ExportCsvDialog';
 import { AllView } from './AllView';
 import { SettledView, ReceivablesView } from './SettledReceivablesViews';
-import { FilterDrawer } from './FilterDrawer';
+import { LedgerFilterBar } from './LedgerFilterBar';
 import { buildHref, currentMonth, shiftMonth, NO_SITE, type Mode, type SP } from './ledger-page-helpers';
 
 export const dynamic = 'force-dynamic';
-
-const ALL_KINDS = Object.keys(LEDGER_KIND_LABEL) as LedgerKind[];
 
 export default async function LedgerHomePage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = (await searchParams) ?? {};
   const mode: Mode = sp.mode === 'receivable' || sp.mode === 'payable' || sp.mode === 'settled' ? sp.mode : 'all';
   const month = sp.month === 'all' || (sp.month && /^\d{4}-\d{2}$/.test(sp.month)) ? sp.month! : currentMonth();
   const siteId = sp.site_id;
-  const kind = sp.kind && ALL_KINDS.includes(sp.kind as LedgerKind) ? (sp.kind as LedgerKind) : undefined;
+  const kind = sp.kind && sp.kind in LEDGER_KIND_LABEL ? (sp.kind as LedgerKind) : undefined;
   const invoice = sp.invoice && sp.invoice in INVOICE_STATUS_LABEL ? (sp.invoice as InvoiceStatus) : undefined;
   const toCheckOnly = sp.to_check === '1';
   const ext = sp.ext === 'internal' || sp.ext === 'external' ? sp.ext : undefined;
@@ -44,19 +42,13 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
 
   const base: SP = { month, mode, site_id: siteId, kind, invoice, to_check: toCheckOnly ? '1' : undefined, ext, show_voided: showVoided ? '1' : undefined };
   const siteName = siteId && siteId !== NO_SITE ? sites.find((s) => s.id === siteId)?.name ?? null : null;
-  const activeFilterLabels = [
-    siteId ? (siteId === NO_SITE ? '專案外' : '歸屬') : null,
-    kind ? '分類' : null,
-    invoice ? '發票' : null,
-    ext ? (ext === 'internal' ? '內帳' : '外帳') : null,
-  ].filter((x): x is string => x !== null);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>帳務</h1>
         <div className="flex items-center gap-2">
-          {(mode === 'settled' || mode === 'all') && (
+          {mode === 'settled' && (
             <div className="flex items-center gap-2 text-[13px]">
               <Link href={buildHref(base, { month: shiftMonth(month === 'all' ? currentMonth() : month, -1) })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto' }}>← 上月</Link>
               <span className="font-semibold min-w-[6rem] text-center" style={{ color: 'var(--nm-text-primary)' }}>
@@ -95,8 +87,8 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
           {([
             ['all', '全部'],
             ['settled', '已收付'],
-            ['receivable', '應收未收'],
-            ['payable', '應付未付'],
+            ['receivable', '應收款'],
+            ['payable', '應付款'],
           ] as const).map(([m, label]) => (
             <Link
               key={m}
@@ -125,91 +117,11 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
         )}
       </div>
 
-      {/* 歸屬篩選:專案內(選特定案場)/ 專案外(依分類)/ 全部——兩種模式共用同一個案場篩選。
-          桌機常駐橫排;手機收進☰抽屜(規格明講,原型 2b 也是這樣)——同一份欄位在
-          兩個斷點各自一份 <form method="get">,無 JS 也能用,跟本頁其他區塊的
-          手機/桌機雙份 markup 慣例一致。 */}
-      <div className="flex flex-wrap items-center gap-3">
-        <form action="/boss/ledger" method="get" className="hidden lg:flex flex-nowrap overflow-x-auto items-center gap-2 text-[13px] pb-1">
-          <input type="hidden" name="mode" value={mode} />
-          {month !== currentMonth() && <input type="hidden" name="month" value={month} />}
-          <select name="site_id" defaultValue={siteId ?? ''} className="nm-input shrink-0" style={{ width: 'auto', minHeight: 34, padding: '4px 10px' }}>
-            <option value="">歸屬:全部</option>
-            <option value={NO_SITE}>— 專案外 —</option>
-            {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          {(mode === 'settled' || mode === 'all') && (
-            <>
-              <select name="kind" defaultValue={kind ?? ''} className="nm-input shrink-0" style={{ width: 'auto', minHeight: 34, padding: '4px 10px' }}>
-                <option value="">分類:全部</option>
-                {ALL_KINDS.map((k) => <option key={k} value={k}>{LEDGER_KIND_LABEL[k]}</option>)}
-              </select>
-              <select name="invoice" defaultValue={invoice ?? ''} className="nm-input shrink-0" style={{ width: 'auto', minHeight: 34, padding: '4px 10px' }}>
-                <option value="">發票:全部</option>
-                <option value="none">不列外帳</option>
-                <option value="to_issue">待開立</option>
-                <option value="issued">已開立</option>
-              </select>
-              <select name="ext" defaultValue={ext ?? ''} className="nm-input shrink-0" style={{ width: 'auto', minHeight: 34, padding: '4px 10px' }}>
-                <option value="">內外帳:全部</option>
-                <option value="internal">內帳</option>
-                <option value="external">外帳</option>
-              </select>
-            </>
-          )}
-          <button type="submit" className="nm-btn shrink-0" style={{ padding: '4px 14px', minHeight: 'auto' }}>套用</button>
-        </form>
-
-        <FilterDrawer activeCount={activeFilterLabels.length} activeSummary={activeFilterLabels.join('・')}>
-          <form action="/boss/ledger" method="get" className="flex flex-col gap-3 text-[13px]">
-            <input type="hidden" name="mode" value={mode} />
-            {month !== currentMonth() && <input type="hidden" name="month" value={month} />}
-            <label className="flex flex-col gap-1">
-              <span style={{ color: 'var(--nm-text-secondary)' }}>歸屬</span>
-              <select name="site_id" defaultValue={siteId ?? ''} className="nm-input">
-                <option value="">全部</option>
-                <option value={NO_SITE}>— 專案外 —</option>
-                {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </label>
-            {(mode === 'settled' || mode === 'all') && (
-              <>
-                <label className="flex flex-col gap-1">
-                  <span style={{ color: 'var(--nm-text-secondary)' }}>分類</span>
-                  <select name="kind" defaultValue={kind ?? ''} className="nm-input">
-                    <option value="">全部</option>
-                    {ALL_KINDS.map((k) => <option key={k} value={k}>{LEDGER_KIND_LABEL[k]}</option>)}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span style={{ color: 'var(--nm-text-secondary)' }}>發票</span>
-                  <select name="invoice" defaultValue={invoice ?? ''} className="nm-input">
-                    <option value="">全部</option>
-                    <option value="none">不列外帳</option>
-                    <option value="to_issue">待開立</option>
-                    <option value="issued">已開立</option>
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span style={{ color: 'var(--nm-text-secondary)' }}>內外帳</span>
-                  <select name="ext" defaultValue={ext ?? ''} className="nm-input">
-                    <option value="">全部</option>
-                    <option value="internal">內帳</option>
-                    <option value="external">外帳</option>
-                  </select>
-                </label>
-              </>
-            )}
-            <button type="submit" className="nm-btn-solid mt-2">套用</button>
-          </form>
-        </FilterDrawer>
-
-        {(siteId || kind || invoice || ext || toCheckOnly) && (
-          <Link href={buildHref(base, { site_id: undefined, kind: undefined, invoice: undefined, ext: undefined, to_check: undefined })} className="text-[13px] underline" style={{ color: 'var(--nm-text-muted)' }}>
-            清除篩選
-          </Link>
-        )}
-      </div>
+      {/* v2:mode=all 的篩選列已搬進 AllView(只作用於下方列表,監測帶永遠不篩選),
+          這裡只給 settled/receivable/payable 用共用的 LedgerFilterBar。 */}
+      {mode !== 'all' && (
+        <LedgerFilterBar mode={mode} month={month} siteId={siteId} kind={kind} invoice={invoice} ext={ext} sites={sites} base={base} showKindInvoiceExt={mode === 'settled'} />
+      )}
 
       {siteId && (
         <div className="rounded-xl px-3 py-2 text-[13px] flex items-center gap-2" style={{ background: 'rgba(126,207,157,0.08)', border: '1px solid rgba(126,207,157,0.26)', color: 'var(--nm-success-glass-text)' }}>
@@ -224,7 +136,7 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
       )}
 
       {mode === 'all' && (
-        <AllView sb={sb} month={month} siteId={siteId} kind={kind} invoice={invoice} toCheckOnly={toCheckOnly} ext={ext} base={base} toCheckCount={toCheckCount} toIssueCount={toIssueCount} />
+        <AllView sb={sb} month={month} siteId={siteId} kind={kind} invoice={invoice} toCheckOnly={toCheckOnly} ext={ext} base={base} toCheckCount={toCheckCount} toIssueCount={toIssueCount} sites={sites} />
       )}
       {mode === 'settled' && (
         <SettledView sb={sb} month={month} siteId={siteId} kind={kind} invoice={invoice} toCheckOnly={toCheckOnly} ext={ext} showVoided={showVoided} base={base} />
