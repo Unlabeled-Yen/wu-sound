@@ -1,6 +1,5 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
-import * as OpenCC from 'opencc-js';
 import {
   AGENT_TOOLS,
   AgentConfigError,
@@ -17,6 +16,10 @@ import {
 import { createKimiLlm } from '@/lib/voice-agent-kimi';
 import { trimMessages } from '@/lib/voice-agent-session';
 import type { AgentSession, PendingField, PendingWrite } from '@/lib/voice-agent-session';
+// toTraditional/matchVoiceCommand 搬到 lib/voice-command-match.ts(不標 server-only,
+// Realtime 語音版要在瀏覽器端用同一份確認詞表)。這裡 re-export,呼叫端不用改路徑。
+import { toTraditional, matchVoiceCommand } from '@/lib/voice-command-match';
+export { toTraditional, matchVoiceCommand } from '@/lib/voice-command-match';
 
 export type {
   LlmClient,
@@ -132,20 +135,6 @@ export function buildSystemPrompt(now: number): string {
 function toolResultText(result: ToolResult): string {
   if (result.ok) return JSON.stringify(result.data);
   return JSON.stringify({ error_code: result.error_code, message_zh: result.message_zh });
-}
-
-/**
- * 簡→繁轉換。用 `to: 'tw'`(只轉字形)而不是 `'twp'`(連詞彙一起換,
- * 例如「调试」→「除錯」)——換詞等於改寫使用者講的話,那不是我們該做的事;
- * 我們要處理的只是「模型寫出簡體字」這一件事。
- *
- * 為什麼需要:實測 Kimi 會把「水電」寫成「水电」存進 tags,而 wu 是全繁體系統。
- * prompt 交代過不准用簡體(規則 12),它照犯——所以改在寫入路徑上轉。
- */
-const toTw = OpenCC.Converter({ from: 'cn', to: 'tw' });
-
-export function toTraditional(value: string): string {
-  return toTw(value);
 }
 
 function normalizePayload(input: Record<string, unknown>): {
@@ -513,33 +502,7 @@ function safeRecap(text: string, pending: PendingWrite): { text: string; leaked:
 }
 
 // ---------- 語音口令確認(Lab 3 §1,雙軌的 B 軌) ----------
-
-/**
- * 免手情境下的確認判斷。
- *
- * 語音沒有按鈕,但要守的鐵律不是「必須是按鈕」,而是
- * **確認與否不由 LLM 判斷**——按鈕只是這條鐵律在螢幕上的實作。
- * 所以這裡用白名單字串比對代替按鈕:判斷的是這個函式,不是模型。
- *
- * 比對規則刻意嚴格:
- * - **整句相等**才算,不做包含比對——「不對」包含「對」、「不可以」包含「可以」,
- *   用包含比對會把否定聽成同意,那是會寫錯資料的錯法
- * - 只剝除語尾助詞(啊/喔/啦/呢/嘛),不做任何語意推論
- * - 不在名單上的一律 unclear,包含「嗯」「應該吧」「大概」——
- *   這正是 handoff §5.4 要求的「模糊回應視為未確認」
- */
-const CONFIRM_WORDS = new Set(['確認', '確定', '對', '對的', '沒錯', '可以', '沒問題', '就這樣', '是的', '好的']);
-const CANCEL_WORDS = new Set(['取消', '不對', '不是', '不要', '算了', '不用', '錯了', '重來']);
-
-export function matchVoiceCommand(transcript: string): 'confirm' | 'cancel' | 'unclear' {
-  const cleaned = toTraditional(transcript)
-    .replace(/[\s,。,.!!??、~～]/g, '')
-    .replace(/[啊阿喔哦囉啦呢嘛耶欸]+$/u, '');
-  if (!cleaned) return 'unclear';
-  if (CONFIRM_WORDS.has(cleaned)) return 'confirm';
-  if (CANCEL_WORDS.has(cleaned)) return 'cancel';
-  return 'unclear';
-}
+// matchVoiceCommand 定義搬到 lib/voice-command-match.ts,上面已經 re-export。
 
 /** 語音口令走到這裡;沒聽清楚一律不動 pending,回去再問一次 */
 export async function handleVoiceCommand(

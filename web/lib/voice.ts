@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getSession } from '@/lib/session';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -83,10 +84,33 @@ interface VoiceAuthFail {
 }
 
 /**
- * 驗 Bearer VOICE_API_KEY + 解析 actor(VOICE_ACTOR_USER_ID,須為 active 使用者)。
- * 缺配置 loud 回 503,不靜默放行(voice-lab spec §8 風險條款)。
+ * 兩種合法呼叫端:
+ *
+ * 1. 帶登入 cookie(瀏覽器直連,例如 Realtime 語音)——actor 是真正登入的那個人,
+ *    不是寫死的 VOICE_ACTOR_USER_ID。這條路優先檢查:帶了合法 session 的請求
+ *    本來就代表一個真人已經登入,不需要再繞道 Bearer key。
+ * 2. Bearer VOICE_API_KEY(server-to-server,例如 Lab 2 文字 agent 的舊路徑)——
+ *    actor 固定是 VOICE_ACTOR_USER_ID。缺配置 loud 回 503,不靜默放行
+ *    (voice-lab spec §8 風險條款)。
  */
 export async function authenticateVoiceRequest(req: Request): Promise<VoiceAuthOk | VoiceAuthFail> {
+  const session = await getSession();
+  if (session) {
+    const sb = getSupabaseAdmin();
+    const { data: actor, error } = await sb
+      .from('users')
+      .select('id, active')
+      .eq('id', session.id)
+      .maybeSingle();
+    if (error) {
+      return { ok: false, response: voiceError('SERVICE_UNAVAILABLE', `讀取 actor 失敗: ${error.message}`, 503) };
+    }
+    if (!actor || !actor.active) {
+      return { ok: false, response: voiceError('UNAUTHORIZED', '使用者不存在或已停用', 401) };
+    }
+    return { ok: true, sb, actorId: actor.id as string };
+  }
+
   const expectedKey = process.env.VOICE_API_KEY;
   if (!expectedKey) {
     return { ok: false, response: voiceError('SERVICE_UNAVAILABLE', 'voice 服務尚未設定(缺 VOICE_API_KEY)', 503) };
