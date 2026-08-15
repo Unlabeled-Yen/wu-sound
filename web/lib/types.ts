@@ -218,6 +218,27 @@ export interface SiteRecord {
   created_at: string;
 }
 
+// 月結:固定月薪(生效日期制)+ 獎金草稿。見 docs/payroll-pettycash-merge-spec.md、migrations/023。
+export interface PayProfile {
+  id: string;
+  user_id: string;
+  monthly_salary_twd: number;
+  effective_from: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface PayrollBonus {
+  id: string;
+  batch_month: string;
+  user_id: string;
+  amount_twd: number;
+  memo: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ReceivableDirection = 'receivable' | 'payable';
 export type ReceivableStatus = 'open' | 'closed' | 'voided';
 

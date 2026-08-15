@@ -1,6 +1,6 @@
 import { taipeiCurrentMonthStr } from '@/lib/tz';
 
-export type Mode = 'all' | 'settled' | 'receivable' | 'payable';
+export type Mode = 'all' | 'settled' | 'receivable' | 'payable' | 'payroll';
 export const NO_SITE = '__none__';
 
 export function currentMonth(): string {

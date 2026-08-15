@@ -18,7 +18,7 @@ import {
 
 // Hot routes prefetched on mount so first-click nav is instant
 // 陣列設計器頁面較重(畫布互動),不預抓,避免拖慢一般導覽
-const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/close', '/boss/ledger', '/boss/quotes', '/tools/spl-calculator'];
+const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/ledger', '/boss/quotes', '/tools/spl-calculator'];
 
 function useBossShellData() {
   const router = useRouter();
