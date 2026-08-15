@@ -6,11 +6,7 @@ export const dynamic = 'force-dynamic';
 
 // catalog_items 的 coverage_h_deg(migration 012)有值就自動帶入覆蓋角,
 // 沒建檔的品項維持手動輸入 + loud 提示(見 shared.tsx useSpeakerCov)。
-//
-// ?speaker=<catalog_item_id>&throw=<m>:SPL 計算器「帶入陣列設計器」的跨工具
-// 交接值,兩支工具目前不共享狀態,用 query string 傳遞。
-export default async function ArrayDesignerPage({ searchParams }: { searchParams: Promise<{ speaker?: string; throw?: string }> }) {
-  const sp = (await searchParams) ?? {};
+export default async function ArrayDesignerPage() {
   const sb = getSupabaseAdmin();
   const { data } = await sb
     .from('catalog_items')
@@ -31,7 +27,7 @@ export default async function ArrayDesignerPage({ searchParams }: { searchParams
           給定場地寬度、觀眾席距離、喇叭覆蓋角,推薦陣列喇叭數量與間距(Auto Mode)。
         </p>
       </div>
-      <ArrayDesignerForm speakers={speakers} initialSpeakerId={sp.speaker} initialAudienceDistM={sp.throw} />
+      <ArrayDesignerForm speakers={speakers} />
     </div>
   );
 }
