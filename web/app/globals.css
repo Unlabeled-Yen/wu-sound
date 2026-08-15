@@ -292,6 +292,19 @@ body::after {
   outline-offset: 2px;
 }
 
+/* Compact glass input — same mobile-safe/desktop-tight split as
+   .nm-btn-compact, for inline table-row edit fields (e.g. due-date). */
+.nm-input-compact {
+  padding: 3px 6px;
+  min-height: 48px;
+}
+@media (min-width: 1024px) {
+  .nm-input-compact {
+    padding: 3px 6px;
+    min-height: auto;
+  }
+}
+
 /* Status pills */
 .nm-pill {
   display: inline-block;

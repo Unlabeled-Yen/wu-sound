@@ -31,7 +31,7 @@ export default function EditDueDateButton({ id, agreedDueDate }: { id: string; a
 
   if (!editing) {
     return (
-      <button type="button" onClick={() => setEditing(true)} className="nm-btn text-xs" style={{ padding: '3px 10px', minHeight: 'auto' }}>
+      <button type="button" onClick={() => setEditing(true)} className="nm-btn nm-btn-compact text-[11px] leading-none tracking-[.14em]">
         編輯日期
       </button>
     );
@@ -44,16 +44,16 @@ export default function EditDueDateButton({ id, agreedDueDate }: { id: string; a
         value={value}
         onChange={(e) => setValue(e.target.value)}
         disabled={busy}
-        className="nm-input text-xs"
-        style={{ padding: '3px 6px', minHeight: 'auto', width: 140 }}
+        className="nm-input nm-input-compact text-[12.5px]"
+        style={{ width: 140 }}
       />
-      <button type="button" disabled={busy} onClick={onSave} className="nm-btn text-xs" style={{ padding: '3px 10px', minHeight: 'auto' }}>
+      <button type="button" disabled={busy} onClick={onSave} className="nm-btn nm-btn-compact text-[11px] leading-none tracking-[.14em]">
         {busy ? '儲存中…' : '儲存'}
       </button>
-      <button type="button" disabled={busy} onClick={() => { setEditing(false); setValue(agreedDueDate ?? ''); setError(null); }} className="nm-btn text-xs" style={{ padding: '3px 10px', minHeight: 'auto' }}>
+      <button type="button" disabled={busy} onClick={() => { setEditing(false); setValue(agreedDueDate ?? ''); setError(null); }} className="nm-btn nm-btn-compact text-[11px] leading-none tracking-[.14em]">
         取消
       </button>
-      {error && <span className="text-xs" style={{ color: 'var(--nm-danger)' }}>{error}</span>}
+      {error && <span className="text-[12px] leading-[1.6]" style={{ color: 'var(--nm-danger)' }}>{error}</span>}
     </div>
   );
 }
