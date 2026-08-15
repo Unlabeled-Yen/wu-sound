@@ -2,117 +2,28 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import ViewportLock from '@/app/_shared/ViewportLock';
 import { fetchTenderRadar } from '@/lib/tender-radar';
+import {
+  PRICE_ORDER,
+  NATURE_ORDER,
+  daysLeft,
+  isRetender,
+  todayInTaipei,
+  buildHref,
+  type TenderHit,
+  type AgencyCompetition,
+  type RatioStats,
+  type BasePriceField,
+} from './shared';
+import SignalRow from './SignalRow';
+import TrackedList from './TrackedList';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-type FieldStatus = 'value' | 'withheld' | 'unfetched' | 'fetch_failed';
-
-interface TenderSignal {
-  code: string;
-  label: string;
-}
-
-interface PriceBand {
-  key: string;
-  label: string;
-}
-
-interface Nature {
-  key: string;
-  label: string;
-  matched: string | null;
-}
-
-// 機關競爭雷達。tier 是樣本量分級:none=無紀錄、thin=1-2 案(不給比率)、
-// range=3-9 案、stable=≥10 案。soloRate 有值時 soloCI 必定有值——後端保證,
-// 前端也絕不單獨顯示比率(區間動輒 30-50 個百分點寬,只給一個數字會誤導)。
-interface AgencyCompetition {
-  n: number;
-  tier: 'none' | 'thin' | 'range' | 'stable';
-  soloCount: number;
-  soloRate: number | null;
-  soloCI: [number, number] | null;
-  avgBidders: number | null;
-  excludedPerformance?: number;
-}
-
-// A 計劃(歷史決標參考)卡片。docs/handoff-base-price-card.md §2c。
-// tier 對齊機關雷達同一套小樣本誠實邏輯:none=無資料、raw=1-2筆(列原始
-// 比值不算統計量)、range_median=3-9筆(範圍+中位數)、quartile=≥10筆
-// (加四分位數)。
-interface RatioStats {
-  n: number;
-  tier: 'none' | 'raw' | 'range_median' | 'quartile';
-  ratios?: number[];
-  min?: number;
-  max?: number;
-  median?: number;
-  q1?: number;
-  q3?: number;
-}
-
-interface GroupedStats {
-  best_value: RatioStats;
-  lowest_bid: RatioStats;
-  other: RatioStats;
-  totalN: number;
-}
-
-// group_labels 是分類名稱的顯示文字,由 API 送——wu-sound 是公開 repo,
-// 不能把這幾個分類名稱寫死在前端原始碼裡(見 handoff §1a)。
-interface BasePriceCardData {
-  // 明確排除 'other'(而非用 string)——這樣 `bp.domain === 'other'` 才能讓
-  // TypeScript 正確做判別聯集窄化,窄化後 TS 才知道剩下的分支一定有
-  // headline/stats 等欄位。
-  domain: 'audio' | 'fire' | 'hvac' | 'it';
-  headline: string;
-  confidence: 'insufficient' | 'low' | 'medium' | 'high';
-  source: 'agency' | 'county' | 'market';
-  source_label: string;
-  stats: GroupedStats;
-  group_labels: Record<'best_value' | 'lowest_bid' | 'other', string>;
-  // 排除的採購演出件數(得標者是劇團/樂團等表演團體,決標/預算比例不能
-  // 反映音響工程的競爭定價)。只在 source='agency' 時可能非零——縣市/
-  // 全市場基線的池子跨機關共用,後端固定回 0(見 base-price.ts 的說明)。
-  excludedPerformance: number;
-}
-
-// domain='other' 時不適用(不是錯誤),整塊不顯示;null 是查詢失敗
-// (不同於 agency_competition,這裡多一個「不適用」狀態要處理)。
-type BasePriceField = BasePriceCardData | { domain: 'other' };
-
-interface TenderHit {
-  id: string;
-  job_number: string;
-  title: string;
-  unit_id: string | null;
-  unit_name: string | null;
-  category: string | null;
-  notice_type: string;
-  publish_date: string;
-  deadline_date: string | null;
-  deadline_status: FieldStatus;
-  budget: number | null;
-  budget_status: FieldStatus;
-  source_url: string;
-  is_retender: number;
-  signals?: TenderSignal[];
-  price_band?: PriceBand;
-  nature?: Nature;
-  agency_competition?: AgencyCompetition | null;
-  base_price?: BasePriceField | null;
-}
 
 interface LoadResult {
   hits: TenderHit[];
   error: string | null;
 }
-
-// 顯示順序寫死在前端,不靠 API 回傳順序——分類的呈現次序是版面決策,
-// 從小到大 / 從具體到模糊,缺漏的桶要能穩定出現在同一個位置。
-const PRICE_ORDER = ['micro', 'small', 'medium', 'large', 'undisclosed', 'unknown'] as const;
-const NATURE_ORDER = ['install', 'procure', 'maintain', 'event', 'service', 'unclassified'] as const;
 
 async function loadRecentTenders(days: number): Promise<LoadResult> {
   const { data, error } = await fetchTenderRadar<{ hits: TenderHit[] }>(`/api/tenders/recent?days=${days}`);
@@ -147,15 +58,6 @@ function formatDeadline(hit: TenderHit): string {
     case 'fetch_failed':
       return '⚠️ 截止日查詢失敗';
   }
-}
-
-// 截止日剩餘天數。等標期中位數只有 6.5-7 天,「還剩幾天」比日期本身
-// 更能驅動行動,所以獨立算一個欄位放在卡片上。
-function daysLeft(hit: TenderHit): number | null {
-  if (hit.deadline_status !== 'value' || !hit.deadline_date) return null;
-  const deadline = new Date(`${hit.deadline_date}T23:59:59+08:00`);
-  const diff = deadline.getTime() - Date.now();
-  return Math.ceil(diff / 86_400_000);
 }
 
 // 機關競爭雷達的文案。三條鐵律:
@@ -276,20 +178,6 @@ function BasePriceCard({ bp }: { bp: BasePriceField | null | undefined }) {
   );
 }
 
-interface ViewParams {
-  days: number;
-  price: string;
-  nature: string;
-  pool: string;
-}
-
-function buildHref(params: ViewParams): string {
-  const q = new URLSearchParams({ days: String(params.days) });
-  if (params.price !== 'all') q.set('price', params.price);
-  if (params.nature !== 'all') q.set('nature', params.nature);
-  if (params.pool !== 'all') q.set('pool', params.pool);
-  return `/boss/tenders/monitor?${q.toString()}`;
-}
 
 // 流標重招池:第一次沒決標成功、重新招標的案。單獨看是因為它的決策情境
 // 跟新案不一樣——不是跟一群人搶新機會,而是在看一件別人已經放掉一次的事。
@@ -299,10 +187,6 @@ function buildHref(params: ViewParams): string {
 const RETENDER_NOTE =
   '這些案第一次沒決標成功。採購法允許第二次招標不受三家廠商限制、等標期也可縮短,所以競爭通常較少;' +
   '但上次沒人接也可能是預算不合理或條件太苛。值得看,但要先弄清楚為什麼上次沒成。';
-
-function isRetender(h: TenderHit): boolean {
-  return h.is_retender === 1 || (h.signals ?? []).some((s) => s.code === 'retender_round');
-}
 
 // 分佈矩陣:價格帶 × 案件性質。每個數字都是連結——格子套兩軸,邊際的
 // 合計套單軸,右下角總計清空篩選。
@@ -425,7 +309,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
   const hasRetenderSignal = signals.some((s) => s.code === 'retender_round');
   const left = daysLeft(hit);
   return (
-    <li className="rounded-2xl nm-raised p-4">
+    <li id={`tender-${hit.id}`} className="rounded-2xl nm-raised p-4 scroll-mt-4">
       <div className="mb-1 flex flex-wrap items-baseline gap-2 text-[13px]">
         <span className="font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
           {hit.unit_name || hit.unit_id || '未知機關'}
@@ -521,7 +405,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
 export default async function BossTendersMonitorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string; price?: string; nature?: string; pool?: string }>;
+  searchParams: Promise<{ days?: string; price?: string; nature?: string; pool?: string; urgent?: string; fresh?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -532,6 +416,8 @@ export default async function BossTendersMonitorPage({
   const price = PRICE_ORDER.includes(sp.price as (typeof PRICE_ORDER)[number]) ? sp.price! : 'all';
   const nature = NATURE_ORDER.includes(sp.nature as (typeof NATURE_ORDER)[number]) ? sp.nature! : 'all';
   const pool = sp.pool === 'retender' ? 'retender' : 'all';
+  const urgent = sp.urgent === '1';
+  const fresh = sp.fresh === '1';
 
   const { hits, error } = await loadRecentTenders(days);
 
@@ -545,10 +431,12 @@ export default async function BossTendersMonitorPage({
   const visible = poolHits.filter(
     (h) =>
       (price === 'all' || h.price_band?.key === price) &&
-      (nature === 'all' || h.nature?.key === nature),
+      (nature === 'all' || h.nature?.key === nature) &&
+      (!urgent || (() => { const d = daysLeft(h); return d !== null && d >= 0 && d <= 7; })()) &&
+      (!fresh || h.publish_date === todayInTaipei()),
   );
 
-  const isFiltered = price !== 'all' || nature !== 'all' || pool !== 'all';
+  const isFiltered = price !== 'all' || nature !== 'all' || pool !== 'all' || urgent || fresh;
 
   const filterPanel = hasClassification ? (
     <div className="rounded-2xl nm-inset p-3">
@@ -592,10 +480,23 @@ export default async function BossTendersMonitorPage({
 
   return (
     <ViewportLock>
-      <header className="shrink-0 flex flex-wrap items-center justify-between gap-3">
+      <header className="shrink-0 flex flex-wrap items-center justify-between gap-3 pb-3" style={{ borderBottom: '1px solid var(--nm-border-hair)' }}>
         <div>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-wide" style={{ color: 'var(--nm-text-muted)', letterSpacing: '.18em' }}>
+            <span>標案</span>
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 normal-case tracking-normal"
+              style={{ background: 'rgba(224,48,19,0.12)', border: '1px solid rgba(224,48,19,0.34)', color: 'var(--nm-breach)' }}
+            >
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{ background: 'var(--nm-breach)', boxShadow: '0 0 8px var(--nm-breach)' }}
+              />
+              LIVE
+            </span>
+          </div>
           <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>標案監測</h1>
-          <p className="mt-0.5 text-sm" style={{ color: 'var(--nm-text-secondary)' }}>
+          <p className="mt-0.5 text-sm tabular-nums" style={{ color: 'var(--nm-text-secondary)' }}>
             近 {days} 天命中 {hits.length} 件
             {isFiltered && ` · 篩選後 ${visible.length} 件`}
           </p>
@@ -621,6 +522,16 @@ export default async function BossTendersMonitorPage({
           ))}
         </nav>
       </header>
+
+      <div className="shrink-0">
+        <SignalRow hits={hits} days={days} price={price} nature={nature} pool={pool} urgent={urgent} fresh={fresh} />
+      </div>
+
+      {visible.length > 0 && (
+        <div className="shrink-0">
+          <TrackedList hits={visible} />
+        </div>
+      )}
 
       {/* 桌機:分佈矩陣固定在上方(地圖不該跟著捲走);手機螢幕不夠高,
           矩陣跟著清單一起捲,不然清單只剩不到一張卡的高度 */}

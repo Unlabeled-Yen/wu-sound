@@ -24,6 +24,10 @@
   --nm-success-glass-text: #a9e3c1;
   --nm-warning: #d9b56b;
   --nm-warning-glass-text: #e7ca8c;
+  /* 越線(breach)專用——語意不同於 --nm-danger(那是錯誤/失敗訊息色)。
+     只在「真的偵測到事件」時使用,不可用在佔位/尚未接上的格子。
+     見 docs/05-tender-watch.md「顏色即事件」。 */
+  --nm-breach: #ec3013;
 
   /* Borders */
   --nm-border-hair: rgba(255, 255, 255, 0.05);
