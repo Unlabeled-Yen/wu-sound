@@ -140,7 +140,7 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
 
             {/* 圖表區 */}
             <div
-              className="relative flex-1 rounded-lg"
+              className="relative flex-1 min-w-0 rounded-lg"
               style={{ height: CHART_H, overflow: 'visible', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--nm-border-hair)' }}
             >
               {/* 刻度線 */}
@@ -231,7 +231,7 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
           {/* 軌跡文字 */}
           <div className="flex mb-4">
             <div style={{ width: 56, flexShrink: 0 }} />
-            <div className="flex-1 text-[11px] tabular-nums" style={{ color: 'var(--nm-text-muted)' }}>
+            <div className="flex-1 min-w-0 text-[11px] tabular-nums" style={{ color: 'var(--nm-text-muted)' }}>
               如期收款 {forecast.balanceTrajectory.map((v) => fmtK(v)).join(' › ')}
             </div>
           </div>
@@ -244,7 +244,7 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
           <div style={{ fontSize: 10.5, color: 'var(--nm-text-faint)', textAlign: 'right', paddingRight: 8 }}>當週<br />進帳</div>
           <div style={{ fontSize: 10.5, color: 'var(--nm-text-faint)', textAlign: 'right', paddingRight: 8, marginTop: 8 }}>當週<br />付出</div>
         </div>
-        <div className="flex-1 flex gap-1">
+        <div className="flex-1 min-w-0 flex gap-1">
           {forecast.weeks.map((w, idx) => {
             const solid = idx === 0;
             const incomeItems = w.items.filter((it) => it.direction === 'receivable');
@@ -253,17 +253,17 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
             const topExpense = expenseItems.sort((a, b) => b.amount - a.amount)[0];
 
             return (
-              <div key={idx} className="flex-1 flex flex-col gap-1">
+              <div key={idx} className="flex-1 min-w-0 flex flex-col gap-1">
                 {/* 進帳 */}
                 {w.incomeTwd > 0 ? (
                   <div
-                    className="rounded p-1.5 min-h-[40px] flex flex-col justify-center"
+                    className="rounded p-1.5 min-h-[40px] min-w-0 flex flex-col justify-center"
                     style={{
                       background: solid ? 'rgba(126,207,157,.18)' : 'rgba(126,207,157,.08)',
                       border: solid ? '1px solid rgba(126,207,157,.36)' : '1px solid rgba(126,207,157,.2)',
                     }}
                   >
-                    <div className="tabular-nums text-[12px] font-semibold" style={{ color: 'var(--nm-success-glass-text)' }}>
+                    <div className="tabular-nums text-[12px] font-semibold truncate" style={{ color: 'var(--nm-success-glass-text)' }}>
                       ＋${fmt(w.incomeTwd)}
                     </div>
                     {topIncome && (
@@ -280,13 +280,13 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
                 {/* 付出 */}
                 {w.expenseTwd > 0 ? (
                   <div
-                    className="rounded p-1.5 min-h-[40px] flex flex-col justify-center"
+                    className="rounded p-1.5 min-h-[40px] min-w-0 flex flex-col justify-center"
                     style={{
                       background: solid ? 'rgba(224,122,122,.16)' : 'rgba(224,122,122,.08)',
                       border: solid ? '1px solid rgba(224,122,122,.34)' : '1px solid rgba(224,122,122,.18)',
                     }}
                   >
-                    <div className="tabular-nums text-[12px] font-semibold" style={{ color: 'var(--nm-danger-glass-text)' }}>
+                    <div className="tabular-nums text-[12px] font-semibold truncate" style={{ color: 'var(--nm-danger-glass-text)' }}>
                       －${fmt(w.expenseTwd)}
                     </div>
                     {topExpense && (
@@ -308,13 +308,13 @@ export function CashForecastTimeline({ forecast, startBalance, safetyLevel }: Pr
       {/* 週標籤列 */}
       <div className="flex mb-3">
         <div style={{ width: 56, flexShrink: 0 }} />
-        <div className="flex-1 flex gap-1">
+        <div className="flex-1 min-w-0 flex gap-1">
           {forecast.weeks.map((w, idx) => {
             const { title, range } = weekLabel(w, idx);
             return (
-              <div key={idx} className="flex-1 px-1">
-                <div className="text-[12px] font-medium" style={{ color: 'var(--nm-text-body)' }}>{idx === 0 ? '本週' : title}</div>
-                <div className="text-[10.5px]" style={{ color: 'var(--nm-text-faint)' }}>{range}</div>
+              <div key={idx} className="flex-1 min-w-0 px-1">
+                <div className="text-[12px] font-medium truncate" style={{ color: 'var(--nm-text-body)' }}>{idx === 0 ? '本週' : title}</div>
+                <div className="text-[10.5px] truncate" style={{ color: 'var(--nm-text-faint)' }}>{range}</div>
               </div>
             );
           })}

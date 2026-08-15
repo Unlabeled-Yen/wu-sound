@@ -10,13 +10,13 @@ import type { LedgerInsight } from '@/lib/ledger-insight';
 // 一次,加一顆什麼都不重算的假按鈕比不做還糟(見 09-帳務首頁校正與缺口.md §1)。
 export function AiInsightCard({ insight }: { insight: LedgerInsight }) {
   return (
-    <div className="rounded-2xl nm-raised p-5 flex flex-col h-full">
+    <div className="rounded-2xl nm-raised p-5 flex flex-col h-full min-w-0">
       <div className="flex items-center justify-between gap-2 mb-5">
         <div className="text-[15px] leading-none font-semibold" style={{ color: 'var(--nm-text-primary)' }}>收支分析</div>
-        <span className="nm-pill nm-pill-neutral">規則式摘要</span>
+        <span className="nm-pill nm-pill-neutral shrink-0">規則式摘要</span>
       </div>
 
-      <p className="text-[13.5px] leading-[2] mb-5" style={{ color: 'var(--nm-text-body)' }}>{insight.headline}</p>
+      <p className="text-[13.5px] leading-[2] mb-5 break-words" style={{ color: 'var(--nm-text-body)' }}>{insight.headline}</p>
 
       {insight.secondary.length > 0 && (
         <div
@@ -35,8 +35,8 @@ export function AiInsightCard({ insight }: { insight: LedgerInsight }) {
           className="flex items-center gap-3 rounded-[13px] px-4 py-3.5 text-[13px] leading-[1.6] mb-4"
           style={{ background: 'rgba(217,181,107,0.08)', border: '1px solid rgba(217,181,107,0.28)', color: 'var(--nm-warning-glass-text)' }}
         >
-          <span className="flex-1">{insight.action.label}</span>
-          <span className="text-[12.5px] leading-none font-medium" style={{ color: 'var(--nm-text-primary)' }}>前往 ›</span>
+          <span className="flex-1 min-w-0">{insight.action.label}</span>
+          <span className="shrink-0 text-[12.5px] leading-none font-medium" style={{ color: 'var(--nm-text-primary)' }}>前往 ›</span>
         </Link>
       )}
 

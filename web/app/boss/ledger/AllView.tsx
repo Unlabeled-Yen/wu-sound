@@ -145,9 +145,13 @@ export async function AllView({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
-        <CashForecastTimeline forecast={forecast} startBalance={cashStartBalance} safetyLevel={cashSafetyLevel} />
-        <AiInsightCard insight={insight} />
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4">
+        <div className="min-w-0">
+          <CashForecastTimeline forecast={forecast} startBalance={cashStartBalance} safetyLevel={cashSafetyLevel} />
+        </div>
+        <div className="min-w-0">
+          <AiInsightCard insight={insight} />
+        </div>
       </div>
 
       {/* v2:月份與篩選從頁面頂部搬到這裡——只作用於下面的已收付明細列表,
