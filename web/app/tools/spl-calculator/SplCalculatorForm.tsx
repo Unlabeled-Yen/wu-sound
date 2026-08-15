@@ -6,32 +6,21 @@ import {
   distanceAttenuationDb,
   computeAmpDrive,
   evaluateAmpMatch,
-  type AmpMatchVerdict,
 } from '@/lib/spl-budget';
 import type { CatalogItem } from '@/lib/types';
+import { SplAnswerBand } from './SplAnswerBand';
+import { SplBudgetBreakdown } from './SplBudgetBreakdown';
+import { SplDriveVsLimit } from './SplDriveVsLimit';
+import { SplConditionsPanel } from './SplConditionsPanel';
+import { SplHandoffBanner } from './SplHandoffBanner';
 
 interface Props {
   speakers: CatalogItem[];
   amps: CatalogItem[];
 }
 
-function fmt(n: number, digits = 1): string {
-  if (!Number.isFinite(n)) return '-';
-  return n.toFixed(digits);
-}
-
-const VERDICT_LABEL: Record<AmpMatchVerdict, string> = {
-  underpowered: '推力不足',
-  matched: '匹配',
-  'over-driving': '過推警告',
-};
-
-const VERDICT_COLOR: Record<AmpMatchVerdict, string> = {
-  underpowered: 'var(--nm-warning-glass-text)',
-  matched: 'var(--nm-success-glass-text)',
-  'over-driving': 'var(--nm-danger-glass-text)',
-};
-
+// 答案先行:最終數字(建議投射距離)放最上面獨佔最大字級,條件收成一區在下面,
+// 公式本身畫成長條圖——計算邏輯完全不動(見 lib/spl-budget.ts),只是重排版面。
 export default function SplCalculatorForm({ speakers, amps }: Props) {
   const [speakerId, setSpeakerId] = useState<string>('');
   const [maxSplDb, setMaxSplDb] = useState('136');
@@ -48,7 +37,7 @@ export default function SplCalculatorForm({ speakers, amps }: Props) {
   const [stereoSumDb, setStereoSumDb] = useState('3');
   const [dynamicHeadroomDb, setDynamicHeadroomDb] = useState('12');
   const [safetyMarginDb, setSafetyMarginDb] = useState('6');
-  const [checkDistanceM, setCheckDistanceM] = useState('');
+  const [checkDistanceM, setCheckDistanceM] = useState('15');
 
   function onSpeakerChange(id: string) {
     setSpeakerId(id);
@@ -90,6 +79,17 @@ export default function SplCalculatorForm({ speakers, amps }: Props) {
     }
   }
 
+  function onMaxSplChange(next: string) {
+    setMaxSplDb(next);
+    setMaxSplTouched(true);
+  }
+
+  function resetAll() {
+    setSpeakerId(''); setMaxSplDb('136'); setMaxSplTouched(false); setRefDistanceM('1'); setSensitivityDb(''); setSpeakerSpecNote(null);
+    setAmpId(''); setAmpPowerW(''); setAmpSpecNote(null);
+    setTargetSplDb('90'); setStereoSumDb('3'); setDynamicHeadroomDb('12'); setSafetyMarginDb('6'); setCheckDistanceM('15');
+  }
+
   const ampDrive = useMemo(() => {
     const s = Number(sensitivityDb);
     const p = Number(ampPowerW);
@@ -127,239 +127,76 @@ export default function SplCalculatorForm({ speakers, amps }: Props) {
     hasCheckDistance && result ? distanceAttenuationDb(checkDistanceNum, input.refDistanceM) : null;
   const checkPasses = checkAttenuation !== null && result ? checkAttenuation <= result.budgetDb : null;
 
-  function onMaxSplChange(next: string) {
-    setMaxSplDb(next);
-    setMaxSplTouched(true);
+  const conditionsPanel = (
+    <SplConditionsPanel
+      speakers={speakers} amps={amps}
+      speakerId={speakerId} onSpeakerChange={onSpeakerChange} speakerSpecNote={speakerSpecNote}
+      maxSplDb={maxSplDb} onMaxSplChange={onMaxSplChange} refDistanceM={refDistanceM} setRefDistanceM={setRefDistanceM}
+      sensitivityDb={sensitivityDb} setSensitivityDb={setSensitivityDb}
+      ampId={ampId} onAmpChange={onAmpChange} ampSpecNote={ampSpecNote} ampPowerW={ampPowerW} setAmpPowerW={setAmpPowerW}
+      targetSplDb={targetSplDb} setTargetSplDb={setTargetSplDb}
+      stereoSumDb={stereoSumDb} setStereoSumDb={setStereoSumDb}
+      dynamicHeadroomDb={dynamicHeadroomDb} setDynamicHeadroomDb={setDynamicHeadroomDb}
+      safetyMarginDb={safetyMarginDb} setSafetyMarginDb={setSafetyMarginDb}
+      onReset={resetAll}
+    />
+  );
+
+  // 輸入無效或計算例外時,答案區塊本身隱藏(不留殘留數字),提示搬到原本答案帶的位置。
+  if (!result || result.theoreticalMaxThrowM <= 0) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-[20px] nm-raised-sm px-6 py-6">
+          <p className="text-[13px]" style={{ color: 'var(--nm-warning-glass-text)' }}>
+            {!inputsValid ? '請確認所有欄位都是有效數字。' : (result?.warnings[0] ?? '預算不足,無法達到目標音壓——請重新檢視音壓需求或器材規格。')}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{conditionsPanel}</div>
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <section className="nm-raised rounded-2xl p-4 space-y-3">
-        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-          擴大機推力(選填)
-        </h2>
-        <p className="text-[12px]" style={{ color: 'var(--nm-text-muted)' }}>
-          填了會用「靈敏度 + 10·log(瓦數)」推算實際可達 SPL,並跟喇叭極限取小值當距離預算的起點。
-        </p>
-        {amps.length > 0 && (
-          <label className="grid gap-1">
-            <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>從價目表帶入(選填)</span>
-            <select className="nm-input w-full" value={ampId} onChange={(e) => onAmpChange(e.target.value)}>
-              <option value="">— 手動輸入 —</option>
-              {amps.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {[a.brand, a.name].filter(Boolean).join(' ')}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {ampSpecNote && (
-          <p className="text-[12px]" style={{ color: 'var(--nm-warning-glass-text)' }}>{ampSpecNote}</p>
-        )}
-        <label className="grid gap-1">
-          <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>擴大機功率(W,實際負載下)</span>
+    <div className="flex flex-col gap-4">
+      <SplAnswerBand
+        recommendedM={result.recommendedMaxThrowM}
+        theoreticalM={result.theoreticalMaxThrowM}
+        budgetDb={result.budgetDb}
+        refDistanceM={input.refDistanceM}
+        checkDistanceM={hasCheckDistance ? checkDistanceNum : null}
+        checkAttenuationDb={checkAttenuation}
+        checkPasses={checkPasses}
+      />
+
+      <SplBudgetBreakdown
+        effectiveMaxSplDb={effectiveMaxSplDb}
+        stereoSumDb={input.stereoSumDb}
+        targetSplDb={input.targetSplDb}
+        budgetDb={result.budgetDb}
+        dynamicHeadroomDb={input.dynamicHeadroomDb}
+        safetyMarginDb={input.safetyMarginDb}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SplDriveVsLimit ampDrive={ampDrive} speakerMaxSplDb={speakerMaxNum} ampMatch={ampMatch} />
+        {conditionsPanel}
+      </div>
+
+      <div className="rounded-[20px] nm-raised px-5 py-4">
+        <label className="flex items-center gap-3 flex-wrap">
+          <span className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>驗算特定距離(選填,公尺)</span>
           <input
             type="number"
             inputMode="decimal"
-            className="nm-input w-full"
-            value={ampPowerW}
-            onChange={(e) => setAmpPowerW(e.target.value)}
-            placeholder="留空則跳過"
+            className="nm-input"
+            style={{ width: 120 }}
+            value={checkDistanceM}
+            onChange={(e) => setCheckDistanceM(e.target.value)}
           />
         </label>
-        {ampDrive && (
-          <div className="nm-inset rounded-xl p-3 space-y-1">
-            <div className="text-[11px]" style={{ color: 'var(--nm-text-muted)' }}>擴大機可推 SPL @1m</div>
-            <div className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-              {fmt(ampDrive.ampDriveSplDb, 2)} dB
-            </div>
-            {ampMatch && (
-              <div className="text-[13px] pt-1" style={{ color: VERDICT_COLOR[ampMatch.verdict] }}>
-                {VERDICT_LABEL[ampMatch.verdict]} · 差 {fmt(ampMatch.gapDb, 2)} dB
-                {ampMatch.verdict === 'over-driving' && ' — 有推爆喇叭風險,已用喇叭極限做上限'}
-                {ampMatch.verdict === 'underpowered' && ' — 距離預算會用推力值,不是喇叭規格值'}
-              </div>
-            )}
-          </div>
-        )}
-      </section>
+      </div>
 
-      <section className="nm-raised rounded-2xl p-4 space-y-3">
-        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-          喇叭規格
-        </h2>
-        {speakers.length > 0 && (
-          <label className="grid gap-1">
-            <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>從價目表帶入(選填)</span>
-            <select
-              className="nm-input w-full"
-              value={speakerId}
-              onChange={(e) => onSpeakerChange(e.target.value)}
-            >
-              <option value="">— 手動輸入 —</option>
-              {speakers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {[s.brand, s.name].filter(Boolean).join(' ')}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {speakerSpecNote && (
-          <p className="text-[12px]" style={{ color: 'var(--nm-warning-glass-text)' }}>
-            {speakerSpecNote}
-          </p>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          <label className="grid gap-1">
-            <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>最大音壓(dB SPL)</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              className="nm-input w-full"
-              value={maxSplDb}
-              onChange={(e) => onMaxSplChange(e.target.value)}
-            />
-          </label>
-          <label className="grid gap-1">
-            <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>基準距離(m)</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              className="nm-input w-full"
-              value={refDistanceM}
-              onChange={(e) => setRefDistanceM(e.target.value)}
-            />
-          </label>
-        </div>
-        <label className="grid gap-1">
-          <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>靈敏度(dB @1W/1m,擴大機計算用)</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            className="nm-input w-full"
-            value={sensitivityDb}
-            onChange={(e) => setSensitivityDb(e.target.value)}
-            placeholder="留空則跳過擴大機計算"
-          />
-        </label>
-        {ampMatch && (
-          <div className="text-[12px] pt-1" style={{ color: 'var(--nm-text-muted)' }}>
-            實際採用的最大音壓 = {fmt(effectiveMaxSplDb, 2)} dB
-            {!maxSplTouched && ampMatch.verdict === 'underpowered' && '(取自擴大機推力)'}
-          </div>
-        )}
-      </section>
-
-      <section className="nm-raised rounded-2xl p-4 space-y-3">
-        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-          演出設定
-        </h2>
-        <label className="grid gap-1">
-          <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>目標音壓(dB SPL)</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            className="nm-input w-full"
-            value={targetSplDb}
-            onChange={(e) => setTargetSplDb(e.target.value)}
-          />
-        </label>
-        <div className="grid grid-cols-3 gap-3">
-          <label className="grid gap-1">
-            <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>聲道疊加</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              className="nm-input w-full"
-              value={stereoSumDb}
-              onChange={(e) => setStereoSumDb(e.target.value)}
-            />
-          </label>
-          <label className="grid gap-1">
-            <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>演出動態</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              className="nm-input w-full"
-              value={dynamicHeadroomDb}
-              onChange={(e) => setDynamicHeadroomDb(e.target.value)}
-            />
-          </label>
-          <label className="grid gap-1">
-            <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>安全餘裕</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              className="nm-input w-full"
-              value={safetyMarginDb}
-              onChange={(e) => setSafetyMarginDb(e.target.value)}
-            />
-          </label>
-        </div>
-      </section>
-
-      {result && (
-        <section className="nm-raised-lg rounded-2xl p-5 space-y-4">
-          <div>
-            <div className="text-[12px]" style={{ color: 'var(--nm-text-muted)' }}>距離衰減預算</div>
-            <div className="text-3xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-              {fmt(result.budgetDb)} dB
-            </div>
-          </div>
-          {result.theoreticalMaxThrowM > 0 ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="nm-inset rounded-xl p-3">
-                <div className="text-[11px]" style={{ color: 'var(--nm-text-muted)' }}>理論最大距離</div>
-                <div className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-                  {fmt(result.theoreticalMaxThrowM)} m
-                </div>
-              </div>
-              <div className="nm-inset rounded-xl p-3">
-                <div className="text-[11px]" style={{ color: 'var(--nm-text-muted)' }}>建議距離(9 折)</div>
-                <div className="text-lg font-semibold" style={{ color: 'var(--nm-success-glass-text)' }}>
-                  {fmt(result.recommendedMaxThrowM)} m
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm" style={{ color: 'var(--nm-danger-glass-text)' }}>
-              預算不足,無法達到目標音壓。
-            </p>
-          )}
-
-          <div className="space-y-1">
-            {result.warnings.map((w, i) => (
-              <p key={i} className="text-[12px]" style={{ color: 'var(--nm-text-muted)' }}>
-                ⚠ {w}
-              </p>
-            ))}
-          </div>
-
-          <div className="pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <label className="grid gap-1">
-              <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>驗算特定距離(選填,公尺)</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                className="nm-input w-40"
-                value={checkDistanceM}
-                onChange={(e) => setCheckDistanceM(e.target.value)}
-              />
-            </label>
-            {hasCheckDistance && checkAttenuation !== null && (
-              <p
-                className="text-sm mt-2"
-                style={{ color: checkPasses ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)' }}
-              >
-                {fmt(checkDistanceNum, 0)}m 衰減 {fmt(checkAttenuation)}dB,
-                {checkPasses ? '在預算內,達標。' : `超出預算 ${fmt(checkAttenuation - result.budgetDb)}dB,不達標。`}
-              </p>
-            )}
-          </div>
-        </section>
-      )}
+      <SplHandoffBanner speakerId={speakerId} recommendedM={result.recommendedMaxThrowM} />
     </div>
   );
 }
