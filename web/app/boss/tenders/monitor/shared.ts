@@ -112,14 +112,22 @@ export function daysLeft(hit: TenderHit): number | null {
 export const RADAR_X_DOMAIN_DAYS = 30; // x = (截止日-今天)/30,超過 30 天釘在右緣
 export const RADAR_Y_TICKS_TWD = [1_000_000, 3_000_000, 6_000_000, 12_000_000] as const;
 
+// y 軸的實際繪圖下限。指南只給了 1M/3M/6M/12M 四個刻度,但實測近 30 天命中案
+// 有一半以上預算低於 1M(中位數約 50–70 萬,最小 1.5 萬)——如果繪圖domain 也
+// 從 1M 起,這些案子會全部夾在同一個 y=底部像素上,疊成分不出來的一個點
+// (2026-08-15 Yen 回報「雷達資訊呈現不正確」查出來的原因)。域下限另外往下
+// 拉到 1 萬,讓小案子照對數比例攤開;1M/3M/6M/12M 仍是畫面上的刻度標籤,只是
+// 不再等於 domain 邊界。
+const RADAR_Y_DOMAIN_MIN_TWD = 10_000;
+
 /** 距離截止日天數 -> 0~1(0=今天/最急,1=30天以後/最不急)。負值(已過期)釘 0。 */
 export function daysToXPct(days: number): number {
   return Math.max(0, Math.min(1, days / RADAR_X_DOMAIN_DAYS));
 }
 
-/** 預算(元)取對數,映射到 1M~12M 的 0~1(0=1M 或以下,1=12M 或以上)。 */
+/** 預算(元)取對數,映射到 1萬~12M 的 0~1(0=1萬或以下,1=12M 或以上)。 */
 export function budgetToYPct(budgetTwd: number): number {
-  const min = RADAR_Y_TICKS_TWD[0];
+  const min = RADAR_Y_DOMAIN_MIN_TWD;
   const max = RADAR_Y_TICKS_TWD[RADAR_Y_TICKS_TWD.length - 1];
   if (budgetTwd <= min) return 0;
   if (budgetTwd >= max) return 1;
