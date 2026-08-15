@@ -54,7 +54,7 @@ function Cell({
     <a
       href={href}
       className="block p-3 nm-lift rounded-lg"
-      style={active ? { background: 'rgba(224,179,80,0.1)' } : undefined}
+      style={active ? { background: 'rgba(217,181,107,0.1)' } : undefined}
     >
       {body}
     </a>

@@ -71,8 +71,8 @@ export function InfoTip({ text }: { text: string }) {
       {pos && typeof document !== 'undefined' && createPortal(
         <span
           role="tooltip"
-          className="fixed pointer-events-none -translate-x-1/2 -translate-y-full z-50 w-[240px] text-[11px] leading-relaxed rounded-lg p-2.5 shadow-lg"
-          style={{ top: pos.top, left: pos.left, background: '#1a1c20', color: 'var(--nm-text-secondary)', border: '1px solid var(--nm-border-glass)' }}
+          className="fixed pointer-events-none -translate-x-1/2 -translate-y-full z-50 w-[240px] text-[11px] leading-relaxed rounded-lg p-2.5 shadow-lg nm-raised-lg"
+          style={{ top: pos.top, left: pos.left, color: 'var(--nm-text-secondary)' }}
         >
           {text}
         </span>,

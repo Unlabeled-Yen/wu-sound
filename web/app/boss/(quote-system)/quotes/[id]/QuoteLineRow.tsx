@@ -207,7 +207,7 @@ export default function QuoteLineRow({
           <button type="button" onClick={() => setMenuOpen((v) => !v)} className="text-[15px]" style={{ color: 'var(--nm-text-faint)' }}>⋯</button>
         )}
         {menuOpen && (
-          <div className="absolute right-0 top-6 z-20 w-40 rounded-[13px] py-1.5 nm-raised-lg" style={{ background: '#1a1c20' }}>
+          <div className="absolute right-0 top-6 z-20 w-40 rounded-[13px] py-1.5 nm-raised-lg">
             <button type="button" onClick={() => { setMenuOpen(false); setEditing(true); }} className="block w-full text-left px-3 py-1.5 text-[12.5px]" style={{ color: 'var(--nm-text-body)' }}>編輯</button>
             <button type="button" onClick={() => moveSection(line.section === '器材' ? '安裝' : '器材')} className="block w-full text-left px-3 py-1.5 text-[12.5px]" style={{ color: 'var(--nm-text-body)' }}>
               移到{line.section === '器材' ? '安裝' : '器材'}

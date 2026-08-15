@@ -75,7 +75,7 @@ function AgencyRow({ a, rank }: { a: Agency; rank: number }) {
         {months !== null && (
           <span
             className="ml-auto text-xs tabular-nums"
-            style={{ color: dormant ? '#c99a3a' : 'var(--nm-text-faint)' }}
+            style={{ color: dormant ? 'var(--nm-warning-glass-text)' : 'var(--nm-text-faint)' }}
           >
             {months === 0 ? '本月剛發案' : `最近一案 ${months} 個月前`}
           </span>
@@ -85,11 +85,11 @@ function AgencyRow({ a, rank }: { a: Agency; rank: number }) {
       <div className="mb-1 flex items-center gap-2">
         <div
           className="h-2 flex-1 overflow-hidden rounded-full"
-          style={{ background: 'rgba(156,146,147,0.14)' }}
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
         >
           <div
             className="h-full rounded-full"
-            style={{ width: bar(c.soloRate), background: 'rgba(224,179,80,0.55)' }}
+            style={{ width: bar(c.soloRate), background: 'var(--nm-warning)' }}
           />
         </div>
         <span className="tabular-nums text-[13px]" style={{ color: 'var(--nm-text-primary)' }}>
@@ -164,7 +164,7 @@ export default async function BossAgenciesPage({
 
       <p
         className="shrink-0 mb-3 rounded-xl p-3 text-xs leading-relaxed"
-        style={{ background: 'rgba(120,144,156,0.10)', color: 'var(--nm-text-secondary)' }}
+        style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--nm-text-secondary)' }}
       >
         條長是「只有一家投標」的比率,越長代表過去越少人跟你搶。但括號裡的區間才是誠實的範圍——
         多數機關的案量只有個位數,真實值可能差很多,不要只看前面那個百分比。

@@ -158,7 +158,7 @@ function BasePriceCard({ bp }: { bp: BasePriceField | null | undefined }) {
         {isFallback && (
           <span
             className="mr-1 rounded-full px-1.5 py-0.5"
-            style={{ background: 'rgba(224,179,80,0.14)', color: '#c99a3a' }}
+            style={{ background: 'rgba(217,181,107,0.14)', color: 'var(--nm-warning-glass-text)' }}
           >
             ⚠️ {bp.source_label}
           </span>
@@ -169,7 +169,7 @@ function BasePriceCard({ bp }: { bp: BasePriceField | null | undefined }) {
         )}
         <span className="ml-1" style={{ color: 'var(--nm-text-faint)' }}>▾</span>
       </summary>
-      <div className="mt-1.5 space-y-1 rounded-lg p-2" style={{ background: 'rgba(120,144,156,0.08)' }}>
+      <div className="mt-1.5 space-y-1 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.05)' }}>
         <RatioGroupDetail label={bp.group_labels.best_value} stats={bp.stats.best_value} />
         <RatioGroupDetail label={bp.group_labels.lowest_bid} stats={bp.stats.lowest_bid} />
         <RatioGroupDetail label={bp.group_labels.other} stats={bp.stats.other} />
@@ -248,8 +248,8 @@ function DistributionMatrix({
             fontWeight: bold || active ? 600 : 400,
             color: active ? 'var(--nm-text-primary)' : 'var(--nm-text-secondary)',
             background: active
-              ? 'rgba(224,179,80,0.22)'
-              : `rgba(156,146,147,${(0.05 + (c / max) * 0.16).toFixed(3)})`,
+              ? 'rgba(217,181,107,0.22)'
+              : `rgba(255,255,255,${(0.02 + (c / max) * 0.07).toFixed(3)})`,
           }}
         >
           {c}
@@ -316,12 +316,12 @@ function TenderCard({ hit }: { hit: TenderHit }) {
         </span>
         <span
           className="rounded-full px-2 py-0.5 text-xs"
-          style={{ background: 'rgba(156,146,147,0.14)', color: 'var(--nm-text-secondary)' }}
+          style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--nm-text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
         >
           {hit.notice_type}
         </span>
         {hit.is_retender === 1 && !hasRetenderSignal && (
-          <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'rgba(224,179,80,0.14)', color: '#c99a3a' }}>
+          <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'rgba(217,181,107,0.14)', color: 'var(--nm-warning-glass-text)' }}>
             ⚠️ 流標重招
           </span>
         )}
@@ -329,7 +329,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
           <span
             key={s.code}
             className="rounded-full px-2 py-0.5 text-xs"
-            style={{ background: 'rgba(224,179,80,0.14)', color: '#c99a3a' }}
+            style={{ background: 'rgba(217,181,107,0.14)', color: 'var(--nm-warning-glass-text)' }}
           >
             {s.label}
           </span>
@@ -345,7 +345,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
         {hit.nature && (
           <span
             className="rounded-full px-2 py-0.5 text-xs"
-            style={{ background: 'rgba(120,144,156,0.16)', color: 'var(--nm-text-secondary)' }}
+            style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--nm-text-secondary)' }}
             title={hit.nature.matched ? `命中關鍵字:${hit.nature.matched}` : '標題沒有可辨識的性質關鍵字'}
           >
             {hit.nature.label}
@@ -354,7 +354,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
         {hit.price_band && (
           <span
             className="rounded-full px-2 py-0.5 text-xs"
-            style={{ background: 'rgba(120,144,156,0.16)', color: 'var(--nm-text-secondary)' }}
+            style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--nm-text-secondary)' }}
           >
             {hit.price_band.label}
           </span>
@@ -365,7 +365,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
         <span className="tabular-nums">{formatBudget(hit)}</span>
         <span>{formatDeadline(hit)}</span>
         {left !== null && (
-          <span className="tabular-nums" style={{ color: left <= 3 ? '#c99a3a' : 'var(--nm-text-secondary)' }}>
+          <span className="tabular-nums" style={{ color: left <= 3 ? 'var(--nm-warning-glass-text)' : 'var(--nm-text-secondary)' }}>
             {left < 0 ? '已截止' : left === 0 ? '今天截止' : `還剩 ${left} 天`}
           </span>
         )}
@@ -540,7 +540,7 @@ export default async function BossTendersMonitorPage({
       {pool === 'retender' && (
         <p
           className="shrink-0 rounded-xl p-3 text-xs leading-relaxed"
-          style={{ background: 'rgba(224,179,80,0.08)', color: 'var(--nm-text-secondary)' }}
+          style={{ background: 'rgba(217,181,107,0.08)', color: 'var(--nm-text-secondary)' }}
         >
           {RETENDER_NOTE}
         </p>

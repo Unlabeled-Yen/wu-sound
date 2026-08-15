@@ -90,7 +90,7 @@ export default async function BossExpensesPage() {
             <div className="text-[13px] font-semibold mb-1" style={{ color: 'var(--nm-warning-glass-text)' }}>
               員工草稿 · {drafts.length} 筆
             </div>
-            <div className="text-[12px] leading-relaxed" style={{ color: '#b8ac8e' }}>
+            <div className="text-[12px] leading-relaxed" style={{ color: 'var(--nm-warning-glass-text)' }}>
               {draftReminderSub}
             </div>
           </div>

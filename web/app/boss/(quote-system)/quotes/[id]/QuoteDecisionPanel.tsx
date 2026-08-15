@@ -137,7 +137,7 @@ export function QuoteDecisionPanel({
           <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,.12)' }} />
           <button type="button" onClick={() => setMoreOpen((v) => !v)}>⋯</button>
           {moreOpen && (
-            <div className="absolute top-6 right-0 z-20 w-40 rounded-[13px] py-1.5 nm-raised-lg" style={{ background: '#1a1c20' }}>
+            <div className="absolute top-6 right-0 z-20 w-40 rounded-[13px] py-1.5 nm-raised-lg">
               <a href={printHref} target="_blank" rel="noreferrer" className="block px-3 py-1.5 text-[12.5px] text-left" style={{ color: 'var(--nm-text-body)' }}>列印</a>
               <a href={csvHref} className="block px-3 py-1.5 text-[12.5px] text-left" style={{ color: 'var(--nm-text-body)' }}>匯出 CSV</a>
               <a href="/boss/quotes" className="block px-3 py-1.5 text-[12.5px] text-left" style={{ color: 'var(--nm-text-body)' }}>返回列表</a>

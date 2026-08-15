@@ -82,15 +82,15 @@ const STATUS_LABEL: Record<ItemStatus, string> = {
 // 沿用現有 nm-* 設計系統的三色語意,不另起爐灶(--nm-success/--nm-warning/
 // --nm-danger 定義在 app/globals.css)。parser_missing/not_started/internal
 // 用跟「標案監測」頁 notice_type 徽章相同的中性灰。
-const STATUS_STYLE: Record<ItemStatus, { bg: string; fg: string }> = {
+const STATUS_STYLE: Record<ItemStatus, { bg: string; fg: string; border?: string }> = {
   done: { bg: 'rgba(126, 207, 157, 0.16)', fg: 'var(--nm-success-glass-text)' },
   backfilling: { bg: 'rgba(217, 181, 107, 0.16)', fg: 'var(--nm-warning-glass-text)' },
   partial: { bg: 'rgba(217, 181, 107, 0.16)', fg: 'var(--nm-warning-glass-text)' },
   needs_docs: { bg: 'rgba(217, 181, 107, 0.16)', fg: 'var(--nm-warning-glass-text)' },
   bug: { bg: 'rgba(224, 122, 122, 0.16)', fg: 'var(--nm-danger-glass-text)' },
-  parser_missing: { bg: 'rgba(156,146,147,0.14)', fg: 'var(--nm-text-secondary)' },
-  not_started: { bg: 'rgba(156,146,147,0.14)', fg: 'var(--nm-text-secondary)' },
-  internal: { bg: 'rgba(156,146,147,0.14)', fg: 'var(--nm-text-secondary)' },
+  parser_missing: { bg: 'rgba(255,255,255,0.06)', fg: 'var(--nm-text-secondary)', border: '1px solid rgba(255,255,255,0.1)' },
+  not_started: { bg: 'rgba(255,255,255,0.06)', fg: 'var(--nm-text-secondary)', border: '1px solid rgba(255,255,255,0.1)' },
+  internal: { bg: 'rgba(255,255,255,0.06)', fg: 'var(--nm-text-secondary)', border: '1px solid rgba(255,255,255,0.1)' },
 };
 
 function StatusBadge({ status }: { status: ItemStatus }) {
@@ -98,7 +98,7 @@ function StatusBadge({ status }: { status: ItemStatus }) {
   return (
     <span
       className="rounded-full px-2 py-0.5 text-xs shrink-0"
-      style={{ background: style.bg, color: style.fg }}
+      style={{ background: style.bg, color: style.fg, border: style.border }}
     >
       {STATUS_LABEL[status]}
     </span>
