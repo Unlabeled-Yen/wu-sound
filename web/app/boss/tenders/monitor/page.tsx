@@ -68,6 +68,14 @@ async function loadSyncStatus(): Promise<SyncStatus | null> {
   };
 }
 
+// 越線警報件數(07-視覺校正指南 §3.4 訊號列第 4 格)。近 7 天決標中,
+// award/base < 0.86 的件數。null 代表 API 沒回應,不代表 0——SignalRow
+// 會分別呈現「查詢失敗」跟「0 件」,不能混為一談。
+async function loadBreachCount(): Promise<number | null> {
+  const { data } = await fetchTenderRadar<{ breaches: unknown[] }>('/api/signals/breaches?days=7&threshold=0.86');
+  return data ? data.breaches.length : null;
+}
+
 function formatBudget(hit: TenderHit): string {
   switch (hit.budget_status) {
     case 'value': {
@@ -430,8 +438,11 @@ export default async function BossTendersMonitorPage({
   const urgent = sp.urgent === '1';
   const fresh = sp.fresh === '1';
 
-  const { hits, error } = await loadRecentTenders(days);
-  const syncStatus = await loadSyncStatus();
+  const [{ hits, error }, syncStatus, breachCount] = await Promise.all([
+    loadRecentTenders(days),
+    loadSyncStatus(),
+    loadBreachCount(),
+  ]);
 
   // 分類是 API 現算的,但舊版 Worker 尚未部署時欄位會是 undefined——
   // 那時不要假裝有分類,直接把篩選列藏起來,免得顯示「每類都 0 件」誤導。
@@ -550,7 +561,7 @@ export default async function BossTendersMonitorPage({
       </header>
 
       <div className="shrink-0">
-        <SignalRow hits={hits} days={days} price={price} nature={nature} pool={pool} urgent={urgent} fresh={fresh} />
+        <SignalRow hits={hits} days={days} price={price} nature={nature} pool={pool} urgent={urgent} fresh={fresh} breachCount={breachCount} />
       </div>
 
       {/* 桌機兩欄:左=雷達/分佈矩陣/追蹤清單/卡片(主分析流),右=對手檔案/
