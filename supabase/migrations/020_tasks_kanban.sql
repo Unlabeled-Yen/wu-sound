@@ -3,10 +3,14 @@
 -- 見 design_handoff_wu_sound/06-project-board.md 11a §4、08-專案管理新建清單.md §1。
 -- 四欄鍵值採 08 文件定案:decide/todo/blocked/done。
 
--- 先回填,CHECK 換掉之前舊值必須先合法化,否則 constraint 會直接擋住既有資料。
+-- 順序很重要:先拿掉舊 constraint,回填才寫得進新值('todo' 不在舊的
+-- ('open','done') 允許清單裡),回填完才能加上收緊後的新 constraint。
+-- (先前版本順序寫反,backfill 在舊 constraint 還在時就想寫 'todo',
+-- 在正式庫上被舊 constraint 擋下,已確認正式庫因此完整回滾、未套用。)
+alter table tasks drop constraint tasks_status_check;
+
 update tasks set status = 'todo' where status = 'open';
 
-alter table tasks drop constraint tasks_status_check;
 alter table tasks add constraint tasks_status_check
   check (status in ('decide', 'todo', 'blocked', 'done'));
 alter table tasks alter column status set default 'todo';
