@@ -16,6 +16,7 @@ import {
 } from './shared';
 import SignalRow from './SignalRow';
 import TrackedList from './TrackedList';
+import RivalDossier from './RivalDossier';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -628,6 +629,7 @@ export default async function BossTendersMonitorPage({
           <div className="h-full space-y-3 overflow-y-auto pr-1 pb-6">
             {/* 手機版的分佈矩陣在捲動區裡面(桌機版在上面固定那份) */}
             <div className="lg:hidden">{filterPanel}</div>
+            <RivalDossier />
             <ul className="space-y-3">
               {visible.map((hit) => (
                 <TenderCard key={hit.id} hit={hit} />
