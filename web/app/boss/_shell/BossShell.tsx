@@ -56,13 +56,15 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
   settings: <GearIcon />,
 };
 
-// Mobile bottom-nav tabs (5 slots)
+// Mobile bottom-nav tabs (5 slots)——老闆手機只看三件事:零用金審核／專案管理
+// 備忘／財務,其餘(報價、現場、標案、設備、聲學計算、使用者管理)收進「更多」,
+// 不逐項砍功能,只是不再各自佔一格。
 type MobileTab = { key: string; href: string; label: string; icon: (active: boolean) => React.ReactNode };
 const MOBILE_TABS: MobileTab[] = [
   { key: 'overview', href: '/boss', label: '總覽', icon: MobileHomeIcon },
   { key: 'review', href: '/boss/expenses', label: '審核', icon: MobileCheckIcon },
-  { key: 'quotes', href: '/boss/quotes', label: '報價', icon: MobileDocIcon },
-  { key: 'ops', href: '/boss/worklogs', label: '現場', icon: MobileUsersIcon },
+  { key: 'projects', href: '/boss/sites', label: '專案', icon: MobileDocIcon },
+  { key: 'finance', href: '/boss/ledger', label: '財務', icon: MobileWalletIcon },
   { key: 'more', href: '/boss/more', label: '更多', icon: MobileMoreIcon },
 ];
 
@@ -412,14 +414,12 @@ function MobileDocIcon(active: boolean) {
     </svg>
   );
 }
-function MobileUsersIcon(active: boolean) {
+function MobileWalletIcon(active: boolean) {
   const c = active ? '#f0f0f2' : '#7d7e83';
   return (
     <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M2.5 20c.5-3.5 3.5-5.5 6.5-5.5s6 2 6.5 5.5" />
-      <circle cx="17" cy="9" r="2.5" />
-      <path d="M15 15c2.5 0 5 1.5 5.5 4" />
+      <path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2" />
+      <path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-4a2 2 0 1 0 0 4" />
     </svg>
   );
 }

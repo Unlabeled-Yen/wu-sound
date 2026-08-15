@@ -17,6 +17,7 @@ const GROUPS: Group[] = [
   {
     title: '報價系統',
     items: [
+      { href: '/boss/quotes', label: '報價系統' },
       { href: '/boss/bundles', label: '標配套組' },
       { href: '/boss/catalog', label: '價目表' },
     ],
@@ -26,12 +27,11 @@ const GROUPS: Group[] = [
     items: [{ href: '/boss/equipment', label: '設備庫存' }],
   },
   {
-    title: '專案管理',
-    items: [{ href: '/boss/sites', label: '專案管理' }],
-  },
-  {
     title: '現場',
-    items: [{ href: '/boss/clockins', label: '打卡' }],
+    items: [
+      { href: '/boss/worklogs', label: '工作記錄' },
+      { href: '/boss/clockins', label: '打卡' },
+    ],
   },
   {
     title: '標案',

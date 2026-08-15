@@ -1,9 +1,11 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import BossMobileDashboard from './BossMobileDashboard';
-import { OverviewDesktop } from './OverviewDesktop';
 import { taipeiCurrentMonthStr } from '@/lib/tz';
 import { summarizeEntries } from '@/lib/ledger-summary';
-import { loadOverviewData } from '@/lib/overview-data';
+
+// 總覽 v2(13a)桌機版重新規劃暫緩(2026-08-15 Yen 決定)——桌機先放「即將推出」
+// 占位畫面。OverviewDesktop.tsx / lib/overview-data.ts 兩支既有實作保留在
+// 專案裡但不掛上這個頁面,之後真的要重新規劃時可能還用得上,不要刪掉。
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +84,7 @@ async function loadMobileStats() {
 }
 
 export default async function BossDashboard() {
-  const [s, overview] = await Promise.all([loadMobileStats(), loadOverviewData()]);
+  const s = await loadMobileStats();
   const anyError = Object.values(s.errors).some(Boolean);
 
   return (
@@ -100,9 +102,15 @@ export default async function BossDashboard() {
         <BossMobileDashboard s={s} />
       </div>
 
-      {/* Desktop view — 總覽 v2(13a) */}
-      <div className="hidden lg:block">
-        <OverviewDesktop data={overview} month={s.month} />
+      {/* Desktop view — 總覽重新規劃暫緩,先放占位畫面 */}
+      <div className="hidden lg:flex items-center justify-center" style={{ minHeight: '60vh' }}>
+        <div
+          className="rounded-2xl px-10 py-8 text-center"
+          style={{ border: '1px solid rgba(255,255,255,.09)', background: 'rgba(8,8,10,.4)' }}
+        >
+          <div className="text-[15px] font-medium mb-2" style={{ color: 'var(--nm-text-primary)' }}>總覽即將推出</div>
+          <div className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>桌機版總覽正在重新規劃中</div>
+        </div>
       </div>
     </>
   );

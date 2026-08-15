@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 type SheetMode = null | 'fuel' | 'parking';
 
@@ -179,6 +180,18 @@ export default function CapturePage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-full">
+      {/* 待確認清單不再獨立佔一格底部分頁(見 layout.tsx 收攏說明),入口移到這裡 */}
+      <Link
+        href="/staff/queue"
+        className="flex items-center justify-between rounded-2xl nm-raised px-4 py-3 nm-focus"
+        style={{ color: 'var(--nm-text-body)' }}
+      >
+        <span className="text-[14px] font-medium">待確認清單</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--nm-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="m9 6 6 6-6 6" />
+        </svg>
+      </Link>
+
       <input
         ref={fileRef}
         type="file"
