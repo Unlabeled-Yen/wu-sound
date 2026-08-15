@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import type { PlacebookData, PlaceRow, SiteCategoryOption, WeekSlot } from '@/lib/placebook-data';
 import { createSite, createSiteCategory, renameSite, setSiteActive, updateSiteMeta } from './actions';
 
@@ -86,7 +87,9 @@ function PlaceSubRow({ project, categories }: { project: PlaceRow['projects'][nu
   return (
     <div style={{ padding: '9px 0 9px 14px', borderLeft: '1px solid rgba(255,255,255,.12)' }}>
       <div className="flex items-center gap-2.5 flex-wrap">
-        <span className="text-[12.5px]" style={{ color: 'var(--nm-text-body)' }}>{project.name}</span>
+        <Link href={`/boss/projects/${project.id}`} className="text-[12.5px] underline nm-focus" style={{ color: 'var(--nm-text-body)' }}>
+          {project.name}
+        </Link>
         {project.categoryName && (
           <span className="text-[10px]" style={{ padding: '3px 8px', borderRadius: 5, background: 'rgba(255,255,255,.07)', color: 'var(--nm-text-secondary)' }}>
             {project.categoryName}
