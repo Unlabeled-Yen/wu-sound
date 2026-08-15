@@ -105,6 +105,27 @@ export function daysLeft(hit: TenderHit): number | null {
   return Math.ceil(diff / 86_400_000);
 }
 
+// 開標視窗雷達(07-視覺校正指南 §3.4-4)座標換算。指南寫明「座標必須由資料算,
+// 不要照抄原型的 left:%」——這兩個函式就是那個「由資料算」,TenderRadar.tsx
+// 只負責畫,不重算。
+
+export const RADAR_X_DOMAIN_DAYS = 30; // x = (截止日-今天)/30,超過 30 天釘在右緣
+export const RADAR_Y_TICKS_TWD = [1_000_000, 3_000_000, 6_000_000, 12_000_000] as const;
+
+/** 距離截止日天數 -> 0~1(0=今天/最急,1=30天以後/最不急)。負值(已過期)釘 0。 */
+export function daysToXPct(days: number): number {
+  return Math.max(0, Math.min(1, days / RADAR_X_DOMAIN_DAYS));
+}
+
+/** 預算(元)取對數,映射到 1M~12M 的 0~1(0=1M 或以下,1=12M 或以上)。 */
+export function budgetToYPct(budgetTwd: number): number {
+  const min = RADAR_Y_TICKS_TWD[0];
+  const max = RADAR_Y_TICKS_TWD[RADAR_Y_TICKS_TWD.length - 1];
+  if (budgetTwd <= min) return 0;
+  if (budgetTwd >= max) return 1;
+  return (Math.log(budgetTwd) - Math.log(min)) / (Math.log(max) - Math.log(min));
+}
+
 // 倒數格式 `2d 03h`(訊號列/追蹤清單用,比卡片上的「還剩 N 天」更精細一格)。
 // 跟 daysLeft() 分開算,不互相依賴——deadline_status 不是 value 時兩邊都回 null,
 // 呼叫端各自決定怎麼顯示缺值,不要在這裡混一套規則進兩種呈現。
