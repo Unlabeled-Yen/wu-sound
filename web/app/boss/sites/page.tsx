@@ -105,12 +105,12 @@ export default async function BossSitesPage() {
         <table className="w-full text-[13px]" style={{ minWidth: 780, borderCollapse: 'collapse' }}>
           <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
             <tr style={{ color: 'var(--nm-text-muted)' }}>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">名稱</th>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">類別</th>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">客戶</th>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">狀態</th>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">目前在場設備</th>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">動作</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">名稱</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">類別</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">客戶</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">狀態</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">目前在場設備</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">動作</th>
             </tr>
           </thead>
           <tbody>

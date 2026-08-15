@@ -218,11 +218,11 @@ export default function StaffWorklogPage() {
             )}
 
             <label className="mb-3 block">
-              <span className="mb-1 block text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>專案</span>
+              <span className="mb-1 block text-[13px] leading-[1.6] font-medium" style={{ color: 'var(--nm-text-secondary)' }}>專案</span>
               <select
                 value={siteId}
                 onChange={(e) => setSiteId(e.target.value)}
-                className="nm-input text-sm"
+                className="nm-input text-[14px]"
                 required
               >
                 <option value="">請選擇</option>
@@ -235,7 +235,7 @@ export default function StaffWorklogPage() {
             </label>
 
             <label className="mb-3 block">
-              <span className="mb-1 flex justify-between text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>
+              <span className="mb-1 flex justify-between text-[13px] leading-[1.6] font-medium" style={{ color: 'var(--nm-text-secondary)' }}>
                 <span>一句話說明</span>
                 <span style={{ color: note.length > 200 ? 'var(--nm-danger)' : 'var(--nm-text-faint)' }}>
                   {note.length}/200
@@ -245,7 +245,7 @@ export default function StaffWorklogPage() {
                 value={note}
                 onChange={(e) => setNote(e.target.value.slice(0, 200))}
                 rows={2}
-                className="nm-input text-sm"
+                className="nm-input text-[14px]"
                 placeholder="今天做了什麼"
                 required
               />
@@ -253,7 +253,7 @@ export default function StaffWorklogPage() {
 
             <div className="mb-3 grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="mb-1 block text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>施工前照片</span>
+                <span className="mb-1 block text-[13px] leading-[1.6] font-medium" style={{ color: 'var(--nm-text-secondary)' }}>施工前照片</span>
                 <input
                   ref={beforeRef}
                   type="file"
@@ -265,7 +265,7 @@ export default function StaffWorklogPage() {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-sm font-medium" style={{ color: 'var(--nm-text-secondary)' }}>施工後照片</span>
+                <span className="mb-1 block text-[13px] leading-[1.6] font-medium" style={{ color: 'var(--nm-text-secondary)' }}>施工後照片</span>
                 <input
                   ref={afterRef}
                   type="file"
@@ -283,10 +283,10 @@ export default function StaffWorklogPage() {
                 className="mb-3 rounded-xl p-3"
                 style={{ background: 'rgba(217,181,107,0.08)', border: '1px solid rgba(217,181,107,0.28)' }}
               >
-                <legend className="px-1 text-sm font-medium" style={{ color: 'var(--nm-warning)' }}>無照片原因(必填)</legend>
+                <legend className="px-1 text-[13px] leading-[1.6] font-medium" style={{ color: 'var(--nm-warning)' }}>無照片原因(必填)</legend>
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   {(Object.keys(REASON_LABEL) as Array<keyof typeof REASON_LABEL>).map((k) => (
-                    <label key={k} className="flex items-center gap-2 text-sm" style={{ color: 'var(--nm-text-body)' }}>
+                    <label key={k} className="flex items-center gap-2 text-[14px]" style={{ color: 'var(--nm-text-body)' }}>
                       <input
                         type="radio"
                         name="no_photo_reason"
@@ -306,14 +306,14 @@ export default function StaffWorklogPage() {
                 type="button"
                 onClick={() => setShowForm(false)}
                 disabled={submitting}
-                className="flex-1 nm-btn text-sm nm-focus"
+                className="flex-1 nm-btn text-[14px] nm-focus"
               >
                 取消
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-[2] nm-btn-solid text-sm nm-focus"
+                className="flex-[2] nm-btn-solid text-[14px] nm-focus"
               >
                 {submitting ? '送出中…' : '送出'}
               </button>

@@ -65,11 +65,11 @@ export default async function BossUsersPage() {
         <table className="w-full text-[13px]" style={{ minWidth: 780, borderCollapse: 'collapse' }}>
           <thead style={{ background: 'rgba(20,20,24,0.92)' }}>
             <tr style={{ color: 'var(--nm-text-muted)' }}>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">姓名</th>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">角色</th>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">狀態</th>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">建立時間</th>
-              <th className="text-left py-2.5 px-3.5 font-normal text-xs whitespace-nowrap">動作</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">姓名</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">角色</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">狀態</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">建立時間</th>
+              <th className="text-left py-2.5 px-3.5 font-normal text-[11px] leading-none tracking-[.14em] whitespace-nowrap">動作</th>
             </tr>
           </thead>
           <tbody>
@@ -86,7 +86,7 @@ export default async function BossUsersPage() {
                     />
                     <button
                       type="submit"
-                      className="text-xs nm-focus"
+                      className="text-[11px] leading-none tracking-[.14em] nm-focus"
                       style={{ color: 'var(--nm-text-muted)' }}
                     >
                       存
@@ -111,7 +111,7 @@ export default async function BossUsersPage() {
                       <input type="hidden" name="active" value={u.active ? 'false' : 'true'} />
                       <button
                         type="submit"
-                        className="nm-btn text-xs"
+                        className="nm-btn text-[11px] leading-none tracking-[.14em]"
                         style={{ padding: '4px 10px', minHeight: 'auto' }}
                       >
                         {u.active ? '停用' : '啟用'}
@@ -131,7 +131,7 @@ export default async function BossUsersPage() {
                       />
                       <button
                         type="submit"
-                        className="nm-btn text-xs"
+                        className="nm-btn text-[11px] leading-none tracking-[.14em]"
                         style={{ padding: '4px 10px', minHeight: 'auto' }}
                       >
                         重設

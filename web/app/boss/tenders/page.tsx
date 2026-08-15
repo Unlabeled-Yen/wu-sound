@@ -97,7 +97,7 @@ function StatusBadge({ status }: { status: ItemStatus }) {
   const style = STATUS_STYLE[status];
   return (
     <span
-      className="rounded-full px-2 py-0.5 text-xs shrink-0"
+      className="rounded-full px-2 py-0.5 text-[11px] leading-none tracking-[.14em] shrink-0"
       style={{ background: style.bg, color: style.fg, border: style.border }}
     >
       {STATUS_LABEL[status]}
@@ -108,7 +108,7 @@ function StatusBadge({ status }: { status: ItemStatus }) {
 function CoverageBar({ coverage }: { coverage: Coverage }) {
   const total = coverage.value + coverage.unfetched + coverage.withheld + coverage.fetch_failed;
   if (total === 0) {
-    return <span className="text-xs" style={{ color: 'var(--nm-text-faint)' }}>尚無資料</span>;
+    return <span className="text-[12px] leading-[1.6]" style={{ color: 'var(--nm-text-faint)' }}>尚無資料</span>;
   }
   const pct = Math.round((coverage.value / total) * 100);
   return (
@@ -141,7 +141,7 @@ function ItemRow({ item }: { item: BidPlanItem }) {
     <li className="border-b last:border-b-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
       <details className="group">
         <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">{header}</summary>
-        <div className="pb-3 pl-1 text-xs space-y-2" style={{ color: 'var(--nm-text-secondary)' }}>
+        <div className="pb-3 pl-1 text-[12px] leading-[1.6] space-y-2" style={{ color: 'var(--nm-text-secondary)' }}>
           {item.note && <p>{item.note}</p>}
           {item.coverage && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
@@ -209,11 +209,11 @@ export default async function BossBidPlanPage() {
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>資料進度板</h1>
-          <p className="mt-0.5 text-sm" style={{ color: 'var(--nm-text-secondary)' }}>
+          <p className="mt-0.5 text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>
             {plan ? `最後盤點 ${plan.config_reviewed_at}` : '給開發者看的資料工程進度'}
           </p>
         </div>
-        <a href="/boss/tenders/monitor" className="text-xs underline" style={{ color: 'var(--nm-text-faint)' }}>
+        <a href="/boss/tenders/monitor" className="text-[12px] leading-[1.6] underline" style={{ color: 'var(--nm-text-faint)' }}>
           → 標案監測
         </a>
       </header>

@@ -110,7 +110,7 @@ function formatRatioPct(ratio: number): string {
 function RatioGroupDetail({ label, stats }: { label: string; stats: RatioStats }) {
   if (stats.tier === 'none') return null; // n=0 的分組不佔版面
   return (
-    <p className="text-xs" style={{ color: 'var(--nm-text-secondary)' }}>
+    <p className="text-[12px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>
       <span style={{ color: 'var(--nm-text-primary)' }}>{label}</span>
       {'　'}
       {stats.tier === 'raw' ? (
@@ -137,7 +137,7 @@ function BasePriceCard({ bp }: { bp: BasePriceField | null | undefined }) {
   if (bp === undefined) return null;
   if (bp === null) {
     return (
-      <p className="mt-2 text-xs" style={{ color: 'var(--nm-danger-glass-text)' }}>
+      <p className="mt-2 text-[12px] leading-[1.6]" style={{ color: 'var(--nm-danger-glass-text)' }}>
         ⚠️ 歷史參考載入失敗
       </p>
     );
@@ -152,7 +152,7 @@ function BasePriceCard({ bp }: { bp: BasePriceField | null | undefined }) {
   return (
     <details className="mt-2">
       <summary
-        className="cursor-pointer list-none text-xs"
+        className="cursor-pointer list-none text-[12px] leading-[1.6]"
         style={{ color: dim ? 'var(--nm-text-muted)' : 'var(--nm-text-secondary)' }}
       >
         {isFallback && (
@@ -265,18 +265,18 @@ function DistributionMatrix({
           <tr>
             <th />
             {cols.map((c) => (
-              <th key={c} className="p-0.5 text-center text-xs font-normal" style={{ color: 'var(--nm-text-faint)' }}>
+              <th key={c} className="p-0.5 text-center text-[11px] leading-none tracking-[.14em] font-normal" style={{ color: 'var(--nm-text-faint)' }}>
                 {natureLabel(c)}
               </th>
             ))}
-            <th className="p-0.5 text-center text-xs font-normal" style={{ color: 'var(--nm-text-faint)' }}>合計</th>
+            <th className="p-0.5 text-center text-[11px] leading-none tracking-[.14em] font-normal" style={{ color: 'var(--nm-text-faint)' }}>合計</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r}>
               <th
-                className="whitespace-nowrap pr-2 text-right text-xs font-normal"
+                className="whitespace-nowrap pr-2 text-right text-[11px] leading-none tracking-[.14em] font-normal"
                 style={{ color: 'var(--nm-text-faint)' }}
               >
                 {priceLabel(r)}
@@ -288,7 +288,7 @@ function DistributionMatrix({
             </tr>
           ))}
           <tr>
-            <th className="pr-2 text-right text-xs font-normal" style={{ color: 'var(--nm-text-faint)' }}>合計</th>
+            <th className="pr-2 text-right text-[11px] leading-none tracking-[.14em] font-normal" style={{ color: 'var(--nm-text-faint)' }}>合計</th>
             {cols.map((c) => (
               <Cell key={c} p="all" n={c} bold />
             ))}
@@ -315,26 +315,26 @@ function TenderCard({ hit }: { hit: TenderHit }) {
           {hit.unit_name || hit.unit_id || '未知機關'}
         </span>
         <span
-          className="rounded-full px-2 py-0.5 text-xs"
+          className="rounded-full px-2 py-0.5 text-[11px] leading-none tracking-[.14em]"
           style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--nm-text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
         >
           {hit.notice_type}
         </span>
         {hit.is_retender === 1 && !hasRetenderSignal && (
-          <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'rgba(217,181,107,0.14)', color: 'var(--nm-warning-glass-text)' }}>
+          <span className="rounded-full px-2 py-0.5 text-[11px] leading-none tracking-[.14em]" style={{ background: 'rgba(217,181,107,0.14)', color: 'var(--nm-warning-glass-text)' }}>
             ⚠️ 流標重招
           </span>
         )}
         {signals.map((s) => (
           <span
             key={s.code}
-            className="rounded-full px-2 py-0.5 text-xs"
+            className="rounded-full px-2 py-0.5 text-[11px] leading-none tracking-[.14em]"
             style={{ background: 'rgba(217,181,107,0.14)', color: 'var(--nm-warning-glass-text)' }}
           >
             {s.label}
           </span>
         ))}
-        <span className="ml-auto text-xs" style={{ color: 'var(--nm-text-faint)' }}>
+        <span className="ml-auto text-[11px] leading-none tracking-[.14em]" style={{ color: 'var(--nm-text-faint)' }}>
           公告 {hit.publish_date}
         </span>
       </div>
@@ -344,7 +344,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         {hit.nature && (
           <span
-            className="rounded-full px-2 py-0.5 text-xs"
+            className="rounded-full px-2 py-0.5 text-[11px] leading-none tracking-[.14em]"
             style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--nm-text-secondary)' }}
             title={hit.nature.matched ? `命中關鍵字:${hit.nature.matched}` : '標題沒有可辨識的性質關鍵字'}
           >
@@ -353,7 +353,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
         )}
         {hit.price_band && (
           <span
-            className="rounded-full px-2 py-0.5 text-xs"
+            className="rounded-full px-2 py-0.5 text-[11px] leading-none tracking-[.14em]"
             style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--nm-text-secondary)' }}
           >
             {hit.price_band.label}
@@ -376,7 +376,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
         const known = hit.agency_competition!.tier !== 'none';
         return (
           <p
-            className="mt-2 text-xs"
+            className="mt-2 text-[12px] leading-[1.6]"
             style={{ color: known ? 'var(--nm-text-secondary)' : 'var(--nm-text-muted)' }}
             title={r.hint}
           >
@@ -387,7 +387,7 @@ function TenderCard({ hit }: { hit: TenderHit }) {
 
       <BasePriceCard bp={hit.base_price} />
 
-      <div className="mt-2 text-xs">
+      <div className="mt-2 text-[12px] leading-[1.6]">
         {hasLink ? (
           <a href={hit.source_url} target="_blank" rel="noreferrer" style={{ color: 'var(--nm-text-secondary)' }} className="underline">
             查看標案詳情 →
@@ -469,7 +469,7 @@ export default async function BossTendersMonitorPage({
       />
 
       {isFiltered && (
-        <p className="mt-2 text-center text-xs">
+        <p className="mt-2 text-center text-[12px] leading-[1.6]">
           <a href={buildHref({ days, price: 'all', nature: 'all', pool: 'all' })} className="underline" style={{ color: 'var(--nm-text-faint)' }}>
             清除篩選
           </a>
@@ -482,7 +482,7 @@ export default async function BossTendersMonitorPage({
     <ViewportLock>
       <header className="shrink-0 flex flex-wrap items-center justify-between gap-3 pb-3" style={{ borderBottom: '1px solid var(--nm-border-hair)' }}>
         <div>
-          <div className="flex items-center gap-2 text-xs uppercase tracking-wide" style={{ color: 'var(--nm-text-muted)', letterSpacing: '.18em' }}>
+          <div className="flex items-center gap-2 text-[11px] leading-none uppercase" style={{ color: 'var(--nm-text-muted)', letterSpacing: '.18em' }}>
             <span>標案</span>
             <span
               className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 normal-case tracking-normal"
@@ -496,11 +496,11 @@ export default async function BossTendersMonitorPage({
             </span>
           </div>
           <h1 className="text-2xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>標案監測</h1>
-          <p className="mt-0.5 text-sm tabular-nums" style={{ color: 'var(--nm-text-secondary)' }}>
+          <p className="mt-0.5 text-[13px] leading-[1.6] tabular-nums" style={{ color: 'var(--nm-text-secondary)' }}>
             近 {days} 天命中 {hits.length} 件
             {isFiltered && ` · 篩選後 ${visible.length} 件`}
           </p>
-          <div className="mt-1 flex flex-wrap gap-3 text-xs">
+          <div className="mt-1 flex flex-wrap gap-3 text-[12px] leading-[1.6]">
             <a href="/boss/tenders/agencies" className="underline" style={{ color: 'var(--nm-text-faint)' }}>
               → 機關經營名單
             </a>
@@ -539,7 +539,7 @@ export default async function BossTendersMonitorPage({
 
       {pool === 'retender' && (
         <p
-          className="shrink-0 rounded-xl p-3 text-xs leading-relaxed"
+          className="shrink-0 rounded-xl p-3 text-[12px] leading-[1.6]"
           style={{ background: 'rgba(217,181,107,0.08)', color: 'var(--nm-text-secondary)' }}
         >
           {RETENDER_NOTE}

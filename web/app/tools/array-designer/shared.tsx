@@ -71,7 +71,7 @@ export function InfoTip({ text }: { text: string }) {
       {pos && typeof document !== 'undefined' && createPortal(
         <span
           role="tooltip"
-          className="fixed pointer-events-none -translate-x-1/2 -translate-y-full z-50 w-[240px] text-[11px] leading-relaxed rounded-lg p-2.5 shadow-lg nm-raised-lg"
+          className="fixed pointer-events-none -translate-x-1/2 -translate-y-full z-50 w-[240px] text-[11px] leading-[1.6] rounded-lg p-2.5 shadow-lg nm-raised-lg"
           style={{ top: pos.top, left: pos.left, color: 'var(--nm-text-secondary)' }}
         >
           {text}
@@ -92,7 +92,7 @@ export function NumberField({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-sm inline-flex items-center" style={{ color: 'var(--nm-text-secondary)' }}>
+      <span className="text-[13px] leading-[1.6] inline-flex items-center" style={{ color: 'var(--nm-text-secondary)' }}>
         {label}
         {tip && <InfoTip text={tip} />}
       </span>
@@ -248,7 +248,7 @@ export function SpeakerCovSection({
       <h2 className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>喇叭規格</h2>
       {speakers.length > 0 && (
         <label className="grid gap-1">
-          <span className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>從價目表帶入(選填,僅供對照型號)</span>
+          <span className="text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>從價目表帶入(選填,僅供對照型號)</span>
           <select className="nm-input w-full" value={speakerId} onChange={(e) => onSpeakerChange(e.target.value)}>
             <option value="">— 手動輸入 —</option>
             {speakers.map((s) => (

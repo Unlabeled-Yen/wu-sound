@@ -110,14 +110,14 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
           className="w-full max-h-72 object-contain rounded-2xl nm-inset"
         />
       ) : (
-        <div className="rounded-2xl nm-inset p-6 text-center text-sm" style={{ color: 'var(--nm-text-muted)', border: '1px dashed rgba(255,255,255,0.18)' }}>
+        <div className="rounded-2xl nm-inset p-6 text-center text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-muted)', border: '1px dashed rgba(255,255,255,0.18)' }}>
           無收據
         </div>
       )}
 
       {needManual ? (
         <div
-          className="rounded-xl px-4 py-3 text-sm font-medium"
+          className="rounded-xl px-4 py-3 text-[13px] leading-[1.6] font-medium"
           style={{ background: 'rgba(224,122,122,0.1)', border: '1px solid rgba(224,122,122,0.34)', color: 'var(--nm-danger-glass-text)' }}
         >
           AI 未辨識,請手動填寫
@@ -125,7 +125,7 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
       ) : null}
 
       <div>
-        <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>日期</label>
+        <label className="text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>日期</label>
         <input
           type="date"
           value={spentOn}
@@ -135,7 +135,7 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
       </div>
 
       <div>
-        <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>分類</label>
+        <label className="text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>分類</label>
         <div className="mt-1 grid grid-cols-2 gap-2">
           {CATS.map((c) => (
             <button
@@ -151,7 +151,7 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
       </div>
 
       <div>
-        <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>金額 ($)</label>
+        <label className="text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>金額 ($)</label>
         <input
           type="text"
           inputMode="numeric"
@@ -166,13 +166,13 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
             = ${parseInt(amount, 10).toLocaleString('zh-TW')}
           </p>
         ) : null}
-        <p className="mt-1 text-sm" style={{ color: 'var(--nm-text-muted)' }}>
+        <p className="mt-1 text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-muted)' }}>
           金額由 AI 辨識,連續手寫零容易誤判位數,送出前請對照收據核對金額是否正確。
         </p>
       </div>
 
       <div>
-        <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>品項</label>
+        <label className="text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>品項</label>
         <input
           type="text"
           value={itemText}
@@ -184,7 +184,7 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
 
       {sites.length > 0 ? (
         <div>
-          <label className="text-sm" style={{ color: 'var(--nm-text-secondary)' }}>專案 (選填)</label>
+          <label className="text-[13px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>專案 (選填)</label>
           <select
             value={siteId}
             onChange={(e) => setSiteId(e.target.value)}
@@ -201,7 +201,7 @@ export default function ConfirmForm({ row, receiptUrl, sites }: Props) {
       ) : null}
 
       {error ? (
-        <p className="text-sm" style={{ color: 'var(--nm-danger)' }} role="alert">
+        <p className="text-[13px] leading-[1.6]" style={{ color: 'var(--nm-danger)' }} role="alert">
           {error}
         </p>
       ) : null}
