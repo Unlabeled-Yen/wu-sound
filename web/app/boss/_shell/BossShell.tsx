@@ -87,7 +87,7 @@ export function BossShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <div
-        className="relative z-[1] min-h-screen w-full flex flex-col lg:flex-row lg:p-3.5 lg:gap-3.5"
+        className="relative z-[1] min-h-screen lg:h-screen lg:overflow-hidden w-full flex flex-col lg:flex-row lg:p-3.5 lg:gap-3.5"
         style={{ color: 'var(--nm-text-body)' }}
       >
         {/* ===== Desktop sidebar (≥lg only) ===== */}
