@@ -6,13 +6,10 @@
 // (見 docs/array-designer/spec-v1.md §4)。
 
 import { useId, useRef, useState } from 'react';
-import { Inter } from 'next/font/google';
 import { speakerPositions, depthMarker, unityDots, unityRays, minArrowDepthM } from '@/lib/array-designer';
 
-// lifeflat 視覺語言(見 docs/array-designer/spec-v1.md §5.2):圖表內文字統一
-// Inter,跟 Wu 頁面主體(Noto Sans TC)分開——圖表內容是英數字/座標,適合 Inter
-// 的可數刻度感;頁面中文 UI 不受影響。
-const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700', '800'] });
+// 圖表數字沿用頁面既有字體(Noto Sans TC/PingFang TC),不另外載 Inter——
+// 系統沒有第二套字型;數字對齊靠 tabular-nums,不靠換字型。
 
 // 標線語意色對照原 app 截圖重新校準:Aud/Min/Max/Unity 保留語意色(降飽和),
 // 覆蓋錐原軟體是單色灰線(不是藍色實心)——見 2026-07-28 對照原 app 截圖的視覺
@@ -268,7 +265,7 @@ export default function ArrayCoverageDiagram({
       <svg
         ref={svgRef}
         viewBox={`0 0 ${WIDTH_PX} ${HEIGHT_PX}`}
-        className={`w-full rounded-xl touch-none ${inter.className}`}
+        className="w-full rounded-xl touch-none tabular"
         style={{ background: '#0e1116', cursor: measureActive ? 'crosshair' : dragRef.current ? 'grabbing' : 'grab' }}
         onWheel={onWheel}
         onMouseDown={onMouseDown}

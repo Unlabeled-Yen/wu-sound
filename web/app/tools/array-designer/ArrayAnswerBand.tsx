@@ -40,7 +40,7 @@ export function ArrayAnswerBand({
             <span className="tabular-nums text-[34px] lg:text-[46px]" style={{ fontWeight: 600, lineHeight: 1, color: 'var(--nm-text-primary)', textShadow: '0 1px 3px rgba(0,0,0,.65)' }}>{quantity}</span>
             <span style={{ fontSize: 17, color: 'var(--nm-text-secondary)' }}>支</span>
             <span style={{ fontSize: 22, color: 'var(--nm-text-faint)' }}>／</span>
-            <span className="tabular-nums text-[26px] lg:text-[34px]" style={{ fontWeight: 600, lineHeight: 1, color: 'var(--nm-text-primary)' }}>{fmt(spacingM)}</span>
+            <span className="tabular-nums text-[34px] lg:text-[46px]" style={{ fontWeight: 600, lineHeight: 1, color: 'var(--nm-text-primary)' }}>{fmt(spacingM)}</span>
             <span style={{ fontSize: 17, color: 'var(--nm-text-secondary)' }}>m 間距</span>
           </div>
         </div>
