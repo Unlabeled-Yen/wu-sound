@@ -19,8 +19,25 @@ export interface NavSection {
   key: string;
   label: string;
   items: NavItem[];
+  /** true = 側欄在這個區塊前面畫一條分隔線,跟前面的區塊拉開視覺距離。 */
+  dividerBefore?: boolean;
 }
 
+// ============================================================================
+// 側欄順序——2026-08-15 Yen 明確指定,之後任何人要改順序前請先跟 Yen 確認,
+// 不要因為「看起來該歸類在一起」就自行調整。目前定案的順序與理由:
+//
+//   總覽 → 專案管理 → 報價系統 → 聲學計算 → 設備庫存 → 現場
+//   ────────────────(視覺分隔線,見 dividerBefore)────────────────
+//   財務 → 標案
+//
+// 財務跟標案排到最下面、用分隔線跟上面隔開——這兩塊目前透過
+// app/boss/layout.tsx 的 `if (session.role !== 'boss') redirect('/staff')`
+// 整個 /boss/* 都已經是老闆專屬,並非額外針對這兩塊加權限檢查,只是
+// Yen 這輪明確要求視覺上把它們跟其餘營運頁面分開。
+//
+// 「現場」區塊內部順序(工作記錄/打卡)這輪不動,Yen 表示之後再調整。
+// ============================================================================
 export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'overview',
@@ -28,24 +45,10 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [{ href: '/boss', label: 'Dashboard' }],
   },
   {
-    key: 'finance',
-    label: '財務',
+    key: 'sites',
+    label: '專案管理',
     items: [
-      // 零用金審核維持獨立頁面(手機底部「審核」分頁靠它),但不畫在側欄——
-      // 入口改成帳務首頁的待審 pill 與月結模式的阻擋卡連結。薪資結算原本
-      // 是獨立頁,現在併進帳務管理的「月結」模式(?mode=payroll),
-      // /boss/close 轉址過去,不再需要側欄項目。見
-      // docs/payroll-pettycash-merge-spec.md。
-      { href: '/boss/expenses', label: '零用金管理', hidden: true },
-      { href: '/boss/ledger', label: '帳務管理' },
-    ],
-  },
-  {
-    key: 'acoustic',
-    label: '聲學計算',
-    items: [
-      { href: '/tools/spl-calculator', label: 'SPL 預算計算器' },
-      { href: '/tools/array-designer', label: '陣列設計器', hidden: true },
+      { href: '/boss/sites', label: '專案管理' },
     ],
   },
   {
@@ -58,16 +61,17 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    key: 'acoustic',
+    label: '聲學計算',
+    items: [
+      { href: '/tools/spl-calculator', label: 'SPL 預算計算器' },
+      { href: '/tools/array-designer', label: '陣列設計器', hidden: true },
+    ],
+  },
+  {
     key: 'equipment',
     label: '設備庫存',
     items: [{ href: '/boss/equipment', label: '設備庫存' }],
-  },
-  {
-    key: 'sites',
-    label: '專案管理',
-    items: [
-      { href: '/boss/sites', label: '專案管理' },
-    ],
   },
   {
     key: 'ops',
@@ -75,6 +79,20 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/boss/worklogs', label: '工作記錄' },
       { href: '/boss/clockins', label: '打卡' },
+    ],
+  },
+  {
+    key: 'finance',
+    label: '財務',
+    dividerBefore: true,
+    items: [
+      // 零用金審核維持獨立頁面(手機底部「審核」分頁靠它),但不畫在側欄——
+      // 入口改成帳務首頁的待審 pill 與月結模式的阻擋卡連結。薪資結算原本
+      // 是獨立頁,現在併進帳務管理的「月結」模式(?mode=payroll),
+      // /boss/close 轉址過去,不再需要側欄項目。見
+      // docs/payroll-pettycash-merge-spec.md。
+      { href: '/boss/expenses', label: '零用金管理', hidden: true },
+      { href: '/boss/ledger', label: '帳務管理' },
     ],
   },
   {
