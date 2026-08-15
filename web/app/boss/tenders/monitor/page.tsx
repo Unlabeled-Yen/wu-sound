@@ -16,6 +16,7 @@ import SignalRow from './SignalRow';
 import TrackedList from './TrackedList';
 import RivalDossier from './RivalDossier';
 import TenderRadar from './TenderRadar';
+import IntelLog from './IntelLog';
 import { PriceBand } from './PriceBands';
 
 export const runtime = 'nodejs';
@@ -552,76 +553,109 @@ export default async function BossTendersMonitorPage({
         <SignalRow hits={hits} days={days} price={price} nature={nature} pool={pool} urgent={urgent} fresh={fresh} />
       </div>
 
-      {/* 桌機:雷達＋對手檔案固定在訊號列下方(兩欄),不進捲動區——之前把
-          它們塞進卡片捲動區,結果那塊區域只剩不到 24px 高、實質上看不到、
-          也捲不出東西(2026-08-15 上線後 Yen 回報畫面捲不動,查出來是這個)。
-          手機螢幕本來就不夠高擺兩欄,維持跟著清單一起捲。 */}
-      <div className="hidden lg:grid lg:grid-cols-2 lg:gap-3 shrink-0">
-        <TenderRadar hits={visible} />
-        <RivalDossier />
+      {/* 桌機兩欄:左=雷達/分佈矩陣/追蹤清單/卡片(主分析流),右=對手檔案/
+          情資日誌(側欄式情報流),對照設計 mock。手機螢幕擺不下兩欄,全部
+          倒回單欄跟著整頁捲。 */}
+      <div className="hidden lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)] lg:gap-3">
+        <div className="space-y-3 min-w-0">
+          <TenderRadar hits={visible} />
+          {filterPanel}
+          {pool === 'retender' && (
+            <p
+              className="rounded-xl p-3 text-[12px] leading-[1.6]"
+              style={{ background: 'rgba(217,181,107,0.08)', color: 'var(--nm-text-secondary)' }}
+            >
+              {RETENDER_NOTE}
+            </p>
+          )}
+          {error && (
+            <div
+              className="rounded-xl p-3 text-[13px]"
+              style={{
+                background: 'rgba(224, 122, 122, 0.08)',
+                border: '1px solid rgba(224, 122, 122, 0.34)',
+                color: 'var(--nm-danger-glass-text)',
+              }}
+            >
+              {error}
+            </div>
+          )}
+          {visible.length > 0 && (
+            <>
+              <TrackedList hits={visible} />
+              <ul className="space-y-3">
+                {visible.map((hit) => (
+                  <TenderCard key={hit.id} hit={hit} />
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+        <div className="space-y-3 min-w-0">
+          <RivalDossier />
+          <IntelLog hits={visible} />
+        </div>
       </div>
 
-      {/* 桌機:分佈矩陣固定在上方(地圖不該跟著捲走);手機螢幕不夠高,
-          矩陣跟著清單一起捲,不然清單只剩不到一張卡的高度 */}
-      <div className="hidden lg:block shrink-0">{filterPanel}</div>
-
-      {pool === 'retender' && (
-        <p
-          className="shrink-0 rounded-xl p-3 text-[12px] leading-[1.6]"
-          style={{ background: 'rgba(217,181,107,0.08)', color: 'var(--nm-text-secondary)' }}
-        >
-          {RETENDER_NOTE}
+      {hits.length === 0 && !error && (
+        <p className="hidden lg:block text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+          近 {days} 天沒有命中的標案
         </p>
       )}
-
-      {error && (
-        <div
-          className="shrink-0 rounded-xl p-3 text-[13px]"
-          style={{
-            background: 'rgba(224, 122, 122, 0.08)',
-            border: '1px solid rgba(224, 122, 122, 0.34)',
-            color: 'var(--nm-danger-glass-text)',
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      {hits.length === 0 && !error && (
-        <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>近 {days} 天沒有命中的標案</p>
-      )}
-
       {hits.length > 0 && visible.length === 0 && (
-        <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+        <p className="hidden lg:block text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
           此分類組合沒有案件,
           <a href={buildHref({ days, price: 'all', nature: 'all', pool })} className="underline">回到全部</a>
         </p>
       )}
 
-      {/* 手機版的分佈矩陣＋雷達＋對手檔案跟著整頁捲(桌機版都在上面固定那份,
-          手機螢幕擺不下兩欄固定區塊)。這頁不再用 ViewportLock 鎖死視窗高度——
-          雷達＋對手檔案＋價格帶這些新區塊加進來後,固定區塊本身就超過一個
-          螢幕高,鎖死只會把清單捲動區壓成看不見的一條縫(2026-08-15 修過一次
-          這個 bug)。改成讓外層 main 既有的 lg:overflow-auto 整頁捲動,側欄
-          仍然固定,不受影響。 */}
-      <div className="lg:hidden">{filterPanel}</div>
-      <div className="lg:hidden">
+      {/* 手機版:全部單欄按順序流,不做兩欄——手機螢幕擺不下,且整頁自然
+          捲動,不需要固定區塊。 */}
+      <div className="lg:hidden space-y-3">
+        {filterPanel}
         <TenderRadar hits={visible} />
-      </div>
-      <div className="lg:hidden">
         <RivalDossier />
+        <IntelLog hits={visible} />
+        {pool === 'retender' && (
+          <p
+            className="rounded-xl p-3 text-[12px] leading-[1.6]"
+            style={{ background: 'rgba(217,181,107,0.08)', color: 'var(--nm-text-secondary)' }}
+          >
+            {RETENDER_NOTE}
+          </p>
+        )}
+        {error && (
+          <div
+            className="rounded-xl p-3 text-[13px]"
+            style={{
+              background: 'rgba(224, 122, 122, 0.08)',
+              border: '1px solid rgba(224, 122, 122, 0.34)',
+              color: 'var(--nm-danger-glass-text)',
+            }}
+          >
+            {error}
+          </div>
+        )}
+        {hits.length === 0 && !error && (
+          <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>近 {days} 天沒有命中的標案</p>
+        )}
+        {hits.length > 0 && visible.length === 0 && (
+          <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>
+            此分類組合沒有案件,
+            <a href={buildHref({ days, price: 'all', nature: 'all', pool })} className="underline">回到全部</a>
+          </p>
+        )}
+        {visible.length > 0 && (
+          <>
+            <TrackedList hits={visible} />
+            <ul className="space-y-3">
+              {visible.map((hit) => (
+                <TenderCard key={hit.id} hit={hit} />
+              ))}
+            </ul>
+          </>
+        )}
       </div>
-
-      {visible.length > 0 && (
-        <div className="space-y-3">
-          <TrackedList hits={visible} />
-          <ul className="space-y-3">
-            {visible.map((hit) => (
-              <TenderCard key={hit.id} hit={hit} />
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
