@@ -14,6 +14,7 @@ import { VoidDialog } from './VoidDialog';
 import LedgerRowMobile from './LedgerRowMobile';
 import ReceivableForm from './receivables/ReceivableForm';
 import StatusButtons from './receivables/StatusButtons';
+import EditDueDateButton from './receivables/EditDueDateButton';
 import { buildHref, fmt, monthRange, NO_SITE, type SP } from './ledger-page-helpers';
 
 // 收支兩欄的列表面板統一用這個高度——固定尺寸、內部捲動,篩選/切月份時版面不跳動。
@@ -241,7 +242,10 @@ export async function ReceivablesView({
                 {closed && <span className="nm-pill" style={{ color: 'var(--nm-success-glass-text)', background: 'rgba(126,207,157,0.1)', borderColor: 'rgba(126,207,157,0.28)' }}>已結清</span>}
                 {voided && <span className="nm-pill nm-pill-muted line-through">已作廢</span>}
               </span>
-              <div className="shrink-0"><StatusButtons id={r.id} status={r.status} remainingTwd={r.remaining_twd} direction={direction} /></div>
+              <div className="shrink-0 flex items-center gap-2">
+                {!voided && <EditDueDateButton id={r.id} agreedDueDate={r.agreed_due_date} />}
+                <StatusButtons id={r.id} status={r.status} remainingTwd={r.remaining_twd} direction={direction} />
+              </div>
             </div>
           );
         })}
@@ -275,6 +279,11 @@ export async function ReceivablesView({
                 {voided && <span className="nm-pill nm-pill-muted line-through">已作廢</span>}
                 <StatusButtons id={r.id} status={r.status} remainingTwd={r.remaining_twd} direction={direction} />
               </div>
+              {!voided && (
+                <div className="pt-1" style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
+                  <EditDueDateButton id={r.id} agreedDueDate={r.agreed_due_date} />
+                </div>
+              )}
             </div>
           );
         })}
