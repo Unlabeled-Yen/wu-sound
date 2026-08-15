@@ -202,6 +202,20 @@ body::after {
   opacity: 0.6;
 }
 
+/* Compact glass chip — inline row actions (e.g. 結清/作廢). ≥48px on mobile
+   (touch target), shrinks to the table-row scale on desktop (lg+). Must come
+   after .nm-btn so equal-specificity cascade order lets it win. */
+.nm-btn-compact {
+  padding: 3px 10px;
+  min-height: 48px;
+}
+@media (min-width: 1024px) {
+  .nm-btn-compact {
+    padding: 3px 10px;
+    min-height: auto;
+  }
+}
+
 /* Solid primary CTA — 實心白鈕 (＋ 新增品項 / 新增設備) */
 .nm-btn-solid {
   background: #f0f0f2;

@@ -33,7 +33,7 @@ export default function LedgerRowMobile({ row, showSettledBadge = false }: { row
         </span>
       </div>
 
-      <div className="text-xs flex flex-wrap gap-x-2 gap-y-1" style={{ color: 'var(--nm-text-secondary)' }}>
+      <div className="text-[12px] leading-[1.6] flex flex-wrap gap-x-2 gap-y-1" style={{ color: 'var(--nm-text-secondary)' }}>
         <span>{row.occurred_on}</span>
         {row.party && <span>· {row.party}</span>}
         {row.sites?.name && <span>· {row.sites.name}</span>}
@@ -57,14 +57,14 @@ export default function LedgerRowMobile({ row, showSettledBadge = false }: { row
       </div>
 
       {row.memo && (
-        <div className="text-xs" style={{ color: 'var(--nm-text-secondary)' }}>{row.memo}</div>
+        <div className="text-[12px] leading-[1.6]" style={{ color: 'var(--nm-text-secondary)' }}>{row.memo}</div>
       )}
       {voided && row.voided_reason && (
-        <div className="text-xs" style={{ color: 'var(--nm-text-muted)' }}>作廢原因:{row.voided_reason}</div>
+        <div className="text-[12px] leading-[1.6]" style={{ color: 'var(--nm-text-muted)' }}>作廢原因:{row.voided_reason}</div>
       )}
 
       {!voided && (
-        <div className="flex gap-3 pt-1 text-xs">
+        <div className="flex gap-3 pt-1 text-[12px] leading-[1.6]">
           <Link href={`/boss/ledger/${row.id}`} className="underline" style={{ color: 'var(--nm-text-secondary)' }}>編輯</Link>
           <VoidDialog
             id={row.id}

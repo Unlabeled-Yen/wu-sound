@@ -49,20 +49,20 @@ export default function StatusButtons({ id, status, remainingTwd = 0, direction 
     <div className="flex items-center gap-2">
       {status === 'open' && (
         <>
-          <button type="button" disabled={busy} onClick={onCloseClick} className="nm-btn text-xs" style={{ padding: '3px 10px', minHeight: 'auto' }}>
+          <button type="button" disabled={busy} onClick={onCloseClick} className="nm-btn nm-btn-compact text-[11px] leading-none tracking-[.14em]">
             結清
           </button>
-          <button type="button" disabled={busy} onClick={() => setStatus('voided')} className="nm-btn text-xs" style={{ padding: '3px 10px', minHeight: 'auto' }}>
+          <button type="button" disabled={busy} onClick={() => setStatus('voided')} className="nm-btn nm-btn-compact text-[11px] leading-none tracking-[.14em]">
             作廢
           </button>
         </>
       )}
       {status === 'closed' && (
-        <button type="button" disabled={busy} onClick={() => setStatus('open')} className="nm-btn text-xs" style={{ padding: '3px 10px', minHeight: 'auto' }}>
+        <button type="button" disabled={busy} onClick={() => setStatus('open')} className="nm-btn nm-btn-compact text-[11px] leading-none tracking-[.14em]">
           重新開啟
         </button>
       )}
-      {error && <span className="text-xs" style={{ color: 'var(--nm-danger)' }}>{error}</span>}
+      {error && <span className="text-[12px] leading-[1.6]" style={{ color: 'var(--nm-danger)' }}>{error}</span>}
 
       {confirmOpen && (
         <div

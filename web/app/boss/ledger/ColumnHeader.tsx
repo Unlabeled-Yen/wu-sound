@@ -50,13 +50,13 @@ export function ColumnHeader({
 
       {/* 幾何編碼:實心＝已收付,空心描邊塊＝未收未付,邊界硬切,不用斜紋、不只靠顏色。 */}
       <div className="mt-3">
-        <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)', gap: settledAmount > 0 && unsettledAmount > 0 ? 2 : 0 }}>
-          {settledAmount > 0 && <div className="rounded-sm" style={{ width: `${settledPct}%`, background: toneColor }} />}
+        <div className="flex h-2.5 overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 3, gap: settledAmount > 0 && unsettledAmount > 0 ? 2 : 0 }}>
+          {settledAmount > 0 && <div style={{ width: `${settledPct}%`, borderRadius: 3, background: toneColor }} />}
           {unsettledAmount > 0 && (
-            <div className="rounded-sm" style={{ width: `${100 - settledPct}%`, border: `2px solid ${toneColor}`, background: 'transparent' }} />
+            <div style={{ width: `${100 - settledPct}%`, borderRadius: 3, border: `2px solid ${toneColor}`, background: 'transparent' }} />
           )}
         </div>
-        <div className="flex justify-between text-xs mt-1.5">
+        <div className="flex justify-between text-[11px] leading-none tracking-[.14em] mt-1.5">
           <Link href={settledHref} className="underline" style={{ color: 'var(--nm-text-secondary)' }}>{settledLabel} ${fmt(settledAmount)}</Link>
           <Link href={unsettledHref} className="underline" style={{ color: 'var(--nm-text-secondary)' }}>{unsettledLabel} ${fmt(unsettledAmount)}</Link>
         </div>
@@ -67,7 +67,7 @@ export function ColumnHeader({
           {ranking.map((r) => {
             const barPct = (r.amount / maxRank) * 100;
             const content = (
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-[11px] leading-none tracking-[.14em]">
                 <span className="truncate w-16 shrink-0" style={{ color: 'var(--nm-text-secondary)' }}>{r.label}</span>
                 <span className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
                   <span className="block h-full rounded-full" style={{ width: `${barPct}%`, background: toneColor }} />
