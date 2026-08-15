@@ -18,7 +18,7 @@ import {
 
 // Hot routes prefetched on mount so first-click nav is instant
 // 陣列設計器頁面較重(畫布互動),不預抓,避免拖慢一般導覽
-const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/close', '/boss/ledger', '/boss/quotes', '/tools/spl-calculator'];
+const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/ledger', '/boss/quotes', '/tools/spl-calculator'];
 
 function useBossShellData() {
   const router = useRouter();
@@ -101,13 +101,16 @@ export function BossShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="flex-1 px-3 py-3.5 overflow-y-auto flex flex-col gap-[22px]">
-            {NAV_SECTIONS.map((section) => (
-              <SectionGroup
-                key={section.key}
-                section={section}
-                pathname={pathname}
-              />
-            ))}
+            {NAV_SECTIONS.map((section) =>
+              section.dividerBefore ? (
+                <div key={section.key} className="flex flex-col gap-3">
+                  <div style={{ borderTop: '1px solid var(--nm-border-hair)', margin: '0 4px' }} />
+                  <SectionGroup section={section} pathname={pathname} />
+                </div>
+              ) : (
+                <SectionGroup key={section.key} section={section} pathname={pathname} />
+              ),
+            )}
           </nav>
 
           <div className="p-3 space-y-0.5" style={{ borderTop: '1px solid var(--nm-border-hair)' }}>

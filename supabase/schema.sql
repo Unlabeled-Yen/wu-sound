@@ -158,15 +158,23 @@ create table audit_log (
 create index audit_log_ts_idx on audit_log (ts desc);
 
 -- voice-lab Lab 1:語音/打字介面,任務(派工最小版)。見 voice-lab/lab1-wu-adapter-spec-v1.md §3。
+-- 看板化(四欄)+ 卡片欄位見 06-project-board.md 11a §4、08-專案管理新建清單.md §1、
+-- migrations/020。site_id 可空:「先記,後歸案」,現場猜不出案子時掛 null。
 create table tasks (
   id uuid primary key default gen_random_uuid(),
-  site_id uuid not null references sites(id),
+  site_id uuid references sites(id),
   title text not null,
   description text,
   due_date date,
-  status text not null default 'open' check (status in ('open', 'done')),
+  status text not null default 'todo' check (status in ('decide', 'todo', 'blocked', 'done')),
   created_by uuid not null references users(id),
   source text not null default 'web' check (source in ('voice', 'text', 'web')),
+  tags text[] not null default '{}',
+  photos jsonb not null default '[]',
+  upload_pending boolean not null default false,
+  blocked_on text,
+  blocked_since timestamptz,
+  completed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -192,6 +200,25 @@ create table write_proposals (
 
 create index write_proposals_expiry_idx on write_proposals (expires_at);
 
+-- 場地知識:跨案子、掛地點(不掛案子)的長效筆記。見 06-project-board.md 11c、
+-- 08-專案管理新建清單.md §1、migrations/022。進場必讀上限 5 條是刻意的摩擦,
+-- app 層強制(validatePin),不下 DB constraint。
+create table site_knowledge (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references sites(id),
+  body text not null,
+  hall text,
+  pinned boolean not null default false,
+  promoted_to_checklist boolean not null default false,
+  author_id uuid not null references users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  last_viewed_at timestamptz
+);
+
+create index site_knowledge_site_idx on site_knowledge (site_id);
+create index site_knowledge_site_pinned_idx on site_knowledge (site_id) where pinned = true;
+
 -- updated_at 自動維護
 create or replace function bump_updated_at() returns trigger as $$
 begin new.updated_at = now(); return new; end $$ language plpgsql;
@@ -201,6 +228,9 @@ before update on expenses for each row execute function bump_updated_at();
 
 create trigger tasks_bump_updated
 before update on tasks for each row execute function bump_updated_at();
+
+create trigger site_knowledge_bump_updated
+before update on site_knowledge for each row execute function bump_updated_at();
 
 -- Phase 2:大型設備位置追蹤
 create type equipment_category as enum (
@@ -357,8 +387,10 @@ create index ledger_state_idx on ledger_entries (state);
 create index ledger_journal_idx on ledger_entries (journal);
 create index ledger_to_check_idx on ledger_entries (to_check) where to_check = true;
 -- 只鎖「還算數」的列(state<>voided),作廢後同批同人才能重新匯入。見 migrations/017。
+-- kind 在唯一鍵裡(見 migrations/024):同一人同一批次可以同時有薪資/獎金/代墊
+-- 三筆不同 kind 的分錄共存,只防同一種分錄被重複匯入。
 create unique index ledger_batch_party_uidx
-  on ledger_entries (source_batch_id, party)
+  on ledger_entries (source_batch_id, party, kind)
   where source_batch_id is not null and state <> 'voided';
 create unique index ledger_recurring_month_uidx
   on ledger_entries (recurring_template_id, date_trunc('month', occurred_on::timestamp))
@@ -423,6 +455,24 @@ create table user_pay_profiles (
 
 create unique index user_pay_profiles_uidx on user_pay_profiles (user_id, effective_from);
 create index user_pay_profiles_user_idx on user_pay_profiles (user_id, effective_from desc);
+
+-- 月結鎖定前的獎金草稿。見 migrations/023。
+create table payroll_bonuses (
+  id uuid primary key default gen_random_uuid(),
+  batch_month date not null,
+  user_id uuid not null references users(id),
+  amount_twd integer not null check (amount_twd > 0),
+  memo text,
+  created_by uuid not null references users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (batch_month, user_id)
+);
+
+create index payroll_bonuses_month_idx on payroll_bonuses (batch_month);
+
+create trigger payroll_bonuses_bump_updated
+before update on payroll_bonuses for each row execute function bump_updated_at();
 
 -- 月結凍結快照(第二批:工時↔薪資鎖定機制上線後才會寫入,先建骨架)
 create table monthly_cost_rates (
@@ -585,6 +635,7 @@ alter table bundle_lines enable row level security;
 alter table line_bind_codes enable row level security;
 alter table tasks enable row level security;
 alter table write_proposals enable row level security;
+alter table site_knowledge enable row level security;
 -- 只有 service_role 能存取(anon 全部拒絕),應用端一律由 server 走。
 -- 若日後改用 Supabase Auth,改為以 auth.uid() 比對 users.id 即可。
 -- user_pay_profiles/monthly_cost_rates 額外強調:即使 service_role 繞過 RLS,

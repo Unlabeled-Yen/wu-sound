@@ -218,6 +218,27 @@ export interface SiteRecord {
   created_at: string;
 }
 
+// 月結:固定月薪(生效日期制)+ 獎金草稿。見 docs/payroll-pettycash-merge-spec.md、migrations/023。
+export interface PayProfile {
+  id: string;
+  user_id: string;
+  monthly_salary_twd: number;
+  effective_from: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface PayrollBonus {
+  id: string;
+  batch_month: string;
+  user_id: string;
+  amount_twd: number;
+  memo: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ReceivableDirection = 'receivable' | 'payable';
 export type ReceivableStatus = 'open' | 'closed' | 'voided';
 
@@ -353,21 +374,71 @@ export const QUOTE_STATUS_LABEL: Record<QuoteStatus,string> = { draft:'草稿', 
 export interface BundleTemplate { id:string; name:string; applicable_to:string|null; note:string|null; active:boolean; created_at:string; updated_at:string; }
 export interface BundleLine { id:string; bundle_id:string; catalog_item_id:string|null; name:string; spec:string|null; qty:number; unit:string|null; section:QuoteLineSection; sort_order:number; created_at:string; }
 
-// 場地知識:案場累積的經驗筆記,依廳別分群,可釘選(上限 5),可升級為檢查表項目
-export interface SiteNote {
-  id: string;
-  site_id: string;
-  zone: string;
-  content: string;
-  is_pinned: boolean;
-  is_checklist: boolean;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
 // voice-lab Lab 1:語音/打字介面 — 任務(派工最小版)+ 兩階段寫入提案
 export type VoiceTaskStatus = 'open' | 'done';
 export type VoiceSource = 'voice' | 'text' | 'web';
 export interface VoiceTask { id:string; site_id:string; title:string; description:string|null; due_date:string|null; status:VoiceTaskStatus; created_by:string; source:VoiceSource; created_at:string; updated_at:string; }
 export interface WriteProposal { token:string; action:'create_task'|'log_note'; payload:Record<string,unknown>; payload_hash:string; actor_id:string; source:'voice'|'text'; transcript_ref:string|null; capture_ref:string|null; created_at:string; expires_at:string; used_at:string|null; result:Record<string,unknown>|null; }
+
+// 專案管理一案一工作面(06-project-board.md、08-專案管理新建清單.md)。
+// tasks 表已從上面 VoiceTaskStatus 的兩態擴成四欄看板,這裡是看板版的型別——
+// VoiceTaskStatus/VoiceTask 留給 voice-lab 既有程式碼用,不動它們。
+export type TaskStatus = 'decide' | 'todo' | 'blocked' | 'done';
+
+export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
+  decide: '要老闆決定',
+  todo: '待辦',
+  blocked: '卡住・等料',
+  done: '完成',
+};
+
+export const TASK_STATUS_ORDER: TaskStatus[] = ['decide', 'todo', 'blocked', 'done'];
+
+export const TASK_TAGS = ['urgent', 'order', 'build', 'complaint', 'quote', 'maintain'] as const;
+export type TaskTag = typeof TASK_TAGS[number];
+
+export const TASK_TAG_LABEL: Record<TaskTag, string> = {
+  urgent: '急',
+  order: '叫料',
+  build: '施工',
+  complaint: '客訴',
+  quote: '報價',
+  maintain: '保養',
+};
+
+export interface TaskPhoto { path: string }
+
+export interface Task {
+  id: string;
+  /** null = 待歸案(現場猜不出案子) */
+  site_id: string | null;
+  status: TaskStatus;
+  title: string;
+  tags: TaskTag[];
+  /** 建立者即負責人,無指派流程——DB 欄位沿用既有的 created_by,不是 owner_id */
+  created_by: string;
+  /** status='blocked' 時必填 */
+  blocked_on: string | null;
+  /** 移入 blocked 的時間點,用來算「已卡 N 天」——不是 created_at */
+  blocked_since: string | null;
+  due_date: string | null;
+  photos: TaskPhoto[];
+  upload_pending: boolean;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface SiteKnowledge {
+  id: string;
+  site_id: string;
+  body: string;
+  hall: string | null;
+  pinned: boolean;
+  promoted_to_checklist: boolean;
+  author_id: string;
+  created_at: string;
+  updated_at: string;
+  last_viewed_at: string | null;
+}
+
+export const SITE_KNOWLEDGE_PIN_LIMIT = 5;
