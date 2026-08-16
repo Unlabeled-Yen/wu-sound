@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { TASK_STATUS_LABEL, TASK_TAG_LABEL, type Task, type TaskStatus, type TaskTag } from '@/lib/types';
 
 interface Props {
@@ -15,7 +16,17 @@ function daysStuck(blockedSince: string): number {
 
 export default function TaskCard({ task, onRequestMove, onDragStart }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const cover = task.photos.length > 0 ? task.photos[0] : null;
+
+  function toggleMenu() {
+    if (!menuOpen) {
+      const r = menuBtnRef.current?.getBoundingClientRect();
+      if (r) setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+    setMenuOpen((v) => !v);
+  }
   const days = task.status === 'blocked' && task.blocked_since ? daysStuck(task.blocked_since) : null;
   const isDone = task.status === 'done';
 
@@ -91,13 +102,16 @@ export default function TaskCard({ task, onRequestMove, onDragStart }: Props) {
             ) : task.due_date ? (
               <span className="tabular-nums" style={{ font: '400 10.5px/1 var(--font-geist-mono),monospace', color: isDone ? '#6d6e73' : '#8a8b90' }}>{task.due_date}</span>
             ) : null}
-            <button type="button" onClick={() => setMenuOpen((v) => !v)} className="nm-focus px-1" aria-label="改狀態" style={{ color: '#6d6e73' }}>
+            <button ref={menuBtnRef} type="button" onClick={toggleMenu} className="nm-focus px-1" aria-label="改狀態" style={{ color: '#6d6e73' }}>
               ⋯
             </button>
-            {menuOpen && (
+            {/* 掛 portal 到 body,不是原地 absolute——卡片本身用 overflow:hidden
+                裁圖片圓角,欄位又是 overflow-y-auto 的捲動容器,選單原地展開
+                一定會被兩層裁掉一半,z-index 開再高都沒用。 */}
+            {menuOpen && menuPos && typeof document !== 'undefined' && createPortal(
               <div
-                className="absolute right-0 z-10 mt-1 rounded-xl p-1"
-                style={{ top: '100%', width: 140, background: 'rgba(24,24,28,.92)', border: '1px solid rgba(255,255,255,.17)', boxShadow: '0 24px 70px -28px rgba(0,0,0,.85)' }}
+                className="fixed z-50 rounded-xl p-1"
+                style={{ top: menuPos.top, right: menuPos.right, width: 140, background: 'rgba(24,24,28,.92)', border: '1px solid rgba(255,255,255,.17)', boxShadow: '0 24px 70px -28px rgba(0,0,0,.85)' }}
                 onMouseLeave={() => setMenuOpen(false)}
               >
                 {(Object.keys(TASK_STATUS_LABEL) as TaskStatus[])
@@ -113,7 +127,8 @@ export default function TaskCard({ task, onRequestMove, onDragStart }: Props) {
                       移到「{TASK_STATUS_LABEL[s]}」
                     </button>
                   ))}
-              </div>
+              </div>,
+              document.body,
             )}
           </div>
         </div>
