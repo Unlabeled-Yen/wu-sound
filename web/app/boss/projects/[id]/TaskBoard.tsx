@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TASK_STATUS_LABEL, TASK_STATUS_ORDER, type Task, type TaskStatus } from '@/lib/types';
 import { validateTaskMove } from '@/lib/task-validation';
@@ -29,6 +29,12 @@ const COLUMN_LABEL_COLOR: Record<TaskStatus, string> = {
 export default function TaskBoard({ initialTasks, archivedDoneCount }: Props) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
+  // router.refresh() 讓 server 重抓資料、傳新的 initialTasks 進來,但 useState
+  // 的初始值只吃第一次掛載那份——不補這個 effect,「記一筆」送出後畫面永遠
+  // 是舊的一份任務清單,看起來像沒反應。
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [pendingBlock, setPendingBlock] = useState<string | null>(null);
   const [reason, setReason] = useState('');
