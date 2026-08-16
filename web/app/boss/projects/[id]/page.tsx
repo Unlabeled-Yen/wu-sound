@@ -116,14 +116,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </div>
           <div className="flex items-center gap-2.5">
             <div className="nm-btn" style={{ minHeight: 40, display: 'flex', alignItems: 'center', padding: '0 14px', fontSize: '12.5px' }}>篩選</div>
-            <div
-              className="nm-btn"
-              style={{ minHeight: 40, display: 'flex', alignItems: 'center', padding: '0 14px', fontSize: '12.5px', opacity: 0.4, cursor: 'not-allowed' }}
-              aria-disabled="true"
-              title="出車前檢查表尚未接上,下一輪再做"
-            >
-              出車前檢查表
-            </div>
             <QuickCaptureButton siteId={site.id} />
           </div>
         </div>
