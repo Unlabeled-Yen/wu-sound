@@ -7,7 +7,15 @@ function fmt(n: number, digits = 1): string {
 }
 
 const DEPTH_SCALE_MAX = 9;
-const pct = (m: number) => Math.max(0, Math.min(100, (m / DEPTH_SCALE_MAX) * 100));
+// autoMode() 的角度幾何(lib/array-designer.ts)用 Math.sin/cos 算 rangeMinM 等值,
+// server/client 末位可能有 ULP 級差異——四捨五入到 4 位小數再拿去算位置與塞進
+// data-value,避免 React hydration mismatch(同一顆坑,ArrayCoverageDiagram.tsx
+// 的 round3 已經踩過一次)。fmt() 顯示用的 1 位小數不受影響。
+function round(v: number, digits = 4): number {
+  const f = 10 ** digits;
+  return Math.round(v * f) / f;
+}
+const pct = (m: number) => round(Math.max(0, Math.min(100, (m / DEPTH_SCALE_MAX) * 100)));
 
 export function ArrayPanelHeader({
   quantity, spacingM, audienceDistM, inRange, tooClose,
@@ -30,6 +38,12 @@ export function ArrayPanelHeader({
   const maxPct = pct(rangeMaxM);
   const audPct = pct(audienceDistM);
   const limitPct = pct(limitDepthM);
+  // data-value 也要圓,不然 §8 驗收 script 用它反推百分比時,同一顆 ULP 誤差
+  // 又會出現在數字本身(即使畫面位置已經圓過)。
+  const rangeMinV = round(rangeMinM);
+  const rangeMaxV = round(rangeMaxM);
+  const audienceDistV = round(audienceDistM);
+  const limitDepthV = round(limitDepthM);
 
   return (
     <div className="flex-none relative flex items-center gap-[22px]">
@@ -62,19 +76,22 @@ export function ArrayPanelHeader({
         </span>
       </div>
 
-      <div className="flex-1 min-w-0 relative" style={{ height: 40, borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 22 }}>
+      {/* overflow:hidden 是安全網——Limit 有時會超出 0–9m 軸(clamp 到 100%),
+          標籤文字本身還是會往右溢出容器,沒有這道牆會把整頁撐出水平捲動
+          (§7 禁止捲動是第一要件,寧可裁字也不能破頁面寬度)。 */}
+      <div className="flex-1 min-w-0 relative overflow-hidden" style={{ height: 40, borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 22 }}>
         <div className="absolute" style={{ left: 22, right: 0, top: 13, height: 14, borderRadius: 3, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)' }} />
         {maxPct > minPct && (
           <div
             className="absolute"
-            data-ruler-mark data-value={rangeMinM}
+            data-ruler-mark data-value={rangeMinV}
             style={{ left: `calc(22px + ${minPct}%)`, width: `${maxPct - minPct}%`, top: 13, height: 14, background: 'rgba(126,207,157,.34)' }}
           />
         )}
-        <div className="absolute" data-ruler-mark data-value={rangeMinM} style={{ left: `calc(22px + ${minPct}%)`, top: 8, width: 1.5, height: 24, background: '#e07a7a' }} />
-        <div className="absolute" data-ruler-mark data-value={rangeMaxM} style={{ left: `calc(22px + ${maxPct}%)`, top: 8, width: 1.5, height: 24, background: '#e07a7a' }} />
-        <div className="absolute" data-ruler-mark data-value={limitDepthM} style={{ left: `calc(22px + ${limitPct}%)`, top: 8, width: 1.5, height: 24, background: '#8b8f98' }} />
-        <div className="absolute" data-ruler-mark data-value={audienceDistM} style={{ left: `calc(22px + ${audPct}%)`, top: 5, width: 3, height: 30, background: '#a068d5', boxShadow: '0 0 8px rgba(160,104,213,.6)' }} />
+        <div className="absolute" data-ruler-mark data-value={rangeMinV} style={{ left: `calc(22px + ${minPct}%)`, top: 8, width: 1.5, height: 24, background: '#e07a7a' }} />
+        <div className="absolute" data-ruler-mark data-value={rangeMaxV} style={{ left: `calc(22px + ${maxPct}%)`, top: 8, width: 1.5, height: 24, background: '#e07a7a' }} />
+        <div className="absolute" data-ruler-mark data-value={limitDepthV} style={{ left: `calc(22px + ${limitPct}%)`, top: 8, width: 1.5, height: 24, background: '#8b8f98' }} />
+        <div className="absolute" data-ruler-mark data-value={audienceDistV} style={{ left: `calc(22px + ${audPct}%)`, top: 5, width: 3, height: 30, background: '#a068d5', boxShadow: '0 0 8px rgba(160,104,213,.6)' }} />
         <span className="absolute tabular-nums" style={{ left: `calc(22px + ${minPct}% - 13px)`, top: -4, font: '400 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace', color: '#e5a0a0' }}>{fmt(rangeMinM)}</span>
         <span className="absolute tabular-nums" style={{ left: `calc(22px + ${audPct}% + 7px)`, top: -4, font: '500 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace', color: '#c39ae8' }}>Aud {fmt(audienceDistM)}</span>
         <span className="absolute tabular-nums" style={{ left: `calc(22px + ${maxPct}% - 13px)`, top: -4, font: '400 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace', color: '#e5a0a0' }}>{fmt(rangeMaxM)}</span>

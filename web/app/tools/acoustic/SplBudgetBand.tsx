@@ -146,6 +146,7 @@ export function SplBudgetBand({ speakers, amps, initialSpeakerId, onRecommendedC
         recommendedM={result.recommendedMaxThrowM}
         theoreticalM={result.theoreticalMaxThrowM}
         checkDistanceM={hasCheckDistance ? checkDistanceNum : null}
+        refDistanceM={input.refDistanceM}
       />
       <SplBudgetCell
         effectiveMaxSplDb={effectiveMaxSplDb}

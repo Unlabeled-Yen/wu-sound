@@ -76,7 +76,7 @@ export function SplInputsCell({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex-none flex flex-col gap-[5px]" style={{ width: 270, borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 20 }}>
+    <div className="flex-none relative flex flex-col gap-[5px]" style={{ width: 270, borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 20 }}>
       <div className="flex items-center justify-between">
         <span className="uppercase" style={{ font: '400 10px/1 "Noto Sans TC",sans-serif', letterSpacing: '.16em', color: '#6d6e73' }}>條件</span>
         <div className="flex items-center gap-2">
@@ -97,8 +97,10 @@ export function SplInputsCell({
         <Row label="疊加" value={stereoSumDb || '—'} />
       </div>
 
+      {/* 絕對定位浮層,理由同 SplBudgetCell 的「怎麼來的 ▾」——SPL 帶只有 132px
+          高,展開的完整表單用 flow 排版會被外層 overflow:hidden 裁掉。 */}
       {open && (
-        <div className="mt-1 flex flex-col gap-2 rounded-lg p-2.5" style={{ background: 'rgba(8,8,10,.4)', border: '1px solid rgba(255,255,255,.11)' }}>
+        <div className="absolute z-20 flex flex-col gap-2 rounded-lg p-2.5" style={{ top: 24, right: 0, width: 260, background: '#131317', border: '1px solid rgba(255,255,255,.13)', boxShadow: '0 8px 24px rgba(0,0,0,.5)' }}>
           {speakers.length > 0 && (
             <div>
               <div style={{ font: '400 9.5px/1 "Noto Sans TC",sans-serif', color: '#6d6e73', marginBottom: 3 }}>喇叭</div>

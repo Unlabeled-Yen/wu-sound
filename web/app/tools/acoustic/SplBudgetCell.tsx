@@ -35,8 +35,11 @@ export function SplBudgetCell({
   ampMatch: AmpMatchResult | null;
 }) {
   const [open, setOpen] = useState(false);
-  const denom = 43.5;
-  const segWidth = (v: number) => Math.max(0, (v / denom) * 100);
+  // §3-3 的 JSON 範例把 denominator 寫死 43.5,但那是範例輸入(25.5+12+6)算出來的
+  // 總和,不是常數——分母要等於三段的總和,否則換一組輸入三段寬度就不會等於
+  // 100%(輕則比例跑掉,重則把 SPL 帶撐出頁面寬度,§8 檢查一的不捲動就會炸)。
+  const denom = budgetDb + dynamicHeadroomDb + safetyMarginDb;
+  const segWidth = (v: number) => (denom > 0 ? Math.max(0, (v / denom) * 100) : 0);
 
   const verdict = ampMatch ? VERDICT_TEXT[ampMatch.verdict](fmt(Math.abs(ampMatch.gapDb)), fmt(ampDrive?.ampDriveSplDb ?? 0), fmt(speakerMaxSplDb)) : `採喇叭規格值 ${fmt(speakerMaxSplDb)}`;
   const verdictColor = ampMatch ? VERDICT_COLOR[ampMatch.verdict] : '#e7ca8c';
@@ -46,7 +49,7 @@ export function SplBudgetCell({
   const spkPct = ampDrive ? Math.min(100, (speakerMaxSplDb / scale) * 100) : 0;
 
   return (
-    <div className="flex-none flex flex-col" style={{ width: 238, borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 20 }}>
+    <div className="flex-none relative flex flex-col" style={{ width: 238, borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 20 }}>
       <div className="flex items-center gap-[2px]" style={{ height: 8 }}>
         <div data-budget-seg data-db={budgetDb} style={{ width: `${segWidth(budgetDb)}%`, height: 8, background: 'rgba(95,201,191,.5)', borderRadius: 2 }} />
         <div data-budget-seg data-db={dynamicHeadroomDb} style={{ width: `${segWidth(dynamicHeadroomDb)}%`, height: 8, border: '1.5px solid #d9b56b', background: 'rgba(217,181,107,.14)', borderRadius: 2, boxSizing: 'border-box' }} />
@@ -61,8 +64,11 @@ export function SplBudgetCell({
       <button type="button" onClick={() => setOpen((v) => !v)} className="text-left mt-1.5 underline w-fit" style={{ font: '400 10.5px/1 "Noto Sans TC",sans-serif', color: '#6d6e73' }}>
         怎麼來的 {open ? '▴' : '▾'}
       </button>
+      {/* 絕對定位浮層,不是正常流——SPL 帶只有 132px 高,展開內容用 flow 排版
+          會被 AcousticWorkbench 的 overflow:hidden 硬裁掉(跟 ArrayPanelHeader
+          的圖例說明 ▾ 用同一招)。 */}
       {open && (
-        <div className="mt-2 rounded-lg p-2.5" style={{ background: 'rgba(8,8,10,.4)', border: '1px solid rgba(255,255,255,.11)' }}>
+        <div className="absolute z-20 rounded-lg p-2.5" style={{ top: 40, left: 0, width: 260, background: '#131317', border: '1px solid rgba(255,255,255,.13)', boxShadow: '0 8px 24px rgba(0,0,0,.5)' }}>
           <div style={{ font: '400 10.5px/1.7 "Noto Sans TC",sans-serif', color: '#8a8b90' }}>
             有效最大音壓 {fmt(effectiveMaxSplDb)} ＋ 聲道疊加 {fmt(stereoSumDb)} － 目標音壓 {fmt(targetSplDb)} ＝ {fmt(budgetDb + dynamicHeadroomDb + safetyMarginDb)} dB 可分配
           </div>
