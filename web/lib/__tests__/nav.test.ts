@@ -60,8 +60,7 @@ describe('findActiveSection / findActiveItemLabel', () => {
     ['/boss/tenders', '標案', '資料進度板'],
     ['/boss/tenders/monitor', '標案', '標案監測'],
     ['/boss/users', '設定', '使用者管理'],
-    ['/tools/spl-calculator', '聲學計算', 'SPL 預算計算器'],
-    ['/tools/array-designer', '聲學計算', '陣列設計器'],
+    ['/tools/acoustic', '聲學計算', '聲學計算'],
   ];
 
   for (const [path, section, item] of cases) {
