@@ -4,7 +4,8 @@ import { useState } from 'react';
 
 // 改月薪=新增一筆新生效日紀錄,不覆寫舊的——見 lib/payroll.ts 的生效日期制說明。
 // 預設生效日=今天,老闆可改成過去/未來日期(例如這個月才調薪,補一筆本月生效)。
-export default function PayProfileButton({ userId, currentSalary }: { userId: string; currentSalary: number | null }) {
+// month=目前月結中心正在看的月份,如果那個月已經結算過,存完會立刻同步。
+export default function PayProfileButton({ userId, currentSalary, month }: { userId: string; currentSalary: number | null; month: string }) {
   const [editing, setEditing] = useState(false);
   const [salary, setSalary] = useState(currentSalary ? String(currentSalary) : '');
   const [effectiveFrom, setEffectiveFrom] = useState(() => new Date().toISOString().slice(0, 10));
@@ -20,7 +21,7 @@ export default function PayProfileButton({ userId, currentSalary }: { userId: st
       const res = await fetch('/api/payroll/pay-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, monthly_salary_twd: amount, effective_from: effectiveFrom }),
+        body: JSON.stringify({ user_id: userId, monthly_salary_twd: amount, effective_from: effectiveFrom, month }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || '設定失敗');

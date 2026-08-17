@@ -34,10 +34,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (before.source_batch_id) {
     for (const f of BATCH_LOCKED_FIELDS) {
       if (f in body && body[f] !== undefined && body[f] !== (before as unknown as Record<string, unknown>)[f]) {
-        return NextResponse.json(
-          { error: '自動匯入的紀錄不可改金額,只能補備註' },
-          { status: 400 },
-        );
+        const isPayroll = before.kind === 'salary' || before.kind === 'bonus' || before.kind === 'reimbursement';
+        const msg = isPayroll
+          ? '這筆由月結管理,到帳務的「月結」模式修改薪資/獎金/代墊,存檔會自動同步這筆分錄'
+          : '自動匯入的紀錄不可改金額,只能補備註';
+        return NextResponse.json({ error: msg }, { status: 400 });
       }
     }
   }

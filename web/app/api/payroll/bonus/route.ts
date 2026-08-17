@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { findPayrollBatchId, syncPayrollMonth } from '@/lib/payroll-sync-server';
 
 export const runtime = 'nodejs';
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
-// 獎金鎖定前可改(upsert),鎖定後(該月已有 book_batches)一律唯讀——
-// 已經轉成 ledger_entries 的獎金不能再從這裡動,要改要走帳務本身的作廢/改分錄。
+// 獎金隨時可改,不分「鎖定前後」——這個月如果已經結算過(book_batches 存在),
+// 存完獎金立刻同步,帳務分錄當場跟上;還沒結算過的月份只是存草稿,不主動
+// 生出批次(那要老闆在月結中心明確按「送出結算」)。
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
@@ -32,28 +34,28 @@ export async function POST(req: Request) {
   const batchMonth = `${month}-01`;
   const sb = getSupabaseAdmin();
 
-  const locked = await sb.from('book_batches').select('id').eq('month', batchMonth).maybeSingle();
-  if (locked.error) return NextResponse.json({ error: `查詢失敗: ${locked.error.message}` }, { status: 500 });
-  if (locked.data) return NextResponse.json({ error: '這個月已經鎖定,獎金不能再改' }, { status: 409 });
-
   if (amount === 0) {
     const del = await sb.from('payroll_bonuses').delete().eq('batch_month', batchMonth).eq('user_id', userId);
     if (del.error) return NextResponse.json({ error: `刪除失敗: ${del.error.message}` }, { status: 500 });
-    return NextResponse.json({ row: null });
+  } else {
+    const upsert = await sb
+      .from('payroll_bonuses')
+      .upsert(
+        { batch_month: batchMonth, user_id: userId, amount_twd: amount, memo, created_by: session.id },
+        { onConflict: 'batch_month,user_id' },
+      )
+      .select('*')
+      .single();
+    if (upsert.error || !upsert.data) {
+      return NextResponse.json({ error: `儲存失敗: ${upsert.error?.message ?? 'unknown'}` }, { status: 500 });
+    }
   }
 
-  const upsert = await sb
-    .from('payroll_bonuses')
-    .upsert(
-      { batch_month: batchMonth, user_id: userId, amount_twd: amount, memo, created_by: session.id },
-      { onConflict: 'batch_month,user_id' },
-    )
-    .select('*')
-    .single();
-
-  if (upsert.error || !upsert.data) {
-    return NextResponse.json({ error: `儲存失敗: ${upsert.error?.message ?? 'unknown'}` }, { status: 500 });
+  const batchId = await findPayrollBatchId(sb, month);
+  if (batchId) {
+    const sync = await syncPayrollMonth(sb, batchId, month, session.id);
+    if (!sync.ok) return NextResponse.json({ error: `獎金已存,但同步到帳務失敗: ${sync.error}` }, { status: 500 });
   }
 
-  return NextResponse.json({ row: upsert.data });
+  return NextResponse.json({ ok: true, synced: batchId !== null });
 }
