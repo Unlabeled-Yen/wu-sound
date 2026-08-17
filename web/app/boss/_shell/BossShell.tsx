@@ -190,11 +190,11 @@ export function BossShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div
-            className="flex-1 lg:overflow-auto px-[22px] pt-[18px] lg:px-8 lg:pt-6 lg:pb-8"
-            style={{
-              color: 'var(--nm-text-body)',
-              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
-            }}
+            // 底部安全區留白只有手機用(要避開固定在螢幕底部的分頁列),桌機沒有那條
+            // nav——用 class 而非 inline style 設定,inline style 的優先權會蓋掉
+            // lg: 這個斷點版本,底部留白在桌機永遠修不掉。
+            className="flex-1 lg:overflow-auto lg:flex lg:flex-col px-[22px] pt-[18px] lg:px-8 lg:pt-6 pb-[calc(env(safe-area-inset-bottom,0px)+96px)] lg:pb-8"
+            style={{ color: 'var(--nm-text-body)' }}
           >
             <div className="lg:contents">{children}</div>
           </div>

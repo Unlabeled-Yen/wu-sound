@@ -59,7 +59,7 @@ export function OverviewDesktop({ data, month }: { data: OverviewData; month: st
         </div>
         <div className="flex items-center gap-2.5">
           <Link href={`/boss/ledger/new?month=${month}`} className="nm-btn text-[12.5px]" style={{ minHeight: 40, padding: '0 14px' }}>
-            ＋ 記一筆
+            ＋ 帳目記入
           </Link>
           {/* 老闆端寫日誌尚未接上(目前只有 staff/worklog 有寫入流程),先放視覺、不可互動,
               跟 app/boss/projects/[id]/QuickCaptureButton.tsx 旁邊那顆同款按鈕的既有作法一致。 */}

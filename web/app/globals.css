@@ -57,6 +57,12 @@
 html {
   color-scheme: dark;
   background: var(--nm-bg-deep);
+  /* macOS 上 Chrome/Safari 的觸控板橫向滑動預設會被瀏覽器接管成「上一頁/下一頁」
+     的頁面導覽手勢——這件事發生在瀏覽器層,網頁 JS 的 wheel handler 呼叫
+     preventDefault() 攔不住。帳務分頁的滑動切換(見 ledger/LedgerTabSwiper.tsx)
+     就是被這個蓋過去,滑一次分頁卻整個導頁跳走。標準解法是關掉水平方向的
+     overscroll 導覽接管,讓自訂的橫向滑動手勢真的歸網頁自己處理。 */
+  overscroll-behavior-x: none;
 }
 body {
   background: transparent;
@@ -371,4 +377,29 @@ body::after {
 }
 @media (prefers-reduced-motion: reduce) {
   .carousel-track { transition: none !important; }
+}
+
+/* --- 報表中心列印:只印 .report-print-area 那個區塊,side bar/分頁列/按鈕
+   一律隱藏,所見即所得——按「列印」看到的表格內容就是印出來的內容。 */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .report-print-area,
+  .report-print-area * {
+    visibility: visible;
+  }
+  .report-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
 }
