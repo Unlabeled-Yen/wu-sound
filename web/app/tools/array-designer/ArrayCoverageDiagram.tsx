@@ -34,6 +34,15 @@ const COLOR = {
   axis: '#e5e7eb', // X/Y 主軸線與刻度數字,比一般網格線亮/粗,對照原軟體十字準線
 };
 
+// 併頁(16-acoustic-merged.md §2)的精簡示意圖只換 3 個顏色常數——扇形填色/
+// 邊線、喇叭方塊。幾何運算(角度/重疊/Unity/Limit)完全不動,summary 模式只是
+// 換一種畫法(拿掉工具列/格線/座標/角度/縮放平移),不是重算。
+const SUMMARY_COLOR = {
+  fanFill: 'rgba(111,192,232,.1)',
+  fanStroke: 'rgba(111,192,232,.34)',
+  speakerBlock: 'rgba(143,208,238,.72)',
+};
+
 interface Props {
   quantity: number;
   spacingM: number;
@@ -49,6 +58,11 @@ interface Props {
   // 水平標線呈現正確的深度數值(弧線幾何需要更多逆向工程,見
   // docs/array-designer/spec-v1.md §6,標為已知簡化,非最終形狀)。
   limitDepthM?: number;
+  // full(預設)= 現有的技術分析畫布(格線/座標/角度/縮放平移/量尺,五個分頁
+  // 各自的求解結果頁用這個)。summary = 帳務併頁(16-acoustic-merged.md)的
+  // 精簡版:固定視角、只留扇形+喇叭方塊+觀眾席線,填滿 1376×424 的扁寬版位。
+  // 兩種模式共用同一套 speakerPositions/px 幾何,只是 summary 拿掉互動與雜訊圖層。
+  variant?: 'full' | 'summary';
 }
 
 interface Point {
@@ -72,9 +86,11 @@ export default function ArrayCoverageDiagram({
   rangeMaxM,
   unityDistM,
   limitDepthM,
+  variant = 'full',
 }: Props) {
-  const WIDTH_PX = 560;
-  const HEIGHT_PX = 420;
+  const isSummary = variant === 'summary';
+  const WIDTH_PX = isSummary ? 1376 : 560;
+  const HEIGHT_PX = isSummary ? 424 : 420;
 
   // SVG <pattern> id 要在頁面內唯一——5 個分頁同時掛載(WBS-B 的 display:none
   // 持久化設計),若用固定字串會 5 個 <svg> 搶同一個 id,網格可能對錯分頁。
@@ -116,8 +132,9 @@ export default function ArrayCoverageDiagram({
   const sy = HEIGHT_PX / worldH;
   const scale = Math.min(sx, sy);
   const ox = WIDTH_PX / 2;
-  // 留白給標題 + 喇叭上方疊三層標籤(角度/座標/D間距標註),由上而下對照原軟體排版。
-  const oy = 84;
+  // 留白給標題;summary 模式沒有角度/座標/D間距標註疊在喇叭上方,不用留那三層的空間
+  // (21a 原型的喇叭列大約落在整體高度 22% 處,見 prototypes/21a.html 的 y=93/424)。
+  const oy = isSummary ? HEIGHT_PX * 0.22 : 84;
 
   // 四捨五入到 3 位小數:server/client 的 Math.sin/cos 末位可能有 ULP 級差異,
   // 直接把完整浮點數塞進 SVG 屬性會觸發 React hydration mismatch。
@@ -237,6 +254,68 @@ export default function ArrayCoverageDiagram({
   const LAYER_LABEL: Record<keyof typeof layers, string> = {
     grid: 'Grid', lines: 'Lines', coords: 'Coords', angles: 'Angles', coverage: 'Coverage',
   };
+
+  // 精簡示意圖(16-acoustic-merged.md §4-2):固定視角,不接 zoom/pan/measure——
+  // 這是答案帶的一部分,不是互動分析工具。扇形+喇叭方塊+觀眾席線用同一套
+  // speakerPositions/px 幾何,只是拿掉格線/座標/角度/Min·Max·Unity·Limit 標線
+  // (那些留在深度軸,不在示意圖裡重複)。
+  if (isSummary) {
+    const coneDepth = dMax;
+    const audLine0 = px(-worldW / 2, audienceDistM);
+    const audLine1 = px(worldW / 2, audienceDistM);
+    const speakerW = 26, speakerH = 15;
+
+    return (
+      <div className="relative w-full h-full" data-diagram>
+        <span
+          className="absolute left-3.5 top-3 uppercase"
+          style={{ font: '400 10px/1 "Noto Sans TC",sans-serif', letterSpacing: '.16em', color: 'var(--nm-text-muted)' }}
+        >
+          覆蓋示意(俯視)
+        </span>
+        <svg viewBox={`0 0 ${WIDTH_PX} ${HEIGHT_PX}`} preserveAspectRatio="none" className="absolute inset-0 w-full h-full block">
+          <g fill={SUMMARY_COLOR.fanFill} stroke={SUMMARY_COLOR.fanStroke} strokeWidth={1}>
+            {positions.map((s, i) => {
+              const leftAngle = -half + s.tiltDeg;
+              const rightAngle = half + s.tiltDeg;
+              const p0 = px(s.x, s.y);
+              const pLeft = px(s.x + coneDepth * Math.sin((leftAngle * Math.PI) / 180), s.y + coneDepth * Math.cos((leftAngle * Math.PI) / 180));
+              const pRight = px(s.x + coneDepth * Math.sin((rightAngle * Math.PI) / 180), s.y + coneDepth * Math.cos((rightAngle * Math.PI) / 180));
+              return <polygon key={`fan-${i}`} points={`${p0.x},${p0.y} ${pLeft.x},${pLeft.y} ${pRight.x},${pRight.y}`} />;
+            })}
+          </g>
+          {positions.map((s, i) => {
+            const c = px(s.x, s.y);
+            return (
+              <rect
+                key={`spk-${i}`}
+                x={c.x - speakerW / 2}
+                y={c.y - speakerH / 2}
+                width={speakerW}
+                height={speakerH}
+                rx={2}
+                fill={SUMMARY_COLOR.speakerBlock}
+                transform={s.tiltDeg !== 0 ? `rotate(${-s.tiltDeg} ${c.x} ${c.y})` : undefined}
+              />
+            );
+          })}
+          <line x1={audLine0.x} y1={audLine0.y} x2={audLine1.x} y2={audLine1.y} stroke="rgba(160,104,213,.65)" strokeWidth={2} />
+        </svg>
+        <span
+          className="absolute"
+          style={{ left: audLine0.x + 8, top: audLine0.y + 6, font: '400 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace', color: '#c39ae8' }}
+        >
+          {depthLabel} {audienceDistM.toFixed(1)}m
+        </span>
+        <div
+          className="absolute left-3.5 bottom-3 max-w-[70%]"
+          style={{ font: '400 10.5px/1.6 "Noto Sans TC",sans-serif', color: 'var(--nm-text-faint)' }}
+        >
+          此為自由場等腰弧列幾何理論值,未計入場地反射、器材規格誤差等現場變因,實際佈點仍需現場覆核。
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">
