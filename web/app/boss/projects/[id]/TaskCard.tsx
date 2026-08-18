@@ -3,6 +3,8 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TASK_STATUS_LABEL, TASK_TAGS, TASK_TAG_LABEL, type Task, type TaskStatus, type TaskTag } from '@/lib/types';
+import FormattedTextarea from './FormattedTextarea';
+import { renderTaskTitle } from './task-format';
 
 interface Props {
   task: Task & { users: { name: string } | null };
@@ -110,8 +112,8 @@ export default function TaskCard({ task, onRequestMove, onDragStart, onEditTask 
           </div>
         )}
 
-        <div style={{ font: '400 13px/1.5 "Noto Sans TC",sans-serif', color: isDone ? '#8a8b90' : '#f0f0f2', marginBottom: 10 }}>
-          {task.title}
+        <div style={{ color: isDone ? '#8a8b90' : '#f0f0f2', marginBottom: 10 }}>
+          {renderTaskTitle(task.title)}
         </div>
 
         {task.status === 'blocked' && (
@@ -189,14 +191,7 @@ export default function TaskCard({ task, onRequestMove, onDragStart, onEditTask 
             </div>
 
             <form onSubmit={submitEdit} className="space-y-4">
-              <textarea
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                rows={10}
-                autoFocus
-                className="nm-input w-full text-[15.5px] leading-[1.7]"
-                style={{ resize: 'vertical', minHeight: 220 }}
-              />
+              <FormattedTextarea value={editTitle} onChange={setEditTitle} rows={10} autoFocus />
               <div className="flex flex-wrap gap-1.5">
                 {TASK_TAGS.map((tag) => (
                   <button

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TASK_TAGS, TASK_TAG_LABEL, type TaskTag } from '@/lib/types';
+import FormattedTextarea from './FormattedTextarea';
 
 export default function QuickCaptureButton({ siteId }: { siteId: string }) {
   const router = useRouter();
@@ -66,14 +67,12 @@ export default function QuickCaptureButton({ siteId }: { siteId: string }) {
             </div>
 
             <form onSubmit={onSubmit} className="space-y-4">
-              <textarea
+              <FormattedTextarea
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={setTitle}
                 rows={10}
                 autoFocus
                 placeholder="今天你在這裡遇到的事,寫成一句話——或多寫幾句把來龍去脈交代清楚"
-                className="nm-input w-full text-[15.5px] leading-[1.7]"
-                style={{ resize: 'vertical', minHeight: 220 }}
               />
               <div className="flex flex-wrap gap-1.5">
                 {TASK_TAGS.map((tag) => (
