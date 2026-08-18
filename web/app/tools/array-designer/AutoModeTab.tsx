@@ -150,7 +150,6 @@ export default function AutoModeTab({
       <div className="flex-1 min-h-0 flex gap-3">
         <div className="flex-1 min-w-0 rounded-xl relative overflow-hidden" style={{ border: '1px dashed rgba(255,255,255,.2)', background: 'rgba(8,8,10,.34)' }}>
           <ArrayCoverageDiagram
-            variant="summary"
             quantity={result.quantity}
             spacingM={result.spacingM}
             coverageDeg={inputs.coverageDeg}

@@ -95,7 +95,6 @@ export default function SplayTab({ speakers, active, onChangeTab }: { speakers: 
       <div className="flex-1 min-h-0 flex gap-3">
         <div className="flex-1 min-w-0 rounded-xl relative overflow-hidden" style={{ border: '1px dashed rgba(255,255,255,.2)', background: 'rgba(8,8,10,.34)' }}>
           <ArrayCoverageDiagram
-            variant="summary"
             quantity={inputs.quantity}
             spacingM={inputs.spacingM}
             coverageDeg={inputs.coverageDeg}
