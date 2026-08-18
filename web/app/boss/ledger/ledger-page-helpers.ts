@@ -31,8 +31,12 @@ export interface SP {
   to_check?: string;
   ext?: string; // internal/external,不填=全部
   show_voided?: string;
-  rp?: string; // 報表中心:期間類型 month/quarter/year
-  rv?: string; // 報表中心:期間值,格式隨 rp 而定(YYYY-MM / YYYY-Q# / YYYY)
+  rp?: string; // 報表中心舊版(A 批):期間類型 month/quarter/year,22c 定案後不再新增用途,保留給既有連結相容
+  rv?: string; // 報表中心舊版(A 批):期間值,格式隨 rp 而定(YYYY-MM / YYYY-Q# / YYYY)
+  dim?: string; // 報表中心 22c:維度旋鈕(category/site/person/books/month)
+  period?: string; // 報表中心 22c:期間旋鈕(month/quarter/year/tax/project/custom)
+  pv?: string; // 報表中心 22c:期間值,格式隨 period 而定
+  drill?: string; // 報表中心 22c:目前展開的就地抽屜(kind 或 site_id),伺服器端 Link 狀態,不是 client state
 }
 
 export function buildHref(base: SP, overrides: Partial<SP>): string {
@@ -48,6 +52,10 @@ export function buildHref(base: SP, overrides: Partial<SP>): string {
   if (merged.show_voided === '1') p.set('show_voided', '1');
   if (merged.rp && merged.rp !== 'month') p.set('rp', merged.rp);
   if (merged.rv) p.set('rv', merged.rv);
+  if (merged.dim && merged.dim !== 'category') p.set('dim', merged.dim);
+  if (merged.period && merged.period !== 'month') p.set('period', merged.period);
+  if (merged.pv) p.set('pv', merged.pv);
+  if (merged.drill) p.set('drill', merged.drill);
   const q = p.toString();
   return q ? `/boss/ledger?${q}` : '/boss/ledger';
 }

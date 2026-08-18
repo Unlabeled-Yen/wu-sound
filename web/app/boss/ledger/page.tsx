@@ -55,7 +55,7 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
   const overpaidCount = overpaidRes.count ?? 0;
   const pettycashCount = pettycashRes.count ?? 0;
 
-  const base: SP = { month: settledMonth, mode, site_id: siteId, kind, invoice, to_check: toCheckOnly ? '1' : undefined, ext, show_voided: showVoided ? '1' : undefined, rp: reportPeriod, rv: reportValue };
+  const base: SP = { month: settledMonth, mode, site_id: siteId, kind, invoice, to_check: toCheckOnly ? '1' : undefined, ext, show_voided: showVoided ? '1' : undefined, rp: reportPeriod, rv: reportValue, dim: sp.dim, period: sp.period, pv: sp.pv, drill: sp.drill };
   // 分頁現在滑動切換、不導頁——伺服器只在「真的導頁那一刻」算過一次 mode,
   // 一個分頁自己的月份/篩選連結不能沿用那個共用 base.mode,不然滑到別分頁後
   // 點裡面的連結(上月、顯示已作廢…)會把 mode 導回原本進來時的那一頁。
@@ -69,7 +69,7 @@ export default async function LedgerHomePage({ searchParams }: { searchParams: P
     { key: 'receivable', label: '應收款', href: buildHref(base, { mode: 'receivable' }), node: <ReceivablesView sb={sb} direction="receivable" siteId={siteId} sites={sites} base={baseFor('receivable')} month={settledMonth} /> },
     { key: 'payable', label: '應付款', href: buildHref(base, { mode: 'payable' }), node: <ReceivablesView sb={sb} direction="payable" siteId={siteId} sites={sites} base={baseFor('payable')} month={settledMonth} /> },
     { key: 'payroll', label: '月結', href: buildHref(base, { mode: 'payroll', month: payrollMonth }), node: <PayrollView sb={sb} month={payrollMonth} base={baseFor('payroll')} /> },
-    { key: 'reports', label: '報表中心', href: buildHref(base, { mode: 'reports' }), node: <ReportsView sb={sb} base={baseFor('reports')} rp={reportPeriod} rv={reportValue} /> },
+    { key: 'reports', label: '報表中心', href: buildHref(base, { mode: 'reports' }), node: <ReportsView sb={sb} base={baseFor('reports')} dim={sp.dim} period={sp.period} pv={sp.pv} drill={sp.drill} /> },
   ];
 
   return (
