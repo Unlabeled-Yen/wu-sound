@@ -11,13 +11,14 @@ interface Props {
   onRequestMove: (taskId: string, toStatus: TaskStatus) => void;
   onDragStart: (taskId: string) => void;
   onEditTask: (taskId: string, title: string, tags: TaskTag[]) => Promise<void>;
+  onDeleteTask: (taskId: string) => void;
 }
 
 function daysStuck(blockedSince: string): number {
   return Math.floor((Date.now() - new Date(blockedSince).getTime()) / (24 * 60 * 60 * 1000));
 }
 
-export default function TaskCard({ task, onRequestMove, onDragStart, onEditTask }: Props) {
+export default function TaskCard({ task, onRequestMove, onDragStart, onEditTask, onDeleteTask }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -171,6 +172,15 @@ export default function TaskCard({ task, onRequestMove, onDragStart, onEditTask 
                       移到「{TASK_STATUS_LABEL[s]}」
                     </button>
                   ))}
+                <div style={{ height: 1, background: 'rgba(255,255,255,.1)', margin: '4px 0' }} />
+                <button
+                  type="button"
+                  className="block w-full text-left px-2 py-1.5 rounded-lg nm-lift"
+                  style={{ fontSize: 12.5, color: 'var(--nm-danger-glass-text)' }}
+                  onClick={() => { setMenuOpen(false); onDeleteTask(task.id); }}
+                >
+                  刪除
+                </button>
               </div>,
               document.body,
             )}

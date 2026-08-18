@@ -37,9 +37,11 @@ export default function TaskBoard({ initialTasks, archivedDoneCount }: Props) {
   }, [initialTasks]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [pendingBlock, setPendingBlock] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function moveTask(taskId: string, toStatus: TaskStatus, blockedOn: string | null) {
     setError(null);
@@ -73,6 +75,25 @@ export default function TaskBoard({ initialTasks, archivedDoneCount }: Props) {
     if (!res.ok) throw new Error(j.error || '更新失敗');
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, title, tags } : t)));
     router.refresh();
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const taskId = pendingDelete;
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || '刪除失敗');
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      setPendingDelete(null);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '刪除失敗');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function requestMove(taskId: string, toStatus: TaskStatus) {
@@ -124,7 +145,7 @@ export default function TaskBoard({ initialTasks, archivedDoneCount }: Props) {
               </div>
               <div className="flex flex-col overflow-y-auto min-h-0" style={{ gap: 10 }}>
                 {colTasks.map((t) => (
-                  <TaskCard key={t.id} task={t} onRequestMove={requestMove} onDragStart={setDraggingId} onEditTask={editTask} />
+                  <TaskCard key={t.id} task={t} onRequestMove={requestMove} onDragStart={setDraggingId} onEditTask={editTask} onDeleteTask={setPendingDelete} />
                 ))}
                 {colTasks.length === 0 && (
                   <div className="text-xs rounded-xl nm-inset p-2 text-center" style={{ color: 'var(--nm-text-faint)' }}>
@@ -163,6 +184,32 @@ export default function TaskBoard({ initialTasks, archivedDoneCount }: Props) {
               <button type="button" className="nm-btn text-[13px]" onClick={() => setPendingBlock(null)}>取消</button>
               <button type="button" disabled={submitting} className="nm-btn-solid text-[13px]" onClick={confirmBlock}>
                 {submitting ? '處理中…' : '確認'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setPendingDelete(null)}>
+          <div
+            className="w-full max-w-sm rounded-2xl nm-raised-lg p-5 space-y-3"
+            style={{ background: 'rgba(24,24,28,0.9)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-semibold text-[13.5px]" style={{ color: 'var(--nm-text-primary)' }}>確定要刪除這張卡片?</h3>
+            <p className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>刪除後無法復原。</p>
+            {error && <div className="text-[13px]" style={{ color: 'var(--nm-danger)' }}>{error}</div>}
+            <div className="flex gap-2 justify-end">
+              <button type="button" className="nm-btn text-[13px]" onClick={() => setPendingDelete(null)}>取消</button>
+              <button
+                type="button"
+                disabled={deleting}
+                className="nm-btn-solid text-[13px]"
+                style={{ background: 'var(--nm-danger)', color: '#fff' }}
+                onClick={confirmDelete}
+              >
+                {deleting ? '刪除中…' : '刪除'}
               </button>
             </div>
           </div>
