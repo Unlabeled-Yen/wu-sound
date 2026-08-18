@@ -1,6 +1,6 @@
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { StaffMobileTopBar } from '@/app/_shared/StaffMobileTopBar';
+import { MobileTopBar } from '@/app/_shared/MobileTopBar';
 
 // 員工手機版原本的殼層,原封不動從 app/staff/layout.tsx 搬過來——
 // 暫緩開發中不刪,見 lib/view-mode.ts 的 STAFF_MOBILE_ENABLED。
@@ -24,7 +24,7 @@ export default async function StaffMobileShell({ children }: { children: React.R
 
   return (
     <div className="relative z-[1] flex-1 flex flex-col min-h-full">
-      <StaffMobileTopBar draftCount={draftCount} />
+      <MobileTopBar role="staff" draftCount={draftCount} />
       <main className="flex-1 px-[22px] pt-[18px] pb-8">{children}</main>
     </div>
   );

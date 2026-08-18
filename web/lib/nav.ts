@@ -217,6 +217,7 @@ const MOBILE_TITLES: Record<string, MobileTitle> = {
   '/boss/clockins': { title: '打卡', subtitle: '出勤記錄' },
   '/boss/more': { title: '更多', subtitle: '其他管理與設定' },
   '/boss/ledger': { title: '帳務管理' },
+  '/boss/overview': { title: '總覽', subtitle: '金流摘要' },
   '/boss/equipment': { title: '設備庫存' },
   '/boss/sites': { title: '專案管理' },
   '/boss/tenders/monitor': { title: '標案監測', subtitle: '標案' },

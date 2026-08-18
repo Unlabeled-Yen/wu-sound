@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { StaffMobileTopBar } from '@/app/_shared/StaffMobileTopBar';
+import { MobileTopBar } from '@/app/_shared/MobileTopBar';
 import { ChatClient } from './_components/ChatClient';
 
 export const dynamic = 'force-dynamic';
@@ -44,13 +44,11 @@ export default async function VoiceLabChatPage({
 
   return (
     <div className="relative z-[1] flex-1 flex flex-col h-[100dvh] lg:h-auto lg:min-h-screen">
-      {session.role === 'staff' && (
-        <div className="lg:hidden">
-          <StaffMobileTopBar draftCount={draftCount} />
-        </div>
-      )}
+      <div className="lg:hidden">
+        <MobileTopBar role={session.role} draftCount={draftCount} />
+      </div>
 
-      <div className={`${session.role === 'staff' ? 'hidden lg:flex' : 'flex'} items-baseline justify-between gap-3 max-w-[720px] w-full mx-auto px-[22px] pt-6`}>
+      <div className="hidden lg:flex items-baseline justify-between gap-3 max-w-[720px] w-full mx-auto px-[22px] pt-6">
         <h1 className="text-[17px] font-medium" style={{ color: 'var(--nm-text-primary)' }}>
           語音實驗室 · {autoVoice ? '免手語音模式' : '打字模式'}
         </h1>

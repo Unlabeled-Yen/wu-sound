@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ToastProvider } from './Toast';
 import { BrandLockup, BrandMark } from '@/app/_shared/BrandLogo';
+import { MobileTopBar } from '@/app/_shared/MobileTopBar';
 import { useAssistantLauncher } from '@/app/_shared/useAssistantShortcut';
 import {
   findActiveItemLabel,
@@ -110,10 +111,19 @@ export function BossShell({ children, role = 'boss' }: { children: React.ReactNo
   // 「報價系統 › 報價系統」
   const showEyebrow = active.label !== desktopActiveLabel;
 
+  // 老闆手機版首頁(2026-08-18 Yen 定案):/boss 換成 AI 聊天介面,跟員工
+  // 同一套殼——拿掉底部分頁列跟置頂標題,改漢堡抽屜(MobileTopBar),
+  // 抽屜項目依角色不同(見 MobileTopBar.tsx)。只有這一支路徑在手機寬度下
+  // 换殼,/boss/* 其他子頁(審核/專案/財務/更多…)完全不受影響,底部分頁列
+  // 照舊——避免一次把所有既有頁面的手機導覽方式都翻掉。
+  const isBossChatHome = role === 'boss' && pathname === '/boss';
+
   return (
     <ToastProvider>
       <div
-        className="relative z-[1] min-h-screen lg:h-screen lg:overflow-hidden w-full flex flex-col lg:flex-row lg:p-3.5 lg:gap-3.5"
+        className={`relative z-[1] w-full flex flex-col lg:flex-row lg:p-3.5 lg:gap-3.5 lg:h-screen lg:overflow-hidden ${
+          isBossChatHome ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'
+        }`}
         style={{ color: 'var(--nm-text-body)' }}
       >
         {/* ===== Desktop sidebar (≥lg only) ===== */}
@@ -160,32 +170,38 @@ export function BossShell({ children, role = 'boss' }: { children: React.ReactNo
         </aside>
 
         {/* ===== Mobile top header (＜lg only) ===== */}
-        <header
-          className="lg:hidden sticky top-0 z-30 px-[22px] pt-1.5 pb-4"
-          style={{
-            background: 'rgba(20,20,23,0.34)',
-            WebkitBackdropFilter: 'blur(14px) saturate(1.15)',
-            backdropFilter: 'blur(14px) saturate(1.15)',
-            borderBottom: '1px solid rgba(255,255,255,0.10)',
-          }}
-        >
-          <div className="flex items-center justify-between text-[13px] mb-[14px]" style={{ color: 'var(--nm-text-secondary)' }}>
-            {/* 不顯示姓名/角色:登入後權限已定,使用者不需要辨識自己是誰 */}
-            <BrandMark size={17} className="opacity-85" />
-            <span className="text-[12px]">{monthLabel}</span>
+        {isBossChatHome ? (
+          <div className="lg:hidden">
+            <MobileTopBar role={role} />
           </div>
-          <div
-            className="text-[25px] font-semibold tracking-[-0.01em]"
-            style={{ color: 'var(--nm-text-primary)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
+        ) : (
+          <header
+            className="lg:hidden sticky top-0 z-30 px-[22px] pt-1.5 pb-4"
+            style={{
+              background: 'rgba(20,20,23,0.34)',
+              WebkitBackdropFilter: 'blur(14px) saturate(1.15)',
+              backdropFilter: 'blur(14px) saturate(1.15)',
+              borderBottom: '1px solid rgba(255,255,255,0.10)',
+            }}
           >
-            {mobileTitle.title}
-          </div>
-          {mobileTitle.subtitle ? (
-            <div className="text-[13px] mt-[3px]" style={{ color: 'var(--nm-text-secondary)' }}>
-              {mobileTitle.subtitle}
+            <div className="flex items-center justify-between text-[13px] mb-[14px]" style={{ color: 'var(--nm-text-secondary)' }}>
+              {/* 不顯示姓名/角色:登入後權限已定,使用者不需要辨識自己是誰 */}
+              <BrandMark size={17} className="opacity-85" />
+              <span className="text-[12px]">{monthLabel}</span>
             </div>
-          ) : null}
-        </header>
+            <div
+              className="text-[25px] font-semibold tracking-[-0.01em]"
+              style={{ color: 'var(--nm-text-primary)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
+            >
+              {mobileTitle.title}
+            </div>
+            {mobileTitle.subtitle ? (
+              <div className="text-[13px] mt-[3px]" style={{ color: 'var(--nm-text-secondary)' }}>
+                {mobileTitle.subtitle}
+              </div>
+            ) : null}
+          </header>
+        )}
 
         {/* ===== Main content — shared by desktop & mobile ===== */}
         <main
@@ -216,30 +232,38 @@ export function BossShell({ children, role = 'boss' }: { children: React.ReactNo
           <div
             // 底部安全區留白只有手機用(要避開固定在螢幕底部的分頁列),桌機沒有那條
             // nav——用 class 而非 inline style 設定,inline style 的優先權會蓋掉
-            // lg: 這個斷點版本,底部留白在桌機永遠修不掉。
-            className="flex-1 lg:overflow-auto lg:flex lg:flex-col px-[22px] pt-[18px] lg:px-8 lg:pt-6 pb-[calc(env(safe-area-inset-bottom,0px)+96px)] lg:pb-8"
+            // lg: 這個斷點版本,底部留白在桌機永遠修不掉。老闆聊天首頁沒有底部
+            // 分頁列,不需要那段留白,而且要 flex-1/min-h-0 讓 ChatClient 自己的
+            // flex-1 內部滾動區生效,不是靠整頁滾動。
+            className={
+              isBossChatHome
+                ? 'flex-1 min-h-0 flex flex-col lg:overflow-auto lg:px-8 lg:pt-6 lg:pb-8'
+                : 'flex-1 lg:overflow-auto lg:flex lg:flex-col px-[22px] pt-[18px] lg:px-8 lg:pt-6 pb-[calc(env(safe-area-inset-bottom,0px)+96px)] lg:pb-8'
+            }
             style={{ color: 'var(--nm-text-body)' }}
           >
-            <div className="lg:contents">{children}</div>
+            <div className={isBossChatHome ? 'lg:contents flex-1 min-h-0 flex flex-col' : 'lg:contents'}>{children}</div>
           </div>
         </main>
 
         {/* ===== Mobile bottom tab bar (＜lg only) ===== */}
-        <nav
-          className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pt-2 grid"
-          style={{
-            background: 'rgba(16,16,20,0.5)',
-            WebkitBackdropFilter: 'blur(22px) saturate(1.2)',
-            backdropFilter: 'blur(22px) saturate(1.2)',
-            borderTop: '1px solid rgba(255,255,255,0.12)',
-            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
-            // 老闆 5 格、員工 2 格(過濾掉進不去的分頁,見 STAFF_MOBILE_TABS)——
-            // 格數不固定,不能用 Tailwind 的 grid-cols-N 寫死。
-            gridTemplateColumns: `repeat(${mobileTabsForRole(role).length}, minmax(0, 1fr))`,
-          }}
-        >
-          <MobileTabBar role={role} activeTab={activeTab} pendingCount={pendingCount} />
-        </nav>
+        {!isBossChatHome && (
+          <nav
+            className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pt-2 grid"
+            style={{
+              background: 'rgba(16,16,20,0.5)',
+              WebkitBackdropFilter: 'blur(22px) saturate(1.2)',
+              backdropFilter: 'blur(22px) saturate(1.2)',
+              borderTop: '1px solid rgba(255,255,255,0.12)',
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+              // 老闆 5 格、員工 2 格(過濾掉進不去的分頁,見 STAFF_MOBILE_TABS)——
+              // 格數不固定,不能用 Tailwind 的 grid-cols-N 寫死。
+              gridTemplateColumns: `repeat(${mobileTabsForRole(role).length}, minmax(0, 1fr))`,
+            }}
+          >
+            <MobileTabBar role={role} activeTab={activeTab} pendingCount={pendingCount} />
+          </nav>
+        )}
       </div>
     </ToastProvider>
   );

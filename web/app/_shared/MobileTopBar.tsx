@@ -3,21 +3,46 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { BrandLockup } from './BrandLogo';
+import type { UserRole } from '@/lib/types';
 
-// 員工手機版導覽(2026-08-18 Yen 定案,取代原本的底部三分頁):AI 助理聊天頁
-// 是首頁,零用金/專案備忘/打卡收進左上角抽屜——仿 Claude 手機版排版
-// (漢堡選單開抽屜,不是常駐分頁列)。這支元件是共用的頂列,
-// /staff/* 子頁(StaffMobileShell)跟 /voice-lab-chat 首頁都用它,
-// 不要各自長一份導覽邏輯出來。
-const DRAWER_ITEMS: { href: string; label: string; icon: React.ReactNode; badgeKey?: 'capture' }[] = [
+// 手機版共用頂列(2026-08-18 Yen 定案,取代原本的底部分頁列):AI 助理聊天頁
+// 是首頁,其餘功能收進左上角抽屜——仿 Claude 手機版排版(漢堡選單開抽屜,
+// 不是常駐分頁列)。員工跟老闆共用這支元件的排版與手勢邏輯,只有抽屜項目
+// 依角色不同(見 DRAWER_ITEMS_BY_ROLE)——「同一個 AI,入口不同而已」,
+// 殼層當然也是同一份,不要各自長一套導覽邏輯。
+type DrawerItem = { href: string; label: string; icon: React.ReactNode; badgeKey?: 'capture' };
+
+const STAFF_DRAWER_ITEMS: DrawerItem[] = [
   { href: '/voice-lab-chat?voice=1', label: 'AI 助理', icon: <ChatIcon /> },
   { href: '/staff/capture', label: '零用金', icon: <CameraIcon />, badgeKey: 'capture' },
   { href: '/staff/memo', label: '專案備忘', icon: <LogIcon /> },
   { href: '/staff/clockin', label: '打卡', icon: <ClockIcon /> },
 ];
 
-export function StaffMobileTopBar({ draftCount = 0, right }: { draftCount?: number; right?: React.ReactNode }) {
+// 老闆的聊天首頁本身就是 /boss,抽屜不需要再放一個回自己的「AI 助理」項目
+// (跟員工不同——員工的抽屜會在聊天頁以外的子頁也出現,需要有路回去)。
+// 「總覽」金流摘要放最後一項(2026-08-18 Yen 定案),前面是老闆平常最常用的
+// 三塊:零用金審核／專案／財務,其餘(報價、現場、標案、設備、聲學計算、
+// 使用者管理)一律收進「更多」,不逐項砍功能。
+const BOSS_DRAWER_ITEMS: DrawerItem[] = [
+  { href: '/boss/expenses', label: '零用金審核', icon: <CheckIcon /> },
+  { href: '/boss/sites', label: '專案', icon: <PinIcon /> },
+  { href: '/boss/ledger', label: '財務', icon: <WalletIcon /> },
+  { href: '/boss/more', label: '更多', icon: <MoreIcon /> },
+  { href: '/boss/overview', label: '總覽（金流摘要）', icon: <ChartIcon /> },
+];
+
+export function MobileTopBar({
+  role = 'staff',
+  draftCount = 0,
+  right,
+}: {
+  role?: UserRole;
+  draftCount?: number;
+  right?: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
+  const items = role === 'boss' ? BOSS_DRAWER_ITEMS : STAFF_DRAWER_ITEMS;
 
   return (
     <>
@@ -61,7 +86,7 @@ export function StaffMobileTopBar({ draftCount = 0, right }: { draftCount?: numb
             >
               功能
             </div>
-            {DRAWER_ITEMS.map((item) => (
+            {items.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -85,7 +110,7 @@ export function StaffMobileTopBar({ draftCount = 0, right }: { draftCount?: numb
             <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '10px 4px' }} />
 
             <Link
-              href="/staff/settings"
+              href={role === 'boss' ? '/boss/users' : '/staff/settings'}
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-[14px] nm-focus"
               style={{ color: 'var(--nm-text-body)' }}
@@ -150,6 +175,47 @@ function ClockIcon() {
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+function CheckIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  );
+}
+function PinIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
+function WalletIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2" />
+      <path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-4a2 2 0 1 0 0 4" />
+    </svg>
+  );
+}
+function MoreIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="5" cy="12" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="19" cy="12" r="1.6" />
+    </svg>
+  );
+}
+function ChartIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19h16" />
+      <path d="M7 19v-5M12 19V8M17 19v-9" />
     </svg>
   );
 }

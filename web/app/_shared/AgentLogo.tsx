@@ -32,7 +32,7 @@ export function AgentLogo({
   onHoldStart,
   onHoldEnd,
   label,
-  size = 88,
+  size = 106,
 }: {
   state: AgentState;
   /** 快點快放:切換免手模式 */

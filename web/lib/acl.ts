@@ -45,6 +45,7 @@ const PAGE_CAPABILITIES: PathEntry[] = [
   { prefix: '/boss/tenders', cap: 'tenders' },
   { prefix: '/boss/users', cap: 'user-admin' },
   { prefix: '/boss/more', cap: 'more' },
+  { prefix: '/boss/overview', cap: 'finance' },
   { prefix: '/boss/expenses', cap: 'finance' },
   { prefix: '/boss/ledger', cap: 'finance' },
   { prefix: '/boss/close', cap: 'finance' },
