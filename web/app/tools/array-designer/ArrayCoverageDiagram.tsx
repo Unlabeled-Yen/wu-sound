@@ -273,7 +273,14 @@ export default function ArrayCoverageDiagram({
         >
           覆蓋示意(俯視)
         </span>
-        <svg viewBox={`0 0 ${WIDTH_PX} ${HEIGHT_PX}`} preserveAspectRatio="none" className="absolute inset-0 w-full h-full block">
+        {/*
+          preserveAspectRatio 一定要是 xMidYMid meet(等比縮放,置中留白),
+          不能是 none——WIDTH_PX×HEIGHT_PX(1376×424)是設計稿假設的畫布尺寸,
+          但實際容器常常拿不到這個寬高比(側欄擠壓、視窗變化)。用 none 會讓
+          瀏覽器把座標系統「硬拉」進不同比例的容器,X/Y 各自套不同縮放倍率,
+          扇形三角形因此整個變形走樣,不是單純「畫面比較小」而已。
+        */}
+        <svg viewBox={`0 0 ${WIDTH_PX} ${HEIGHT_PX}`} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 w-full h-full block">
           <g fill={SUMMARY_COLOR.fanFill} stroke={SUMMARY_COLOR.fanStroke} strokeWidth={1}>
             {positions.map((s, i) => {
               const leftAngle = -half + s.tiltDeg;
@@ -300,13 +307,22 @@ export default function ArrayCoverageDiagram({
             );
           })}
           <line x1={audLine0.x} y1={audLine0.y} x2={audLine1.x} y2={audLine1.y} stroke="rgba(160,104,213,.65)" strokeWidth={2} />
+          {/*
+            標籤畫在 SVG 座標系裡面(不是外層疊一個 HTML <span>)——之前那版
+            直接把 0~1376 的 viewBox 數值當 CSS px 用在 position:absolute 上,
+            但容器實際沒有 1376px 寬,標籤位置對不上圖形,容器又是
+            overflow:hidden,數值大一點整個被裁掉看不到。畫在 SVG 裡面就
+            跟其他圖形共用同一套座標轉換,永遠對得上,不管容器縮放多少。
+          */}
+          <text
+            x={audLine0.x + 6}
+            y={audLine0.y + 16}
+            fill="#c39ae8"
+            style={{ font: '400 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace' }}
+          >
+            {depthLabel} {audienceDistM.toFixed(1)}m
+          </text>
         </svg>
-        <span
-          className="absolute"
-          style={{ left: audLine0.x + 8, top: audLine0.y + 6, font: '400 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace', color: '#c39ae8' }}
-        >
-          {depthLabel} {audienceDistM.toFixed(1)}m
-        </span>
         <div
           className="absolute left-3.5 bottom-3 max-w-[70%]"
           style={{ font: '400 10.5px/1.6 "Noto Sans TC",sans-serif', color: 'var(--nm-text-faint)' }}
