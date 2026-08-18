@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { requirePageCapability } from '@/lib/require-capability';
 import { fetchTenderRadar } from '@/lib/tender-radar';
 import {
   PRICE_ORDER,
@@ -436,9 +435,7 @@ export default async function BossTendersMonitorPage({
 }: {
   searchParams: Promise<{ days?: string; price?: string; nature?: string; pool?: string; urgent?: string; fresh?: string }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (session.role !== 'boss') redirect('/staff');
+  await requirePageCapability('tenders');
 
   const sp = await searchParams;
   const days = [1, 3, 7, 14, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;

@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { notFound } from 'next/navigation';
 import { getSupabaseAdmin, RECEIPTS_BUCKET } from '@/lib/supabase';
 import type { Task } from '@/lib/types';
 import TaskBoard from './TaskBoard';
 import QuickCaptureButton from './QuickCaptureButton';
+import { requirePageCapability } from '@/lib/require-capability';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,9 +27,7 @@ interface WorklogRow {
 }
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (session.role !== 'boss') redirect('/staff');
+  await requirePageCapability('sites');
 
   const { id } = await params;
   const sb = getSupabaseAdmin();

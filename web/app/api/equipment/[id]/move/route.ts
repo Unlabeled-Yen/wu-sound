@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
+import { can } from '@/lib/acl';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { EquipmentStatus } from '@/lib/types';
 import { validateMove } from '@/lib/equipment-validation';
@@ -15,7 +16,7 @@ export async function POST(
   const { id } = await params;
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
+  if (!can(session.role, 'equipment')) return NextResponse.json({ error: '權限不足' }, { status: 403 });
   if (!id) return NextResponse.json({ error: '缺少 id' }, { status: 400 });
 
   let body: { to_status?: unknown; to_site_id?: unknown; notes?: unknown };

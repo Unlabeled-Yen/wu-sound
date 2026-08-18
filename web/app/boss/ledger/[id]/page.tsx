@@ -2,12 +2,14 @@ import { redirect } from 'next/navigation';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { LedgerEntry } from '@/lib/types';
 import LedgerForm from '../LedgerForm';
+import { requirePageCapability } from '@/lib/require-capability';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EditLedgerPage(
   { params }: { params: Promise<{ id: string }> },
 ) {
+  await requirePageCapability('finance');
   const { id } = await params;
   const sb = getSupabaseAdmin();
   const { data, error } = await sb.from('ledger_entries').select('*').eq('id', id).maybeSingle();

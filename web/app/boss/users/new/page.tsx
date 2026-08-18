@@ -1,15 +1,12 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { requirePageCapability } from '@/lib/require-capability';
 import { createUser } from '../actions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export default async function NewUserPage() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (session.role !== 'boss') redirect('/staff');
+  await requirePageCapability('user-admin');
 
   return (
     <div className="max-w-md">

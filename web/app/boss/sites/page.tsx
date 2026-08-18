@@ -1,8 +1,7 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { loadPlacebookData } from '@/lib/placebook-data';
 import { PlacebookView } from './PlacebookView';
+import { requirePageCapability } from '@/lib/require-capability';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,9 +10,7 @@ export const dynamic = 'force-dynamic';
 // 就是唯一的專案管理頁,取代原本「全部專案」分頁——新增/改名/改類別/
 // 改客戶/啟用停用全部整合進地點簿本身,見 PlacebookBoard.tsx)。
 export default async function BossSitesPage() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (session.role !== 'boss') redirect('/staff');
+  await requirePageCapability('sites');
 
   const sb = getSupabaseAdmin();
   const data = await loadPlacebookData(sb);

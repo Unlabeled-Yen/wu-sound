@@ -6,21 +6,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { ToastProvider } from './Toast';
 import { BrandLockup, BrandMark } from '@/app/_shared/BrandLogo';
 import {
-  NAV_SECTIONS,
-  SETTINGS_SECTION,
   findActiveItemLabel,
   findActiveMobileTab,
   findActiveSection,
   findMobileTitle,
+  navSectionsForRole,
+  settingsSectionForRole,
   visibleItems,
   type NavSection,
 } from '@/lib/nav';
+import type { UserRole } from '@/lib/types';
 
 // Hot routes prefetched on mount so first-click nav is instant
 // 陣列設計器頁面較重(畫布互動),不預抓,避免拖慢一般導覽
 const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/ledger', '/boss/quotes', '/tools/spl-calculator'];
 
-function useBossShellData() {
+function useBossShellData(role: UserRole) {
   const router = useRouter();
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -30,6 +31,9 @@ function useBossShellData() {
   }, [router]);
 
   useEffect(() => {
+    // 待審零用金是財務範圍,員工看不到「審核」分頁,不需要打這支 API
+    // (打了也是 403,徒增雜訊)。
+    if (role !== 'boss') return;
     let cancelled = false;
     // Fetch pending badge count client-side so layout doesn't block every nav
     fetch('/api/boss/pending-count', { cache: 'no-store' })
@@ -37,7 +41,7 @@ function useBossShellData() {
       .then((j) => { if (!cancelled) setPendingCount(j.count ?? 0); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, []);
+  }, [role]);
 
   return pendingCount;
 }
@@ -73,15 +77,18 @@ function currentMonthLabel(): string {
   return `本月 ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export function BossShell({ children }: { children: React.ReactNode }) {
+export function BossShell({ children, role = 'boss' }: { children: React.ReactNode; role?: UserRole }) {
   const pathname = usePathname() ?? '/boss';
-  const active = useMemo(() => findActiveSection(pathname), [pathname]);
+  const navSections = useMemo(() => navSectionsForRole(role), [role]);
+  const settingsSection = useMemo(() => settingsSectionForRole(role), [role]);
+  const allSections = useMemo(() => [...navSections, settingsSection], [navSections, settingsSection]);
+  const active = useMemo(() => findActiveSection(pathname, allSections), [pathname, allSections]);
   const activeTab = useMemo(() => findActiveMobileTab(pathname), [pathname]);
   const mobileTitle = useMemo(() => findMobileTitle(pathname), [pathname]);
   const monthLabel = useMemo(() => currentMonthLabel(), []);
-  const pendingCount = useBossShellData();
+  const pendingCount = useBossShellData(role);
 
-  const desktopActiveLabel = useMemo(() => findActiveItemLabel(pathname), [pathname]);
+  const desktopActiveLabel = useMemo(() => findActiveItemLabel(pathname, allSections), [pathname, allSections]);
   // 區塊名和頁面名相同時(例如報價系統首頁)不重複顯示,不然標題列會變成
   // 「報價系統 › 報價系統」
   const showEyebrow = active.label !== desktopActiveLabel;
@@ -101,7 +108,7 @@ export function BossShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="flex-1 px-3 py-3.5 overflow-y-auto flex flex-col gap-[22px]">
-            {NAV_SECTIONS.map((section) =>
+            {navSections.map((section) =>
               section.dividerBefore ? (
                 <div key={section.key} className="flex flex-col gap-3">
                   <div style={{ borderTop: '1px solid var(--nm-border-hair)', margin: '0 4px' }} />
@@ -115,7 +122,7 @@ export function BossShell({ children }: { children: React.ReactNode }) {
 
           <div className="p-3 space-y-0.5" style={{ borderTop: '1px solid var(--nm-border-hair)' }}>
             <SectionGroup
-              section={SETTINGS_SECTION}
+              section={settingsSection}
               pathname={pathname}
             />
             <form action="/api/auth/logout" method="post">
@@ -383,7 +390,6 @@ function GearIcon() {
     </svg>
   );
 }
-
 /* --- Mobile bottom-nav icons (stroke 1.7, 23px, from mockup) --- */
 function MobileHomeIcon(active: boolean) {
   const c = active ? '#f0f0f2' : '#7d7e83';

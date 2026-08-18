@@ -7,10 +7,12 @@ import { PayrollView } from './PayrollView';
 import { ReportsView } from './ReportsView';
 import { LedgerTabSwiper, type LedgerTab } from './LedgerTabSwiper';
 import { buildHref, currentMonth, currentQuarter, currentYear, type Mode, type ReportPeriodType, type SP } from './ledger-page-helpers';
+import { requirePageCapability } from '@/lib/require-capability';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LedgerHomePage({ searchParams }: { searchParams: Promise<SP> }) {
+  await requirePageCapability('finance');
   const sp = (await searchParams) ?? {};
   const mode: Mode = sp.mode === 'receivable' || sp.mode === 'payable' || sp.mode === 'settled' || sp.mode === 'payroll' || sp.mode === 'reports' ? sp.mode : 'all';
   // 五個分頁現在同時掛載、滑動切換不導頁,不能再靠「目前是哪個 mode」決定

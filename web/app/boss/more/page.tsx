@@ -28,10 +28,8 @@ const GROUPS: Group[] = [
   },
   {
     title: '現場',
-    items: [
-      { href: '/boss/worklogs', label: '工作記錄' },
-      { href: '/boss/clockins', label: '打卡' },
-    ],
+    // 工作記錄已移除(被專案管理看板取代),見 lib/nav.ts 同名註解。
+    items: [{ href: '/boss/clockins', label: '打卡' }],
   },
   {
     title: '標案',

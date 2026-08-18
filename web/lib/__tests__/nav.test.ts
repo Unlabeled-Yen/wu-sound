@@ -4,11 +4,14 @@ import {
   NAV_SECTIONS,
   QUOTE_SYSTEM_TABS,
   SETTINGS_SECTION,
+  STAFF_SETTINGS_SECTION,
   findActiveItemLabel,
   findActiveMobileTab,
   findActiveSection,
   findMobileTitle,
   isTabActive,
+  navSectionsForRole,
+  settingsSectionForRole,
   visibleItems,
 } from '../nav';
 
@@ -55,7 +58,6 @@ describe('findActiveSection / findActiveItemLabel', () => {
     ['/boss/equipment', '設備庫存', '設備庫存'],
     ['/boss/equipment/xyz', '設備庫存', '設備庫存'],
     ['/boss/sites', '專案管理', '專案管理'],
-    ['/boss/worklogs', '現場', '工作記錄'],
     ['/boss/clockins', '現場', '打卡'],
     ['/boss/tenders', '標案', '資料進度板'],
     ['/boss/tenders/monitor', '標案', '標案監測'],
@@ -141,5 +143,35 @@ describe('頁內分頁列', () => {
     expect(isTabActive('/boss/quotes/abc', QUOTE_SYSTEM_TABS[0])).toBe(true);
     expect(isTabActive('/boss/catalog', QUOTE_SYSTEM_TABS[0])).toBe(false);
     expect(isTabActive('/boss/bundles/new', QUOTE_SYSTEM_TABS[1])).toBe(true);
+  });
+});
+
+describe('員工桌面版側欄過濾(docs/desktop-lock-and-staff-access-spec-v1.md)', () => {
+  it('老闆拿到完整結構,不受影響', () => {
+    expect(navSectionsForRole('boss')).toBe(NAV_SECTIONS);
+    expect(settingsSectionForRole('boss')).toBe(SETTINGS_SECTION);
+  });
+
+  it('員工看不到財務與標案兩個區塊', () => {
+    const sections = navSectionsForRole('staff');
+    expect(sections.some((s) => s.key === 'finance')).toBe(false);
+    expect(sections.some((s) => s.key === 'tenders')).toBe(false);
+  });
+
+  it('員工其餘區塊維持不變,不額外加區塊', () => {
+    const sections = navSectionsForRole('staff');
+    const keys = sections.map((s) => s.key);
+    expect(keys).toEqual(['overview', 'sites', 'quotes', 'acoustic', 'equipment', 'ops']);
+  });
+
+  it('員工設定區塊指向 /staff/settings,不是使用者管理', () => {
+    const settings = settingsSectionForRole('staff');
+    expect(settings).toBe(STAFF_SETTINGS_SECTION);
+    expect(settings.items[0].href).toBe('/staff/settings');
+  });
+
+  it('員工桌面標題列在 /staff/settings 可以正確解出頁面名', () => {
+    const sections = [...navSectionsForRole('staff'), settingsSectionForRole('staff')];
+    expect(findActiveItemLabel('/staff/settings', sections)).toBe('我的設定');
   });
 });

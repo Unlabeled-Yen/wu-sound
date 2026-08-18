@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { requirePageCapability } from '@/lib/require-capability';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { pairClockinsByDay } from '@/lib/hours';
 import AllocationEditor from './AllocationEditor';
@@ -36,9 +35,11 @@ export default async function BossClockinsPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (session.role !== 'boss') redirect('/');
+  const session = await requirePageCapability('ops');
+  // 打卡是薪資結算的原始資料,跟帳務同一級敏感度——員工只看得到自己那一列,
+  // 不是全公司出勤總表。老闆維持看全部。見
+  // docs/desktop-lock-and-staff-access-spec-v1.md §5.4。
+  const selfOnly = session.role !== 'boss';
 
   const sp = await searchParams;
   const { ym, y, m } = parseMonth(sp.month);
@@ -47,25 +48,34 @@ export default async function BossClockinsPage({
   const daysInMonth = new Date(y, m, 0).getDate();
 
   const supabase = getSupabaseAdmin();
+  let usersQuery = supabase.from('users').select('id, name, role, active').eq('role', 'staff').order('name');
+  let clockQuery = supabase
+    .from('clockins')
+    .select('id, user_id, ts, type, is_backfill, backfill_reason, users(name)')
+    .gte('ts', start.toISOString())
+    .lt('ts', end.toISOString())
+    .order('ts', { ascending: true });
+  let allocQuery = supabase
+    .from('day_site_allocations')
+    .select('user_id, worked_on, site_id')
+    .gte('worked_on', `${ym}-01`)
+    .lt('worked_on', end.toISOString().slice(0, 10));
+  if (selfOnly) {
+    usersQuery = usersQuery.eq('id', session.id);
+    clockQuery = clockQuery.eq('user_id', session.id);
+    allocQuery = allocQuery.eq('user_id', session.id);
+  }
+
   const [
     { data: usersData, error: usersErr },
     { data: clockData, error: ciErr },
     { data: sitesData },
     { data: allocData },
   ] = await Promise.all([
-    supabase.from('users').select('id, name, role, active').eq('role', 'staff').order('name'),
-    supabase
-      .from('clockins')
-      .select('id, user_id, ts, type, is_backfill, backfill_reason, users(name)')
-      .gte('ts', start.toISOString())
-      .lt('ts', end.toISOString())
-      .order('ts', { ascending: true }),
+    usersQuery,
+    clockQuery,
     supabase.from('sites').select('id, name').eq('active', true).order('name'),
-    supabase
-      .from('day_site_allocations')
-      .select('user_id, worked_on, site_id')
-      .gte('worked_on', `${ym}-01`)
-      .lt('worked_on', end.toISOString().slice(0, 10)),
+    allocQuery,
   ]);
 
   const error = usersErr?.message || ciErr?.message || null;

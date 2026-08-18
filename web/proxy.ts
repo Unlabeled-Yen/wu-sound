@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { canAccessPagePath } from '@/lib/acl';
 
 const COOKIE_NAME = 'sess';
 
@@ -80,9 +81,15 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (pathname.startsWith('/boss') && session.role !== 'boss') {
+  // /boss/* 現在是老闆與員工共用的路由(員工桌面版複用同一套殼層,見
+  // docs/desktop-lock-and-staff-access-spec-v1.md §8)。這裡不再整段擋員工,
+  // 改成跟 app/boss 底下每支頁面一致的能力表判斷——這層是 Edge middleware,
+  // 在頁面渲染之前就先擋掉禁區(財務/標案/使用者管理),沒被這裡擋到的
+  // 才會走到頁面自己的 requirePageCapability 覆核。兩層用同一份 lib/acl.ts,
+  // 不會不同步。
+  if (pathname.startsWith('/boss') && !canAccessPagePath(session.role, pathname)) {
     const url = req.nextUrl.clone();
-    url.pathname = '/staff';
+    url.pathname = '/boss';
     url.search = '';
     return NextResponse.redirect(url);
   }

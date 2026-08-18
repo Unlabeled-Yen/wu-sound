@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/session';
+import { can } from '@/lib/acl';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { computeChangedFields, retireEquipmentCore } from '@/lib/equipment-actions';
 
@@ -10,10 +11,10 @@ interface Result {
   error?: string;
 }
 
-async function assertBoss() {
+async function assertCanEditEquipment() {
   const session = await getSession();
   if (!session) return { session: null, err: '未登入' };
-  if (session.role !== 'boss') return { session: null, err: '權限不足' };
+  if (!can(session.role, 'equipment')) return { session: null, err: '權限不足' };
   return { session, err: null };
 }
 
@@ -22,7 +23,7 @@ function readStr(v: FormDataEntryValue | null): string {
 }
 
 export async function updateEquipment(id: string, formData: FormData): Promise<Result> {
-  const { session, err } = await assertBoss();
+  const { session, err } = await assertCanEditEquipment();
   if (!session) return { ok: false, error: err ?? '未登入' };
   if (!id) return { ok: false, error: '缺少 id' };
 
@@ -69,7 +70,7 @@ export async function updateEquipment(id: string, formData: FormData): Promise<R
 }
 
 export async function retireEquipment(id: string): Promise<Result> {
-  const { session, err } = await assertBoss();
+  const { session, err } = await assertCanEditEquipment();
   if (!session) return { ok: false, error: err ?? '未登入' };
   if (!id) return { ok: false, error: '缺少 id' };
 

@@ -2,11 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/session';
+import { can } from '@/lib/acl';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-async function assertBoss() {
+async function assertCanEditSites() {
   const session = await getSession();
-  if (!session || session.role !== 'boss') throw new Error('權限不足');
+  if (!session || !can(session.role, 'sites')) throw new Error('權限不足');
   return session;
 }
 
@@ -22,7 +23,7 @@ async function audit(actor: string, action: string, id: string, diff: Record<str
 }
 
 export async function createSite(formData: FormData) {
-  const actor = await assertBoss();
+  const actor = await assertCanEditSites();
   const name = (formData.get('name') as string || '').trim();
   if (!name) throw new Error('專案名稱不得為空');
   const categoryId = (formData.get('category_id') as string || '').trim() || null;
@@ -44,7 +45,7 @@ export async function createSite(formData: FormData) {
 }
 
 export async function updateSiteMeta(formData: FormData) {
-  const actor = await assertBoss();
+  const actor = await assertCanEditSites();
   const id = formData.get('id') as string;
   if (!id) throw new Error('缺少 id');
   const categoryId = (formData.get('category_id') as string || '').trim() || null;
@@ -65,7 +66,7 @@ export async function updateSiteMeta(formData: FormData) {
 }
 
 export async function createSiteCategory(formData: FormData) {
-  const actor = await assertBoss();
+  const actor = await assertCanEditSites();
   const name = (formData.get('name') as string || '').trim();
   if (!name) throw new Error('類別名稱不得為空');
 
@@ -87,7 +88,7 @@ export async function createSiteCategory(formData: FormData) {
 }
 
 export async function renameSite(formData: FormData) {
-  const actor = await assertBoss();
+  const actor = await assertCanEditSites();
   const id = formData.get('id') as string;
   const name = (formData.get('name') as string || '').trim();
   if (!id) throw new Error('缺少 id');
@@ -110,7 +111,7 @@ export async function renameSite(formData: FormData) {
 }
 
 export async function setSiteActive(formData: FormData) {
-  const actor = await assertBoss();
+  const actor = await assertCanEditSites();
   const id = formData.get('id') as string;
   const active = formData.get('active') === 'true';
   if (!id) throw new Error('缺少 id');

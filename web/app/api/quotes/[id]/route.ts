@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
+import { can } from '@/lib/acl';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { QUOTE_STATUS_TRANSITIONS, type Quote, type QuoteLine, type QuoteStatus } from '@/lib/types';
 
@@ -10,7 +11,7 @@ const VALID_STATUS: QuoteStatus[] = ['draft', 'sent', 'won', 'lost'];
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
+  if (!can(session.role, 'quotes')) return NextResponse.json({ error: '權限不足' }, { status: 403 });
 
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ error: '缺少 id' }, { status: 400 });
@@ -34,7 +35,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
+  if (!can(session.role, 'quotes')) return NextResponse.json({ error: '權限不足' }, { status: 403 });
 
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ error: '缺少 id' }, { status: 400 });

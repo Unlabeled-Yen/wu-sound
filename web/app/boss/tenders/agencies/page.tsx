@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { requirePageCapability } from '@/lib/require-capability';
 import ViewportLock from '@/app/_shared/ViewportLock';
 import { fetchTenderRadar } from '@/lib/tender-radar';
 
@@ -121,9 +120,7 @@ export default async function BossAgenciesPage({
 }: {
   searchParams: Promise<{ min?: string }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (session.role !== 'boss') redirect('/staff');
+  await requirePageCapability('tenders');
 
   const sp = await searchParams;
   const minCases = [3, 5, 10].includes(Number(sp.min)) ? Number(sp.min) : 3;

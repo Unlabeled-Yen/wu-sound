@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { taipeiCurrentMonthStr } from '@/lib/tz';
+import { requirePageCapability } from '@/lib/require-capability';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,7 @@ export default async function BossClosePage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
+  await requirePageCapability('finance');
   const sp = await searchParams;
   const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : taipeiCurrentMonthStr();
   redirect(`/boss/ledger?mode=payroll&month=${month}`);

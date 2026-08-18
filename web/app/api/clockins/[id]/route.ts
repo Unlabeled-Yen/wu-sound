@@ -7,7 +7,6 @@ export const runtime = 'nodejs';
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
 
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ error: '缺少 id' }, { status: 400 });
@@ -24,6 +23,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (cur.error) return NextResponse.json({ error: `查詢失敗: ${cur.error.message}` }, { status: 500 });
   if (!cur.data) return NextResponse.json({ error: '找不到打卡紀錄' }, { status: 404 });
   const before = cur.data;
+
+  // 打卡直接換算成薪資結算,員工只能改自己的紀錄,改他人維持老闆專屬。
+  // 見 docs/desktop-lock-and-staff-access-spec-v1.md §5.4。
+  if (session.role !== 'boss' && before.user_id !== session.id) {
+    return NextResponse.json({ error: '無權限修改他人紀錄' }, { status: 403 });
+  }
 
   const patch: Record<string, unknown> = {};
   if ('ts' in body) {
@@ -62,7 +67,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
 
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ error: '缺少 id' }, { status: 400 });
@@ -72,6 +76,10 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   if (cur.error) return NextResponse.json({ error: `查詢失敗: ${cur.error.message}` }, { status: 500 });
   if (!cur.data) return NextResponse.json({ error: '找不到打卡紀錄' }, { status: 404 });
   const before = cur.data;
+
+  if (session.role !== 'boss' && before.user_id !== session.id) {
+    return NextResponse.json({ error: '無權限修改他人紀錄' }, { status: 403 });
+  }
 
   const del = await sb.from('clockins').delete().eq('id', id);
   if (del.error) return NextResponse.json({ error: `刪除失敗: ${del.error.message}` }, { status: 500 });

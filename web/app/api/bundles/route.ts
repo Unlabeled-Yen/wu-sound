@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
+import { can } from '@/lib/acl';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -7,7 +8,7 @@ export const runtime = 'nodejs';
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
+  if (!can(session.role, 'quotes')) return NextResponse.json({ error: '權限不足' }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const includeInactive = searchParams.get('include_inactive') === '1';
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
+  if (!can(session.role, 'quotes')) return NextResponse.json({ error: '權限不足' }, { status: 403 });
 
   let body: Record<string, unknown>;
   try {

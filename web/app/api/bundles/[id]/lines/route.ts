@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
+import { can } from '@/lib/acl';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { BundleLine, CatalogItem, QuoteLineSection } from '@/lib/types';
 
@@ -21,7 +22,7 @@ function parseSection(v: unknown): QuoteLineSection | 'invalid' {
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
+  if (!can(session.role, 'quotes')) return NextResponse.json({ error: '權限不足' }, { status: 403 });
 
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ error: '缺少 id' }, { status: 400 });

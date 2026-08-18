@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { requirePageCapability } from '@/lib/require-capability';
 import { fetchTenderRadar } from '@/lib/tender-radar';
 
 export const runtime = 'nodejs';
@@ -198,9 +197,7 @@ function DatabaseSection({ database }: { database: BidPlanDatabase }) {
 }
 
 export default async function BossBidPlanPage() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (session.role !== 'boss') redirect('/staff');
+  await requirePageCapability('tenders');
 
   const { plan, error } = await loadBidPlan();
 

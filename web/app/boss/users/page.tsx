@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { requirePageCapability } from '@/lib/require-capability';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { UserRole } from '@/lib/types';
 import { setActive, updateName, resetPin } from './actions';
@@ -19,9 +18,7 @@ interface Row {
 const ROLE_LABEL: Record<UserRole, string> = { boss: '老闆', staff: '員工' };
 
 export default async function BossUsersPage() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (session.role !== 'boss') redirect('/staff');
+  await requirePageCapability('user-admin');
 
   const sb = getSupabaseAdmin();
   const { data, error } = await sb

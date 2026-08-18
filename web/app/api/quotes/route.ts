@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
+import { can } from '@/lib/acl';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { BundleLine, BundleTemplate, CatalogItem, Quote, QuoteLine } from '@/lib/types';
 
@@ -14,7 +15,7 @@ export interface QuoteSummary extends Quote {
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
+  if (!can(session.role, 'quotes')) return NextResponse.json({ error: '權限不足' }, { status: 403 });
 
   const sb = getSupabaseAdmin();
   const { data: quotes, error } = await sb
@@ -61,7 +62,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: '未登入' }, { status: 401 });
-  if (session.role !== 'boss') return NextResponse.json({ error: '權限不足' }, { status: 403 });
+  if (!can(session.role, 'quotes')) return NextResponse.json({ error: '權限不足' }, { status: 403 });
 
   let body: Record<string, unknown>;
   try {

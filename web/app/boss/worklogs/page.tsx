@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { requirePageCapability } from '@/lib/require-capability';
 import { getSupabaseAdmin, RECEIPTS_BUCKET } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -64,9 +63,7 @@ export default async function BossWorklogsPage({
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (session.role !== 'boss') redirect('/');
+  await requirePageCapability('ops');
 
   const sp = await searchParams;
   const view = sp.view === 'site' ? 'site' : 'timeline';

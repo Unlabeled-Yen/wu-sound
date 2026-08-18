@@ -1,3 +1,5 @@
+import type { UserRole } from './types';
+
 // 老闆端導覽的單一事實來源。
 //
 // 側欄、桌機標題列、手機底部分頁、手機頁面標題以前各自帶一份路徑清單,
@@ -7,6 +9,11 @@
 // hidden 的項目仍然參與比對(所以標題/高亮正確),只是不畫在側欄上——
 // 用在「一個區塊收成一列、其餘頁面靠頁內分頁進入」的情況,例如報價系統
 // 和聲學計算。
+//
+// 員工桌面版(docs/desktop-lock-and-staff-access-spec-v1.md)複用這份結構,
+// 靠 navSectionsForRole() 過濾禁區。這裡的過濾只決定「畫不畫出來」,
+// 不是權限邊界——真正擋存取的是 lib/acl.ts + 各 page/route 自己的檢查,
+// 兩邊各司其職,不要互相依賴。
 
 export interface NavItem {
   href: string;
@@ -76,8 +83,10 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'ops',
     label: '現場',
+    // 工作記錄已從兩端導覽移除(2026-08-18 Yen 裁決:被專案管理看板的
+    // 動態軌取代)。路由 /boss/worklogs、/staff/worklog 照專案慣例保留,
+    // 只是不再有入口。
     items: [
-      { href: '/boss/worklogs', label: '工作記錄' },
       { href: '/boss/clockins', label: '打卡' },
     ],
   },
@@ -114,6 +123,32 @@ export const SETTINGS_SECTION: NavSection = {
   items: [{ href: '/boss/users', label: '使用者管理' }],
 };
 
+export const STAFF_SETTINGS_SECTION: NavSection = {
+  key: 'settings',
+  label: '設定',
+  items: [{ href: '/staff/settings', label: '我的設定' }],
+};
+
+// 員工桌面版不得看到的側欄區塊——對照 lib/acl.ts 的 STAFF_DENIED
+// ('finance' / 'tenders'/ 'user-admin' / 'more')。使用者管理不在 NAV_SECTIONS
+// 裡(它在 SETTINGS_SECTION),所以這裡只需要處理 finance 跟 tenders 兩個 key。
+const STAFF_DENIED_SECTION_KEYS = new Set(['finance', 'tenders']);
+
+/**
+ * 依角色決定側欄要畫哪些區塊。老闆維持原樣;員工就是拿掉財務/標案兩塊,
+ * 不額外加區塊(2026-08-18 Yen 明確要求不要「我的作業」)。這只是畫面過濾,
+ * 不是權限邊界——見檔案頂端註解。
+ */
+export function navSectionsForRole(role: UserRole): NavSection[] {
+  if (role === 'boss') return NAV_SECTIONS;
+  return NAV_SECTIONS.filter((s) => !STAFF_DENIED_SECTION_KEYS.has(s.key));
+}
+
+/** 依角色決定側欄底部的設定區塊。員工看不到使用者管理,只能改自己的 PIN。 */
+export function settingsSectionForRole(role: UserRole): NavSection {
+  return role === 'boss' ? SETTINGS_SECTION : STAFF_SETTINGS_SECTION;
+}
+
 /** 側欄實際要畫出來的項目 */
 export function visibleItems(section: NavSection): NavItem[] {
   return section.items.filter((i) => !i.hidden);
@@ -125,19 +160,28 @@ function matchScore(pathname: string, href: string): number {
   return 0;
 }
 
-export function findActiveSection(pathname: string): NavSection {
-  const all = [...NAV_SECTIONS, SETTINGS_SECTION];
+/**
+ * sections 預設是老闆的完整結構,保持舊呼叫端(單一參數)行為不變。
+ * 員工桌面版由 BossShell 傳入 navSectionsForRole('staff') + settingsSectionForRole('staff')。
+ */
+export function findActiveSection(
+  pathname: string,
+  sections: NavSection[] = [...NAV_SECTIONS, SETTINGS_SECTION],
+): NavSection {
   let best: { section: NavSection; score: number } | null = null;
-  for (const section of all) {
+  for (const section of sections) {
     const score = Math.max(...section.items.map((i) => matchScore(pathname, i.href)));
     if (!best || score > best.score) best = { section, score };
   }
-  return best && best.score > 0 ? best.section : NAV_SECTIONS[0];
+  return best && best.score > 0 ? best.section : sections[0];
 }
 
 /** 桌機標題列的大標:當前頁面自己的名字(含 hidden 項目) */
-export function findActiveItemLabel(pathname: string): string {
-  const section = findActiveSection(pathname);
+export function findActiveItemLabel(
+  pathname: string,
+  sections: NavSection[] = [...NAV_SECTIONS, SETTINGS_SECTION],
+): string {
+  const section = findActiveSection(pathname, sections);
   let best: { item: NavItem; score: number } | null = null;
   for (const item of section.items) {
     const score = matchScore(pathname, item.href);
@@ -170,7 +214,6 @@ const MOBILE_TITLES: Record<string, MobileTitle> = {
   '/boss/quotes': { title: '報價系統', subtitle: '進行中的報價單' },
   '/boss/bundles': { title: '標配套組', subtitle: '報價系統' },
   '/boss/catalog': { title: '價目表', subtitle: '報價系統' },
-  '/boss/worklogs': { title: '現場', subtitle: '工作記錄' },
   '/boss/clockins': { title: '打卡', subtitle: '出勤記錄' },
   '/boss/more': { title: '更多', subtitle: '其他管理與設定' },
   '/boss/ledger': { title: '帳務管理' },
@@ -182,6 +225,12 @@ const MOBILE_TITLES: Record<string, MobileTitle> = {
   '/boss/users': { title: '使用者管理' },
   '/tools/spl-calculator': { title: 'SPL 預算計算器', subtitle: '聲學計算' },
   '/tools/array-designer': { title: '陣列設計器', subtitle: '聲學計算' },
+  // 員工桌面版鎖死寬螢幕(見 view-mode.ts),這幾條理論上不會被畫出來,
+  // 補上只是避免萬一走到窄螢幕時標題開天窗。
+  '/staff/capture': { title: '零用金' },
+  '/staff/memo': { title: '專案備忘' },
+  '/staff/clockin': { title: '打卡' },
+  '/staff/settings': { title: '我的設定' },
 };
 
 export function findMobileTitle(pathname: string): MobileTitle {

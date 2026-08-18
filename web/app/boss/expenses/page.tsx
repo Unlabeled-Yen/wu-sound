@@ -1,5 +1,6 @@
 import { getSupabaseAdmin, RECEIPTS_BUCKET } from '@/lib/supabase';
 import { CATEGORY_LABEL, type ExpenseRecord } from '@/lib/types';
+import { requirePageCapability } from '@/lib/require-capability';
 import RowActions from './RowActions';
 import ExpenseCardMobile from './ExpenseCardMobile';
 
@@ -23,6 +24,7 @@ function LowConfidenceBadge() {
 }
 
 export default async function BossExpensesPage() {
+  await requirePageCapability('finance');
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from('expenses')
