@@ -403,3 +403,67 @@ body::after {
     display: none !important;
   }
 }
+
+/* --- 報表中心(22c):螢幕與列印是兩個模板,不是同一份深色畫面硬印(Q3)。
+   .print-only 平常不顯示,只在列印時現身;必須包在 .report-print-area 底下才會
+   躲過上面「body * visibility:hidden」的全站清空規則。印版用自己的淺色配色,
+   不依賴 --nm-* 深色 token 顏色反轉——那組顏色本來就是為深色玻璃介面設計的。 */
+.print-only {
+  display: none;
+}
+@media print {
+  .print-only {
+    display: block;
+  }
+}
+
+/* --- 員工手機首頁 AI 入口(voice-lab/lab4-mobile-agent-entry-brief-v1.md):logo 本體
+   當狀態指示器,效果直接套在 logo 圖層(drop-shadow 呼吸光暈 + 極小幅縮放),不是外掛
+   一圈裝飾物。兩色語意:執行動作(真的在動手做事)= 綠,其餘全部(待命/聽/想/答)
+   = 橘——顏色只回答「要不要注意」,細節區分交給每個狀態各自的呼吸節奏(下面五組
+   keyframes 的 duration 都不同,故意不能只看顏色分辨狀態)。 */
+:root {
+  --nm-agent-active: 230, 126, 34;  /* 橘,rgb 分量,待命/聽/想/答共用 */
+  --nm-agent-executing: 99, 153, 34; /* 綠,只有執行動作用 */
+}
+
+/* logo 素材是白色透明底,只在深色底上使用(見 app/_shared/BrandLogo.tsx 同一份
+   素材的既有慣例),app 本身也是 color-scheme:dark 寫死、沒有淺色模式,不處理反轉。 */
+.agent-logo {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  cursor: pointer;
+}
+
+@keyframes agent-glow-idle {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 14px rgba(var(--nm-agent-active), 0.55)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 18px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 34px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.04); }
+}
+@keyframes agent-glow-listening {
+  0% { filter: drop-shadow(0 0 12px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 22px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.01); }
+  20% { filter: drop-shadow(0 0 26px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 46px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.06); }
+  35% { filter: drop-shadow(0 0 15px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 28px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.02); }
+  55% { filter: drop-shadow(0 0 30px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 50px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.07); }
+  70% { filter: drop-shadow(0 0 10px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 20px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.01); }
+  85% { filter: drop-shadow(0 0 24px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 42px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.05); }
+  100% { filter: drop-shadow(0 0 12px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 22px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.01); }
+}
+@keyframes agent-glow-thinking {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 20px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.01); }
+  50% { filter: drop-shadow(0 0 26px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 46px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.06); }
+}
+@keyframes agent-glow-responding {
+  0%, 100% { filter: drop-shadow(0 0 11px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 22px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.02); }
+  50% { filter: drop-shadow(0 0 29px rgba(var(--nm-agent-active), 0.8)) drop-shadow(0 0 50px rgba(var(--nm-agent-active), 0.55)); transform: scale(1.08); }
+}
+@keyframes agent-glow-executing {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(var(--nm-agent-executing), 0.8)) drop-shadow(0 0 18px rgba(var(--nm-agent-executing), 0.55)); transform: scale(1.01); }
+  50% { filter: drop-shadow(0 0 24px rgba(var(--nm-agent-executing), 0.8)) drop-shadow(0 0 38px rgba(var(--nm-agent-executing), 0.55)); transform: scale(1.05); }
+}
+
+.agent-logo[data-state="idle"] { animation: agent-glow-idle 1.8s ease-in-out infinite; }
+.agent-logo[data-state="listening"] { animation: agent-glow-listening 0.9s ease-in-out infinite; }
+.agent-logo[data-state="thinking"] { animation: agent-glow-thinking 0.65s ease-in-out infinite; }
+.agent-logo[data-state="responding"] { animation: agent-glow-responding 0.28s ease-in-out infinite; }
+.agent-logo[data-state="executing"] { animation: agent-glow-executing 0.5s ease-in-out infinite; }

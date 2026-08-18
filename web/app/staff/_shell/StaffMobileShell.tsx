@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { BrandMark } from '@/app/_shared/BrandLogo';
+import { AgentHero } from './AgentHero';
 
 // 員工手機版原本的殼層,原封不動從 app/staff/layout.tsx 搬過來——
 // 暫緩開發中不刪,見 lib/view-mode.ts 的 STAFF_MOBILE_ENABLED。
@@ -53,7 +54,12 @@ export default async function StaffMobileShell({ children }: { children: React.R
         </div>
       </header>
 
-      <main className="flex-1 pb-28 px-[22px] pt-[18px]">{children}</main>
+      <main className="flex-1 pb-28 px-[22px] pt-[18px]">
+        {/* AI 入口(voice-lab/lab4-mobile-agent-entry-brief-v1.md)——外加,不取代
+            下面三分頁的內容,位置是這輪的第一版擺法,還沒最終定案。 */}
+        <AgentHero />
+        {children}
+      </main>
 
       <nav
         className="fixed bottom-0 inset-x-0 z-40 px-3 pt-2 grid grid-cols-5"

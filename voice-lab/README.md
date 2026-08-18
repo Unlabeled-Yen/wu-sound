@@ -33,7 +33,7 @@
 | Lab 1 | wu 後端轉接層(A 路):`tasks`/`write_proposals` 新表 + 6 端點,規格見 [lab1-wu-adapter-spec-v1.md](lab1-wu-adapter-spec-v1.md) | ✅ **完成,22/22 測試綠**(2026-08-11) |
 | Lab 2 | 文字模式 Agent:狀態機、實體對齊、確認流程 —— **此即打字系統本體,非測試工具**,規格見 [lab2-text-agent-spec-v1.md](lab2-text-agent-spec-v1.md) | 規格草案,待 Yen 確認 3 題後動工 |
 | Lab 3 | STT 擂台:批次轉寫為主,語料含工地噪音、中英夾雜案名、少量台語;TTS 盲測 | 待做 |
-| Lab 4 | 語音掛載:手機 PWA push-to-talk + 本地佇列 + 批次處理管線 | 待做 |
+| Lab 4 | 語音掛載:手機 PWA push-to-talk + 本地佇列 + 批次處理管線;員工首頁 AI 入口(logo 即狀態指示器)視覺形狀已定案,規格見 [lab4-mobile-agent-entry-brief-v1.md](lab4-mobile-agent-entry-brief-v1.md) | 視覺形狀定案,卡在 Lab 3 語音後端未就緒 |
 
 ## Lab 1 現況(2026-08-11)
 

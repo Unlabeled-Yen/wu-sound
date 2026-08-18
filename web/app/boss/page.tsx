@@ -2,10 +2,17 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import BossMobileDashboard from './BossMobileDashboard';
 import { taipeiCurrentMonthStr } from '@/lib/tz';
 import { summarizeEntries } from '@/lib/ledger-summary';
+import { getSession } from '@/lib/session';
 
 // 總覽 v2(13a)桌機版重新規劃暫緩(2026-08-15 Yen 決定)——桌機先放「即將推出」
 // 占位畫面。OverviewDesktop.tsx / lib/overview-data.ts 兩支既有實作保留在
 // 專案裡但不掛上這個頁面,之後真的要重新規劃時可能還用得上,不要刪掉。
+//
+// 手機版總覽(BossMobileDashboard)全部是財務/營運數字,員工不得看——這支
+// 元件本來假設只有老闆會走到「真手機寬度」,員工手機版解鎖後(見
+// lib/view-mode.ts)這個假設不再成立。員工在這裡看到的是跟桌機版一樣的
+// 占位卡,不是刪掉手機版總覽,是等真的重新規劃時比照桌機版依角色/能力
+// 出卡片。
 
 export const dynamic = 'force-dynamic';
 
@@ -83,7 +90,34 @@ async function loadMobileStats() {
   };
 }
 
+function ComingSoonCard({ subtitle }: { subtitle: string }) {
+  return (
+    <div className="flex items-center justify-center" style={{ minHeight: '60vh' }}>
+      <div
+        className="rounded-2xl px-10 py-8 text-center"
+        style={{ border: '1px solid rgba(255,255,255,.09)', background: 'rgba(8,8,10,.4)' }}
+      >
+        <div className="text-[15px] font-medium mb-2" style={{ color: 'var(--nm-text-primary)' }}>總覽即將推出</div>
+        <div className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>{subtitle}</div>
+      </div>
+    </div>
+  );
+}
+
 export default async function BossDashboard() {
+  const session = await getSession();
+
+  // 桌機版兩個角色都還是占位卡(13a 重新規劃暫緩)。手機版只有老闆能看
+  // BossMobileDashboard 的財務數字,員工在手機寬度下也是占位卡。
+  if (session?.role !== 'boss') {
+    return (
+      <>
+        <div className="lg:hidden"><ComingSoonCard subtitle="手機版總覽正在重新規劃中" /></div>
+        <div className="hidden lg:block"><ComingSoonCard subtitle="桌機版總覽正在重新規劃中" /></div>
+      </>
+    );
+  }
+
   const s = await loadMobileStats();
   const anyError = Object.values(s.errors).some(Boolean);
 
@@ -103,15 +137,7 @@ export default async function BossDashboard() {
       </div>
 
       {/* Desktop view — 總覽重新規劃暫緩,先放占位畫面 */}
-      <div className="hidden lg:flex items-center justify-center" style={{ minHeight: '60vh' }}>
-        <div
-          className="rounded-2xl px-10 py-8 text-center"
-          style={{ border: '1px solid rgba(255,255,255,.09)', background: 'rgba(8,8,10,.4)' }}
-        >
-          <div className="text-[15px] font-medium mb-2" style={{ color: 'var(--nm-text-primary)' }}>總覽即將推出</div>
-          <div className="text-[13px]" style={{ color: 'var(--nm-text-secondary)' }}>桌機版總覽正在重新規劃中</div>
-        </div>
-      </div>
+      <div className="hidden lg:block"><ComingSoonCard subtitle="桌機版總覽正在重新規劃中" /></div>
     </>
   );
 }
