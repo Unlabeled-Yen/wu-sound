@@ -5,7 +5,7 @@
 // Uncoupled Array Designer v1.7 的 do_zoom/do_pan/toggle_measure/screen_to_phys
 // (見 docs/array-designer/spec-v1.md §4)。
 
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { speakerPositions, depthMarker, unityDots, unityRays, minArrowDepthM } from '@/lib/array-designer';
 
 // 圖表數字沿用頁面既有字體(Noto Sans TC/PingFang TC),不另外載 Inter——
@@ -89,8 +89,30 @@ export default function ArrayCoverageDiagram({
   variant = 'full',
 }: Props) {
   const isSummary = variant === 'summary';
-  const WIDTH_PX = isSummary ? 1376 : 560;
-  const HEIGHT_PX = isSummary ? 424 : 420;
+
+  // summary 的投影畫布要用「容器實際量到的尺寸」,不能寫死設計稿的 1376×424。
+  // 寫死的後果:那組數字假設版位是 3.2:1 的扁寬條,但實際容器(側欄擠壓後)是
+  // 1.2:1,等比縮放時整張圖被縮到 ~50% 並上下各留一大塊空白——形狀沒歪,但圖
+  // 只用到 37% 的可用高度,12px 的標籤字實縮成 6px 完全看不清。
+  // 讓 viewBox 等於容器實際大小,SVG 單位就等於 CSS px:不留白、字級如實。
+  const summaryBoxRef = useRef<HTMLDivElement>(null);
+  const [summaryBox, setSummaryBox] = useState<{ w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    const el = summaryBoxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setSummaryBox({ w: Math.round(width), h: Math.round(height) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isSummary]);
+
+  // SSR 與 client 首次 render 都用這組 fallback,兩邊一致才不會 hydration mismatch;
+  // ResizeObserver 量到真值後才觸發第二次 render。
+  const WIDTH_PX = isSummary ? (summaryBox?.w ?? 1376) : 560;
+  const HEIGHT_PX = isSummary ? (summaryBox?.h ?? 424) : 420;
 
   // SVG <pattern> id 要在頁面內唯一——5 個分頁同時掛載(WBS-B 的 display:none
   // 持久化設計),若用固定字串會 5 個 <svg> 搶同一個 id,網格可能對錯分頁。
@@ -132,9 +154,27 @@ export default function ArrayCoverageDiagram({
   const sy = HEIGHT_PX / worldH;
   const scale = Math.min(sx, sy);
   const ox = WIDTH_PX / 2;
-  // 留白給標題;summary 模式沒有角度/座標/D間距標註疊在喇叭上方,不用留那三層的空間
-  // (21a 原型的喇叭列大約落在整體高度 22% 處,見 prototypes/21a.html 的 y=93/424)。
-  const oy = isSummary ? HEIGHT_PX * 0.22 : 84;
+  // summary 把畫出來的世界範圍垂直置中,不是釘在固定比例位置。
+  //
+  // 俯視圖的 X/Y 必須同一個 scale(拉伸任一軸,角度就是假的),所以世界寬高比
+  // 跟容器寬高比不同時,一定有一軸用不滿——差別只在那塊空白留在哪。原本
+  // 寫死 22%(來自 21a 原型 y=93/424 的扁寬版位),容器一變高就把整張圖擠在
+  // 上緣、下方空一大片。置中後不論容器什麼比例,圖都在視覺重心上。
+  // 上緣保留 44px 給「覆蓋示意(俯視)」標題,不讓喇叭方塊壓到字。
+  const TITLE_INSET_PX = 44;
+  // 真正畫到的最深處,不是 dMax——扇形底邊兩角在 dMax*cos(半角±傾角),半角 45°
+  // 時只有 dMax 的 0.71 倍。拿 dMax 當繪製範圍會高估,置中就會偏上。
+  const halfRad = (a: number) => (a * Math.PI) / 180;
+  const drawnMaxY = Math.max(
+    audienceDistM, // 觀眾席線也要算進來,它可能比扇形更深
+    ...positions.flatMap((s) => [
+      s.y + dMax * Math.cos(halfRad(-half + s.tiltDeg)),
+      s.y + dMax * Math.cos(halfRad(half + s.tiltDeg)),
+    ]),
+  );
+  const oy = isSummary
+    ? Math.max(TITLE_INSET_PX, (HEIGHT_PX - (drawnMaxY + arrayExtentY) * scale) / 2) + arrayExtentY * scale
+    : 84;
 
   // 四捨五入到 3 位小數:server/client 的 Math.sin/cos 末位可能有 ULP 級差異,
   // 直接把完整浮點數塞進 SVG 屬性會觸發 React hydration mismatch。
@@ -266,7 +306,7 @@ export default function ArrayCoverageDiagram({
     const speakerW = 26, speakerH = 15;
 
     return (
-      <div className="relative w-full h-full" data-diagram>
+      <div ref={summaryBoxRef} className="relative w-full h-full" data-diagram>
         <span
           className="absolute left-3.5 top-3 uppercase"
           style={{ font: '400 10px/1 "Noto Sans TC",sans-serif', letterSpacing: '.16em', color: 'var(--nm-text-muted)' }}
