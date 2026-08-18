@@ -54,25 +54,26 @@ export default function QuickCaptureButton({ siteId }: { siteId: string }) {
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6" onClick={() => setOpen(false)}>
           <div
-            className="w-full max-w-md rounded-2xl nm-raised-lg p-6 space-y-4"
+            className="w-full max-w-2xl rounded-2xl nm-raised-lg p-8 space-y-5"
             style={{ background: 'rgba(24,24,28,0.9)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>記一筆</h2>
+              <h2 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>記一筆</h2>
               <button onClick={() => setOpen(false)} className="nm-focus" style={{ color: 'var(--nm-text-muted)' }}>✕</button>
             </div>
 
-            <form onSubmit={onSubmit} className="space-y-3">
+            <form onSubmit={onSubmit} className="space-y-4">
               <textarea
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                rows={2}
+                rows={10}
                 autoFocus
-                placeholder="今天你在這裡遇到的事,寫成一句話"
-                className="nm-input w-full text-[15px]"
+                placeholder="今天你在這裡遇到的事,寫成一句話——或多寫幾句把來龍去脈交代清楚"
+                className="nm-input w-full text-[15.5px] leading-[1.7]"
+                style={{ resize: 'vertical', minHeight: 220 }}
               />
               <div className="flex flex-wrap gap-1.5">
                 {TASK_TAGS.map((tag) => (

@@ -177,24 +177,25 @@ export default function TaskCard({ task, onRequestMove, onDragStart, onEditTask 
       </div>
 
       {editOpen && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6" onClick={() => setEditOpen(false)}>
           <div
-            className="w-full max-w-md rounded-2xl nm-raised-lg p-6 space-y-4"
+            className="w-full max-w-2xl rounded-2xl nm-raised-lg p-8 space-y-5"
             style={{ background: 'rgba(24,24,28,0.9)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>編輯內容</h2>
+              <h2 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>編輯內容</h2>
               <button onClick={() => setEditOpen(false)} className="nm-focus" style={{ color: 'var(--nm-text-muted)' }}>✕</button>
             </div>
 
-            <form onSubmit={submitEdit} className="space-y-3">
+            <form onSubmit={submitEdit} className="space-y-4">
               <textarea
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                rows={2}
+                rows={10}
                 autoFocus
-                className="nm-input w-full text-[15px]"
+                className="nm-input w-full text-[15.5px] leading-[1.7]"
+                style={{ resize: 'vertical', minHeight: 220 }}
               />
               <div className="flex flex-wrap gap-1.5">
                 {TASK_TAGS.map((tag) => (
