@@ -1,37 +1,14 @@
-import { getSupabaseAdmin } from '@/lib/supabase';
-import type { CatalogItem } from '@/lib/types';
-import ArrayDesignerForm from './ArrayDesignerForm';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-// catalog_items 的 coverage_h_deg(migration 012)有值就自動帶入覆蓋角,
-// 沒建檔的品項維持手動輸入 + loud 提示(見 shared.tsx useSpeakerCov)。
-//
-// ?speaker=<catalog_item_id>&throw=<m>:SPL 計算器「帶入陣列設計器」的跨工具
-// 交接值,兩支工具目前不共享狀態,用 query string 傳遞。
+// 陣列設計器已併入 /tools/acoustic(16-acoustic-merged.md)。舊路由保留純
+// redirect,並轉送 ?speaker=&throw= 跨工具交接參數,讓既有深層連結不失效。
 export default async function ArrayDesignerPage({ searchParams }: { searchParams: Promise<{ speaker?: string; throw?: string }> }) {
   const sp = (await searchParams) ?? {};
-  const sb = getSupabaseAdmin();
-  const { data } = await sb
-    .from('catalog_items')
-    .select('*')
-    .eq('active', true)
-    .eq('item_type', '喇叭')
-    .order('brand', { ascending: true })
-    .order('name', { ascending: true });
-  const speakers = (data ?? []) as CatalogItem[];
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--nm-text-primary)' }}>
-          陣列設計器
-        </h1>
-        <p className="text-[13px] mt-1" style={{ color: 'var(--nm-text-muted)' }}>
-          給定場地寬度、觀眾席距離、喇叭覆蓋角,推薦陣列喇叭數量與間距(Auto Mode)。
-        </p>
-      </div>
-      <ArrayDesignerForm speakers={speakers} initialSpeakerId={sp.speaker} initialAudienceDistM={sp.throw} />
-    </div>
-  );
+  const params = new URLSearchParams();
+  if (sp.speaker) params.set('speaker', sp.speaker);
+  if (sp.throw) params.set('throw', sp.throw);
+  const qs = params.toString();
+  redirect(qs ? `/tools/acoustic?${qs}` : '/tools/acoustic');
 }

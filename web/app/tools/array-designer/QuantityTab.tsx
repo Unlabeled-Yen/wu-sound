@@ -3,27 +3,22 @@
 import { useMemo, useState } from 'react';
 import { tabQuantity } from '@/lib/array-designer';
 import type { CatalogItem } from '@/lib/types';
+import { ErrorNote, ValidationNote, GENERIC_ERROR_MSG, useSpeakerCov, Legend } from './shared';
 import ArrayCoverageDiagram from './ArrayCoverageDiagram';
-import {
-  ErrorNote, ValidationNote, NumberField, ResultPanel, fmt, GENERIC_ERROR_MSG,
-  useSpeakerCov, SpeakerCovSection, TabHeader,
-} from './shared';
+import { ArrayPanelHeader } from './ArrayPanelHeader';
+import { ArraySidebar, ArrayConditionInputRow, ArrayConditionRow } from './ArraySidebar';
+import { ArraySolvePills, type TabKey } from './ArraySolvePills';
 
 const DEFAULTS = { targetWidthM: '28', spacingM: '7', coverageDeg: '110' };
 
-// Find Quantity (N):給定目標寬度 + 間距 + 覆蓋角,求所需喇叭數。
-// 原 app 此分頁沒有 Splay 欄位(bytecode 只有 q_width/q_spacing/q_speaker 三個輸入),
-// beta 固定為 0。Unity Dist 是算出來的唯讀顯示,不是輸入。
-export default function QuantityTab({ speakers }: { speakers: CatalogItem[] }) {
+// Find Quantity (N):給定目標寬度 + 間距 + 覆蓋角,求所需喇叭數。計算邏輯不動
+// (tabQuantity)。這個分頁沒有 Splay 欄位、beta 固定 0;Unity Dist 是算出來的
+// 唯讀顯示,不是輸入——併頁改版只換版面(見 AutoModeTab.tsx 開頭說明)。
+export default function QuantityTab({ speakers, active, onChangeTab }: { speakers: CatalogItem[]; active: TabKey; onChangeTab: (key: TabKey) => void }) {
   const cov = useSpeakerCov(DEFAULTS.coverageDeg, speakers);
   const [targetWidthM, setTargetWidthM] = useState(DEFAULTS.targetWidthM);
   const [spacingM, setSpacingM] = useState(DEFAULTS.spacingM);
-
-  function resetAll() {
-    cov.reset();
-    setTargetWidthM(DEFAULTS.targetWidthM);
-    setSpacingM(DEFAULTS.spacingM);
-  }
+  const [legendOpen, setLegendOpen] = useState(false);
 
   const inputs = useMemo(
     () => ({
@@ -48,47 +43,59 @@ export default function QuantityTab({ speakers }: { speakers: CatalogItem[] }) {
     }
   }, [inputsValid, inputs]);
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
-      <div className="flex flex-col gap-6">
-        <SpeakerCovSection speakers={speakers} {...cov} />
+  const isActive = active === 'quantity';
+  const conditionsSlot = (
+    <>
+      {speakers.length > 0 && <ArrayConditionRow label="喇叭" value={cov.selectedSpeaker ? [cov.selectedSpeaker.brand, cov.selectedSpeaker.name].filter(Boolean).join(' ') : '手動輸入'} />}
+      <ArrayConditionInputRow label="覆蓋角" value={cov.coverageDeg} onChange={cov.setCoverageDeg} unit="°" color="#8fd0ee" />
+      <ArrayConditionInputRow label="目標寬度" value={targetWidthM} onChange={setTargetWidthM} unit="m" />
+      <ArrayConditionInputRow label="間距" value={spacingM} onChange={setSpacingM} unit="m" />
+      {cov.selectedSpeaker && cov.selectedSpeaker.coverage_h_deg == null && (
+        <ValidationNote message="此品項尚未建檔覆蓋角規格,請查廠商 datasheet 手動輸入。" />
+      )}
+    </>
+  );
 
-        <section className="nm-raised rounded-2xl p-4 space-y-3">
-          <TabHeader title="Find Quantity (N)" onReset={resetAll} />
-          <div className="grid grid-cols-2 gap-3">
-            <NumberField
-              label="Target Width(m)" value={targetWidthM} onChange={setTargetWidthM}
-              tip="要真正蓋滿的橫向寬度。這個分頁反過來問:間距已經被吊點鎖死了,要幾支喇叭才蓋得到這個寬度?"
-            />
-            <NumberField
-              label="Spacing(m)" value={spacingM} onChange={setSpacingM}
-              tip="現場已經固定的喇叭間距(常見於吊點、桁架限制死的場合)。這裡是已知條件,不是求解目標。"
-            />
-          </div>
-        </section>
-
-        {!inputsValid && <ValidationNote message="請確認 Target Width、Spacing 為正數,覆蓋角介於 0~180 度之間。" />}
-        {result && 'error' in result && <ErrorNote message={result.error} />}
+  if (!inputsValid || !result || 'error' in result) {
+    return (
+      <div style={{ display: isActive ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, gap: 12 }}>
+        <div className="flex-none rounded-xl px-4 py-3" style={{ background: 'rgba(8,8,10,.4)', border: '1px solid rgba(255,255,255,.13)' }}>
+          {!inputsValid && <ValidationNote message="請確認 Target Width、Spacing 為正數,覆蓋角介於 0~180 度之間。" />}
+          {result && 'error' in result && <ErrorNote message={result.error} />}
+        </div>
+        <div className="flex-1 min-h-0 flex gap-3">
+          <div className="flex-1" />
+          <ArraySidebar conditionsSlot={conditionsSlot} stats={[]} pillsSlot={<ArraySolvePills active={active} onChange={onChangeTab} />} />
+        </div>
       </div>
+    );
+  }
 
-      {result && !('error' in result) && (
-        <ResultPanel
-          title="計算結果"
-          rangeMinM={result.rangeMinM}
-          rangeMaxM={result.rangeMaxM}
-          stats={[
-            { label: 'Unity Dist (-6dB)', value: `${fmt(result.unityDistM)} m`, tip: '這個分頁不讓你直接輸入觀眾距離——系統內部把它當成「剛好接上」的深度算出來,再拿去求需要幾支喇叭。' },
-            { label: 'Required Qty', value: `${result.quantity} pcs`, tip: '在你鎖死的間距下,蓋滿目標寬度需要的最少支數。' },
-            { label: 'Rec. Width (-3dB)', value: `${fmt(result.suggestedWidthM)} m`, tip: '用較保守的 -3dB 門檻算出的建議覆蓋寬度,現場均勻度的參考值。' },
-            { label: 'Max Width (-6dB)', value: `${fmt(result.actualWidthM)} m`, danger: true, tip: '用 -6dB 算出的理論覆蓋上限——這是天花板不是建議值,紅字提醒貼著這個數字設計已經開始有重疊感。' },
-            { label: 'Limit(Overlap)', value: `${fmt(result.dMaxM)} m`, tip: '重疊惡化的絕對邊界深度,比這更遠音質會明顯變糊。' },
-          ]}
-        >
+  const audienceDistM = result.unityDistM;
+  const inRange = audienceDistM >= result.rangeMinM && audienceDistM <= result.rangeMaxM;
+
+  return (
+    <div style={{ display: isActive ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, gap: 12 }}>
+      <ArrayPanelHeader
+        quantity={result.quantity}
+        spacingM={inputs.spacingM}
+        audienceDistM={audienceDistM}
+        inRange={inRange}
+        tooClose={audienceDistM < result.rangeMinM}
+        rangeMinM={result.rangeMinM}
+        rangeMaxM={result.rangeMaxM}
+        limitDepthM={result.dMaxM}
+        legendOpen={legendOpen}
+        onToggleLegend={() => setLegendOpen((v) => !v)}
+        legendSlot={<Legend />}
+      />
+      <div className="flex-1 min-h-0 flex gap-3">
+        <div className="flex-1 min-w-0 rounded-xl relative overflow-hidden" style={{ border: '1px dashed rgba(255,255,255,.2)', background: 'rgba(8,8,10,.34)' }}>
           <ArrayCoverageDiagram
             quantity={result.quantity}
             spacingM={inputs.spacingM}
             coverageDeg={inputs.coverageDeg}
-            audienceDistM={result.unityDistM}
+            audienceDistM={audienceDistM}
             depthLabel="Unity(算出)"
             coverageWidth3dbM={result.suggestedWidthM}
             rangeMinM={result.rangeMinM}
@@ -96,8 +103,17 @@ export default function QuantityTab({ speakers }: { speakers: CatalogItem[] }) {
             unityDistM={result.unityDistM}
             limitDepthM={result.dMaxM}
           />
-        </ResultPanel>
-      )}
+        </div>
+        <ArraySidebar
+          conditionsSlot={conditionsSlot}
+          stats={[
+            { label: 'Rec. Width −3dB', value: `${result.suggestedWidthM.toFixed(1)} m`, color: '#8fd0ee' },
+            { label: 'Unity Dist −6dB', value: `${result.unityDistM.toFixed(1)} m`, color: '#d8bd7a' },
+            { label: 'Limit', value: `${result.dMaxM.toFixed(1)} m`, color: '#8b8f98' },
+          ]}
+          pillsSlot={<ArraySolvePills active={active} onChange={onChangeTab} />}
+        />
+      </div>
     </div>
   );
 }

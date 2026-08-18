@@ -5,7 +5,7 @@
 // Uncoupled Array Designer v1.7 的 do_zoom/do_pan/toggle_measure/screen_to_phys
 // (見 docs/array-designer/spec-v1.md §4)。
 
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { speakerPositions, depthMarker, unityDots, unityRays, minArrowDepthM } from '@/lib/array-designer';
 
 // 圖表數字沿用頁面既有字體(Noto Sans TC/PingFang TC),不另外載 Inter——
@@ -34,6 +34,15 @@ const COLOR = {
   axis: '#e5e7eb', // X/Y 主軸線與刻度數字,比一般網格線亮/粗,對照原軟體十字準線
 };
 
+// 併頁(16-acoustic-merged.md §2)的精簡示意圖只換 3 個顏色常數——扇形填色/
+// 邊線、喇叭方塊。幾何運算(角度/重疊/Unity/Limit)完全不動,summary 模式只是
+// 換一種畫法(拿掉工具列/格線/座標/角度/縮放平移),不是重算。
+const SUMMARY_COLOR = {
+  fanFill: 'rgba(111,192,232,.1)',
+  fanStroke: 'rgba(111,192,232,.34)',
+  speakerBlock: 'rgba(143,208,238,.72)',
+};
+
 interface Props {
   quantity: number;
   spacingM: number;
@@ -49,6 +58,11 @@ interface Props {
   // 水平標線呈現正確的深度數值(弧線幾何需要更多逆向工程,見
   // docs/array-designer/spec-v1.md §6,標為已知簡化,非最終形狀)。
   limitDepthM?: number;
+  // full(預設)= 現有的技術分析畫布(格線/座標/角度/縮放平移/量尺,五個分頁
+  // 各自的求解結果頁用這個)。summary = 帳務併頁(16-acoustic-merged.md)的
+  // 精簡版:固定視角、只留扇形+喇叭方塊+觀眾席線,填滿 1376×424 的扁寬版位。
+  // 兩種模式共用同一套 speakerPositions/px 幾何,只是 summary 拿掉互動與雜訊圖層。
+  variant?: 'full' | 'summary';
 }
 
 interface Point {
@@ -72,9 +86,33 @@ export default function ArrayCoverageDiagram({
   rangeMaxM,
   unityDistM,
   limitDepthM,
+  variant = 'full',
 }: Props) {
-  const WIDTH_PX = 560;
-  const HEIGHT_PX = 420;
+  const isSummary = variant === 'summary';
+
+  // summary 的投影畫布要用「容器實際量到的尺寸」,不能寫死設計稿的 1376×424。
+  // 寫死的後果:那組數字假設版位是 3.2:1 的扁寬條,但實際容器(側欄擠壓後)是
+  // 1.2:1,等比縮放時整張圖被縮到 ~50% 並上下各留一大塊空白——形狀沒歪,但圖
+  // 只用到 37% 的可用高度,12px 的標籤字實縮成 6px 完全看不清。
+  // 讓 viewBox 等於容器實際大小,SVG 單位就等於 CSS px:不留白、字級如實。
+  const summaryBoxRef = useRef<HTMLDivElement>(null);
+  const [summaryBox, setSummaryBox] = useState<{ w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    const el = summaryBoxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setSummaryBox({ w: Math.round(width), h: Math.round(height) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isSummary]);
+
+  // SSR 與 client 首次 render 都用這組 fallback,兩邊一致才不會 hydration mismatch;
+  // ResizeObserver 量到真值後才觸發第二次 render。
+  const WIDTH_PX = isSummary ? (summaryBox?.w ?? 1376) : 560;
+  const HEIGHT_PX = isSummary ? (summaryBox?.h ?? 424) : 420;
 
   // SVG <pattern> id 要在頁面內唯一——5 個分頁同時掛載(WBS-B 的 display:none
   // 持久化設計),若用固定字串會 5 個 <svg> 搶同一個 id,網格可能對錯分頁。
@@ -116,8 +154,27 @@ export default function ArrayCoverageDiagram({
   const sy = HEIGHT_PX / worldH;
   const scale = Math.min(sx, sy);
   const ox = WIDTH_PX / 2;
-  // 留白給標題 + 喇叭上方疊三層標籤(角度/座標/D間距標註),由上而下對照原軟體排版。
-  const oy = 84;
+  // summary 把畫出來的世界範圍垂直置中,不是釘在固定比例位置。
+  //
+  // 俯視圖的 X/Y 必須同一個 scale(拉伸任一軸,角度就是假的),所以世界寬高比
+  // 跟容器寬高比不同時,一定有一軸用不滿——差別只在那塊空白留在哪。原本
+  // 寫死 22%(來自 21a 原型 y=93/424 的扁寬版位),容器一變高就把整張圖擠在
+  // 上緣、下方空一大片。置中後不論容器什麼比例,圖都在視覺重心上。
+  // 上緣保留 44px 給「覆蓋示意(俯視)」標題,不讓喇叭方塊壓到字。
+  const TITLE_INSET_PX = 44;
+  // 真正畫到的最深處,不是 dMax——扇形底邊兩角在 dMax*cos(半角±傾角),半角 45°
+  // 時只有 dMax 的 0.71 倍。拿 dMax 當繪製範圍會高估,置中就會偏上。
+  const halfRad = (a: number) => (a * Math.PI) / 180;
+  const drawnMaxY = Math.max(
+    audienceDistM, // 觀眾席線也要算進來,它可能比扇形更深
+    ...positions.flatMap((s) => [
+      s.y + dMax * Math.cos(halfRad(-half + s.tiltDeg)),
+      s.y + dMax * Math.cos(halfRad(half + s.tiltDeg)),
+    ]),
+  );
+  const oy = isSummary
+    ? Math.max(TITLE_INSET_PX, (HEIGHT_PX - (drawnMaxY + arrayExtentY) * scale) / 2) + arrayExtentY * scale
+    : 84;
 
   // 四捨五入到 3 位小數:server/client 的 Math.sin/cos 末位可能有 ULP 級差異,
   // 直接把完整浮點數塞進 SVG 屬性會觸發 React hydration mismatch。
@@ -237,6 +294,84 @@ export default function ArrayCoverageDiagram({
   const LAYER_LABEL: Record<keyof typeof layers, string> = {
     grid: 'Grid', lines: 'Lines', coords: 'Coords', angles: 'Angles', coverage: 'Coverage',
   };
+
+  // 精簡示意圖(16-acoustic-merged.md §4-2):固定視角,不接 zoom/pan/measure——
+  // 這是答案帶的一部分,不是互動分析工具。扇形+喇叭方塊+觀眾席線用同一套
+  // speakerPositions/px 幾何,只是拿掉格線/座標/角度/Min·Max·Unity·Limit 標線
+  // (那些留在深度軸,不在示意圖裡重複)。
+  if (isSummary) {
+    const coneDepth = dMax;
+    const audLine0 = px(-worldW / 2, audienceDistM);
+    const audLine1 = px(worldW / 2, audienceDistM);
+    const speakerW = 26, speakerH = 15;
+
+    return (
+      <div ref={summaryBoxRef} className="relative w-full h-full" data-diagram>
+        <span
+          className="absolute left-3.5 top-3 uppercase"
+          style={{ font: '400 10px/1 "Noto Sans TC",sans-serif', letterSpacing: '.16em', color: 'var(--nm-text-muted)' }}
+        >
+          覆蓋示意(俯視)
+        </span>
+        {/*
+          preserveAspectRatio 一定要是 xMidYMid meet(等比縮放,置中留白),
+          不能是 none——WIDTH_PX×HEIGHT_PX(1376×424)是設計稿假設的畫布尺寸,
+          但實際容器常常拿不到這個寬高比(側欄擠壓、視窗變化)。用 none 會讓
+          瀏覽器把座標系統「硬拉」進不同比例的容器,X/Y 各自套不同縮放倍率,
+          扇形三角形因此整個變形走樣,不是單純「畫面比較小」而已。
+        */}
+        <svg viewBox={`0 0 ${WIDTH_PX} ${HEIGHT_PX}`} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 w-full h-full block">
+          <g fill={SUMMARY_COLOR.fanFill} stroke={SUMMARY_COLOR.fanStroke} strokeWidth={1}>
+            {positions.map((s, i) => {
+              const leftAngle = -half + s.tiltDeg;
+              const rightAngle = half + s.tiltDeg;
+              const p0 = px(s.x, s.y);
+              const pLeft = px(s.x + coneDepth * Math.sin((leftAngle * Math.PI) / 180), s.y + coneDepth * Math.cos((leftAngle * Math.PI) / 180));
+              const pRight = px(s.x + coneDepth * Math.sin((rightAngle * Math.PI) / 180), s.y + coneDepth * Math.cos((rightAngle * Math.PI) / 180));
+              return <polygon key={`fan-${i}`} points={`${p0.x},${p0.y} ${pLeft.x},${pLeft.y} ${pRight.x},${pRight.y}`} />;
+            })}
+          </g>
+          {positions.map((s, i) => {
+            const c = px(s.x, s.y);
+            return (
+              <rect
+                key={`spk-${i}`}
+                x={c.x - speakerW / 2}
+                y={c.y - speakerH / 2}
+                width={speakerW}
+                height={speakerH}
+                rx={2}
+                fill={SUMMARY_COLOR.speakerBlock}
+                transform={s.tiltDeg !== 0 ? `rotate(${-s.tiltDeg} ${c.x} ${c.y})` : undefined}
+              />
+            );
+          })}
+          <line x1={audLine0.x} y1={audLine0.y} x2={audLine1.x} y2={audLine1.y} stroke="rgba(160,104,213,.65)" strokeWidth={2} />
+          {/*
+            標籤畫在 SVG 座標系裡面(不是外層疊一個 HTML <span>)——之前那版
+            直接把 0~1376 的 viewBox 數值當 CSS px 用在 position:absolute 上,
+            但容器實際沒有 1376px 寬,標籤位置對不上圖形,容器又是
+            overflow:hidden,數值大一點整個被裁掉看不到。畫在 SVG 裡面就
+            跟其他圖形共用同一套座標轉換,永遠對得上,不管容器縮放多少。
+          */}
+          <text
+            x={audLine0.x + 6}
+            y={audLine0.y + 16}
+            fill="#c39ae8"
+            style={{ font: '400 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace' }}
+          >
+            {depthLabel} {audienceDistM.toFixed(1)}m
+          </text>
+        </svg>
+        <div
+          className="absolute left-3.5 bottom-3 max-w-[70%]"
+          style={{ font: '400 10.5px/1.6 "Noto Sans TC",sans-serif', color: 'var(--nm-text-faint)' }}
+        >
+          此為自由場等腰弧列幾何理論值,未計入場地反射、器材規格誤差等現場變因,實際佈點仍需現場覆核。
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">

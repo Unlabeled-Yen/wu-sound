@@ -71,8 +71,8 @@ export const NAV_SECTIONS: NavSection[] = [
     key: 'acoustic',
     label: '聲學計算',
     items: [
-      { href: '/tools/spl-calculator', label: 'SPL 預算計算器' },
-      { href: '/tools/array-designer', label: '陣列設計器', hidden: true },
+      // 16-acoustic-merged.md:SPL 預算計算器與陣列設計器併為一頁,不再是兩個路由。
+      { href: '/tools/acoustic', label: '聲學計算' },
     ],
   },
   {
@@ -223,8 +223,9 @@ const MOBILE_TITLES: Record<string, MobileTitle> = {
   '/boss/tenders/agencies': { title: '機關經營名單', subtitle: '標案' },
   '/boss/tenders': { title: '資料進度板', subtitle: '標案' },
   '/boss/users': { title: '使用者管理' },
-  '/tools/spl-calculator': { title: 'SPL 預算計算器', subtitle: '聲學計算' },
-  '/tools/array-designer': { title: '陣列設計器', subtitle: '聲學計算' },
+  // /tools/spl-calculator、/tools/array-designer 已併入 /tools/acoustic
+  // (16-acoustic-merged.md),舊路徑只剩 redirect,不再需要手機標題。
+  '/tools/acoustic': { title: '聲學計算' },
   // 員工桌面版鎖死寬螢幕(見 view-mode.ts),這幾條理論上不會被畫出來,
   // 補上只是避免萬一走到窄螢幕時標題開天窗。
   '/staff/capture': { title: '零用金' },
@@ -255,10 +256,6 @@ export const QUOTE_SYSTEM_TABS: PageTab[] = [
   { href: '/boss/catalog', label: '價目表' },
 ];
 
-export const ACOUSTIC_TABS: PageTab[] = [
-  { href: '/tools/spl-calculator', label: 'SPL 預算計算器' },
-  { href: '/tools/array-designer', label: '陣列設計器' },
-];
 
 export function isTabActive(pathname: string, tab: PageTab): boolean {
   return pathname === tab.href || pathname.startsWith(tab.href + '/');
