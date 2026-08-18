@@ -4,6 +4,7 @@ import { getSupabaseAdmin, RECEIPTS_BUCKET } from '@/lib/supabase';
 import type { Task } from '@/lib/types';
 import TaskBoard from './TaskBoard';
 import QuickCaptureButton from './QuickCaptureButton';
+import WriteWorklogBox from './WriteWorklogBox';
 import { requirePageCapability } from '@/lib/require-capability';
 
 export const dynamic = 'force-dynamic';
@@ -169,20 +170,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             </Link>
           </div>
 
-          {/* 老闆端寫日誌尚未接上(目前只有 staff/worklog 有寫入流程),先放視覺、不可互動 */}
-          <div className="rounded-xl mb-3.5" style={{ background: 'rgba(30,30,36,.55)', border: '1px solid rgba(255,255,255,.12)', padding: '11px 12px' }}>
-            <div style={{ font: '400 12.5px/1.5 "Noto Sans TC",sans-serif', color: 'var(--nm-text-muted)', marginBottom: 10 }}>今天發生了什麼？</div>
-            <div className="flex gap-2">
-              <span
-                className="flex-1 rounded-lg flex items-center justify-center opacity-40"
-                style={{ minHeight: 34, background: '#f0f0f2', color: '#17171a', font: '500 12px/1 "Noto Sans TC",sans-serif', cursor: 'not-allowed' }}
-                aria-disabled="true"
-                title="尚未接上,先到「全部日誌」補寫"
-              >
-                寫日誌
-              </span>
-            </div>
-          </div>
+          <WriteWorklogBox siteId={site.id} />
 
           {worklogsWithUrls.length === 0 ? (
             <div style={{ font: '400 12.5px/1.5 "Noto Sans TC",sans-serif', color: 'var(--nm-text-faint)' }}>今天還沒有人寫日誌</div>
