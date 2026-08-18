@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getSupabaseAdmin, RECEIPTS_BUCKET } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Task } from '@/lib/types';
 import TaskBoard from './TaskBoard';
 import QuickCaptureButton from './QuickCaptureButton';
-import WriteWorklogBox from './WriteWorklogBox';
 import { requirePageCapability } from '@/lib/require-capability';
 
 export const dynamic = 'force-dynamic';
@@ -16,15 +15,6 @@ interface SiteDetail {
   name: string;
   active: boolean;
   customer_name: string | null;
-}
-
-interface WorklogRow {
-  id: string;
-  users: { name: string } | null;
-  note: string;
-  logged_on: string;
-  created_at: string;
-  photos: { kind: string; path: string }[];
 }
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -50,7 +40,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   const cutoff = new Date(Date.now() - ARCHIVE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-  const [tasksRes, archivedRes, knowledgeRes, knowledgeCountRes, pinnedCountRes, worklogsRes] = await Promise.all([
+  const [tasksRes, archivedRes, knowledgeRes, knowledgeCountRes, pinnedCountRes] = await Promise.all([
     sb
       .from('tasks')
       .select('id, site_id, status, title, tags, created_by, blocked_on, blocked_since, due_date, photos, upload_pending, created_at, completed_at, users:created_by(name)')
@@ -61,12 +51,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     sb.from('site_knowledge').select('id, body, hall').eq('site_id', id).eq('pinned', true).order('created_at', { ascending: true }).limit(3),
     sb.from('site_knowledge').select('id', { count: 'exact', head: true }).eq('site_id', id),
     sb.from('site_knowledge').select('id', { count: 'exact', head: true }).eq('site_id', id).eq('pinned', true),
-    sb
-      .from('worklogs')
-      .select('id, users(name), note, logged_on, created_at, photos')
-      .eq('site_id', id)
-      .order('created_at', { ascending: false })
-      .limit(3),
   ]);
 
   if (tasksRes.error) {
@@ -76,19 +60,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </div>
     );
   }
-
-  const worklogRows = (worklogsRes.data || []) as unknown as WorklogRow[];
-  const worklogsWithUrls = await Promise.all(
-    worklogRows.map(async (r) => {
-      const first = Array.isArray(r.photos) && r.photos.length > 0 ? r.photos[0] : null;
-      let thumbUrl: string | null = null;
-      if (first) {
-        const { data: s } = await sb.storage.from(RECEIPTS_BUCKET).createSignedUrl(first.path, 3600);
-        thumbUrl = s?.signedUrl || null;
-      }
-      return { ...r, thumbUrl };
-    })
-  );
 
   const knowledgeTotalCount = knowledgeCountRes.count ?? 0;
   const pinnedTotalCount = pinnedCountRes.count ?? 0;
@@ -154,54 +125,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </div>
 
       <div className="flex-1 flex min-h-0">
-        <div className="flex-1 min-w-0" style={{ padding: '18px 20px 22px 28px' }}>
+        <div className="flex-1 min-w-0" style={{ padding: '18px 28px 22px' }}>
           <TaskBoard initialTasks={(tasksRes.data || []) as unknown as (Task & { users: { name: string } | null })[]} archivedDoneCount={archivedRes.count ?? 0} />
         </div>
-
-        {/* 案子動態軌 */}
-        <aside
-          className="flex flex-col shrink-0"
-          style={{ width: 260, borderLeft: '1px solid rgba(255,255,255,.07)', background: 'rgba(8,8,10,.3)', padding: '18px 20px' }}
-        >
-          <div className="flex items-baseline justify-between mb-3">
-            <span style={{ font: '500 12.5px/1 "Noto Sans TC",sans-serif', color: 'var(--nm-text-body)' }}>案子動態</span>
-            <Link href="/boss/worklogs?view=site" className="underline nm-focus" style={{ font: '400 11px/1 "Noto Sans TC",sans-serif', color: 'var(--nm-text-muted)' }}>
-              全部日誌
-            </Link>
-          </div>
-
-          <WriteWorklogBox siteId={site.id} />
-
-          {worklogsWithUrls.length === 0 ? (
-            <div style={{ font: '400 12.5px/1.5 "Noto Sans TC",sans-serif', color: 'var(--nm-text-faint)' }}>今天還沒有人寫日誌</div>
-          ) : (
-            <div className="flex flex-col">
-              {worklogsWithUrls.map((w) => (
-                <div key={w.id} style={{ padding: '12px 0', borderTop: '1px solid rgba(255,255,255,.07)' }}>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="inline-flex items-center justify-center rounded-full" style={{ width: 20, height: 20, background: '#3a3a42', font: '500 9.5px/20px "Noto Sans TC",sans-serif', color: '#e4e4e7', textAlign: 'center' }}>
-                      {(w.users?.name || '?').slice(0, 1)}
-                    </span>
-                    <span className="tabular-nums" style={{ font: '400 10.5px/1 var(--font-geist-mono),monospace', color: 'var(--nm-text-muted)' }}>
-                      {new Date(w.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <div style={{ font: '400 12.5px/1.6 "Noto Sans TC",sans-serif', color: 'var(--nm-text-secondary)' }}>{w.note}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={{ marginTop: 'auto', paddingTop: 14 }}>
-            <Link
-              href="/boss/worklogs?view=site"
-              className="nm-btn flex items-center justify-center"
-              style={{ minHeight: 38, fontSize: 12 }}
-            >
-              全部日誌
-            </Link>
-          </div>
-        </aside>
       </div>
     </div>
   );
