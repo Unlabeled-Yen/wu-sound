@@ -1,4 +1,4 @@
-import { taipeiCurrentMonthStr } from '@/lib/tz';
+import { taipeiCurrentMonthStr, taipeiCurrentQuarterStr, taipeiCurrentYear } from '@/lib/tz';
 
 export type Mode = 'all' | 'settled' | 'receivable' | 'payable' | 'payroll' | 'reports';
 export const NO_SITE = '__none__';
@@ -73,11 +73,10 @@ export function reportPeriodRange(rp: ReportPeriodType, rv: string): { from: str
   return { from, to, label: rv };
 }
 
+// R-AMT5(ledger-master-spec.md §3.1):期間一律走台北時區,不可用 UTC 方法推算——
+// 舊版用 Date.UTC 系列,台北時間 00:00–07:59 之間會把「本年/本季」算成前一期。
 export function currentQuarter(): string {
-  const now = new Date();
-  const y = now.getUTCFullYear();
-  const q = Math.floor(now.getUTCMonth() / 3) + 1;
-  return `${y}-Q${q}`;
+  return taipeiCurrentQuarterStr();
 }
 
 export function shiftQuarter(rv: string, delta: number): string {
@@ -89,7 +88,7 @@ export function shiftQuarter(rv: string, delta: number): string {
 }
 
 export function currentYear(): string {
-  return String(new Date().getUTCFullYear());
+  return String(taipeiCurrentYear());
 }
 
 export const fmt = (n: number) => n.toLocaleString('zh-TW');

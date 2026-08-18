@@ -1,14 +1,16 @@
 import Link from 'next/link';
-import { LEDGER_KIND_LABEL, type LedgerEntry, type LedgerKind } from '@/lib/types';
+import { type LedgerEntry } from '@/lib/types';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { buildIncomeStatement, type ReportEntryRow, type KindAmount } from '@/lib/ledger-report-summary';
 import { PrintButton } from './PrintButton';
 import {
   buildHref, currentMonth, currentQuarter, currentYear, fmt,
   reportPeriodRange, shiftMonth, shiftQuarter, type ReportPeriodType, type SP,
 } from './ledger-page-helpers';
 
-// 報表中心——基礎版:先給老闆看月/季/年的正式損益表、能列印/存 PDF。
-// 外帳給會計的資料報表是下一輪要細部討論的東西,這版先不做,見底部說明文字。
+// 報表中心——A 批:口徑止血。淨額/營業收入分類全部委派 lib/ledger-report-summary.ts,
+// 這裡不再自行 reduce(R-RPT2)。版面本身待設計端提案(見
+// docs/reports-center-shape-brief-v1.md),這版只保證數字對,不重排結構。
 export async function ReportsView({ sb, base, rp, rv }: {
   sb: ReturnType<typeof getSupabaseAdmin>;
   base: SP;
@@ -19,7 +21,7 @@ export async function ReportsView({ sb, base, rp, rv }: {
 
   const { data, error } = await sb
     .from('ledger_entries')
-    .select('kind, direction, amount_twd')
+    .select('kind, direction, amount_twd, fee_twd')
     .eq('state', 'posted')
     .gte('occurred_on', from)
     .lte('occurred_on', to);
@@ -32,19 +34,8 @@ export async function ReportsView({ sb, base, rp, rv }: {
     );
   }
 
-  const rows = (data ?? []) as Array<Pick<LedgerEntry, 'kind' | 'direction' | 'amount_twd'>>;
-  const incomeByKind = new Map<LedgerKind, number>();
-  const expenseByKind = new Map<LedgerKind, number>();
-  let totalIncome = 0, totalExpense = 0;
-  for (const r of rows) {
-    const map = r.direction === 'income' ? incomeByKind : expenseByKind;
-    map.set(r.kind, (map.get(r.kind) ?? 0) + r.amount_twd);
-    if (r.direction === 'income') totalIncome += r.amount_twd;
-    else totalExpense += r.amount_twd;
-  }
-  const net = totalIncome - totalExpense;
-  const incomeRows = Array.from(incomeByKind.entries()).sort((a, b) => b[1] - a[1]);
-  const expenseRows = Array.from(expenseByKind.entries()).sort((a, b) => b[1] - a[1]);
+  const rows = (data ?? []) as Array<Pick<LedgerEntry, 'kind' | 'direction' | 'amount_twd' | 'fee_twd'>> as ReportEntryRow[];
+  const stmt = buildIncomeStatement(rows);
 
   return (
     <div className="space-y-4 lg:h-full lg:overflow-y-auto lg:pr-1">
@@ -54,18 +45,69 @@ export async function ReportsView({ sb, base, rp, rv }: {
       </div>
 
       <div className="report-print-area rounded-2xl nm-raised p-6 lg:p-8" style={{ maxWidth: 640 }}>
-        <div className="text-center mb-6">
+        <div className="text-center mb-2">
           <div className="text-[18px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>損益表</div>
           <div className="text-[13px] mt-1" style={{ color: 'var(--nm-text-secondary)' }}>{label}</div>
         </div>
+        <div className="text-center text-[11.5px] mb-6" style={{ color: 'var(--nm-text-faint)' }}>
+          單位:新台幣元 · 現金收付制 · 已扣轉帳手續費 · 不含未收未付款 · 不含人力分攤成本
+        </div>
 
-        <ReportSection title="收入" rows={incomeRows} total={totalIncome} tone="income" />
-        <ReportSection title="支出" rows={expenseRows} total={totalExpense} tone="expense" />
+        <ReportSection title="營業收入" rows={stmt.operatingIncomeRows} total={stmt.operatingIncomeTotal} tone="income" emptyLabel="這段期間沒有營業收入紀錄" />
+        <ReportSection title="營業支出" rows={stmt.operatingExpenseRows} total={stmt.operatingExpenseTotal} tone="expense" emptyLabel="這段期間沒有營業支出紀錄" />
+
+        <div className="flex items-center justify-between py-1.5 text-[13.5px]" style={{ borderBottom: '1px solid var(--nm-border-hair)', color: 'var(--nm-text-body)' }}>
+          <span>轉帳手續費</span>
+          <span className="tabular-nums">${fmt(stmt.feeTotal)}</span>
+        </div>
+
+        <div className="flex items-center justify-between pt-3 mt-2 mb-6" style={{ borderTop: '1px solid var(--nm-text-primary)' }}>
+          <span className="text-[14.5px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>營業損益</span>
+          <span className="text-[16px] font-bold tabular-nums" style={{ color: stmt.operatingNet >= 0 ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)' }}>
+            {stmt.operatingNet >= 0 ? '+' : ''}${fmt(stmt.operatingNet)}
+          </span>
+        </div>
+
+        {(stmt.nonOperatingIncomeRows.length > 0 || stmt.nonOperatingExpenseRows.length > 0) && (
+          <div className="mb-5">
+            <div className="text-[13px] font-semibold mb-2" style={{ color: 'var(--nm-text-secondary)' }}>營業外及個人項</div>
+            <div className="text-[11.5px] mb-2" style={{ color: 'var(--nm-text-faint)' }}>
+              借款/資本、投資、健檢——不是本業經營結果,不計入營業損益(R-RPT1)
+            </div>
+            {stmt.nonOperatingIncomeRows.map((r) => (
+              <div key={r.kind} className="flex items-center justify-between py-1.5 text-[13.5px]" style={{ borderBottom: '1px solid var(--nm-border-hair)', color: 'var(--nm-text-body)' }}>
+                <span>{r.label}</span>
+                <span className="tabular-nums">+${fmt(r.amount)}</span>
+              </div>
+            ))}
+            {stmt.nonOperatingExpenseRows.map((r) => (
+              <div key={r.kind} className="flex items-center justify-between py-1.5 text-[13.5px]" style={{ borderBottom: '1px solid var(--nm-border-hair)', color: 'var(--nm-text-body)' }}>
+                <span>{r.label}</span>
+                <span className="tabular-nums">-${fmt(r.amount)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {stmt.retiredRows.length > 0 && (
+          <div className="mb-5">
+            <div className="text-[13px] font-semibold mb-2" style={{ color: 'var(--nm-text-faint)' }}>已退役類別(歷史資料)</div>
+            <div className="text-[11.5px] mb-2" style={{ color: 'var(--nm-text-faint)' }}>
+              「信用卡」自 v3 起不再是可選類別,以下是遷移前的舊分錄,仍計入本期淨額(R-RPT4)
+            </div>
+            {stmt.retiredRows.map((r) => (
+              <div key={r.kind} className="flex items-center justify-between py-1.5 text-[13.5px]" style={{ borderBottom: '1px solid var(--nm-border-hair)', color: 'var(--nm-text-faint)' }}>
+                <span>{r.label}</span>
+                <span className="tabular-nums">-${fmt(r.amount)}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center justify-between pt-4 mt-4" style={{ borderTop: '2px solid var(--nm-text-primary)' }}>
-          <span className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>本期損益</span>
-          <span className="text-[18px] font-bold tabular-nums" style={{ color: net >= 0 ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)' }}>
-            {net >= 0 ? '+' : ''}${fmt(net)}
+          <span className="text-[15px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>本期淨額</span>
+          <span className="text-[18px] font-bold tabular-nums" style={{ color: stmt.net >= 0 ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)' }}>
+            {stmt.net >= 0 ? '+' : ''}${fmt(stmt.net)}
           </span>
         </div>
       </div>
@@ -73,28 +115,29 @@ export async function ReportsView({ sb, base, rp, rv }: {
       <div className="no-print flex flex-wrap gap-3 items-center">
         <PrintButton />
         <span className="text-[12px]" style={{ color: 'var(--nm-text-faint)' }}>
-          基礎版:先看月/季/年損益,外帳給會計的資料報表之後再細部討論。
+          基礎版:營業損益已排除借款/投資/健檢、已扣手續費。多維度(專案/稅務/零用金)報表下一輪加入。
         </span>
       </div>
     </div>
   );
 }
 
-function ReportSection({ title, rows, total, tone }: {
+function ReportSection({ title, rows, total, tone, emptyLabel }: {
   title: string;
-  rows: Array<[LedgerKind, number]>;
+  rows: KindAmount[];
   total: number;
   tone: 'income' | 'expense';
+  emptyLabel: string;
 }) {
   const toneColor = tone === 'income' ? 'var(--nm-success-glass-text)' : 'var(--nm-danger-glass-text)';
   return (
     <div className="mb-5">
       <div className="text-[13px] font-semibold mb-2" style={{ color: toneColor }}>{title}</div>
-      {rows.length === 0 && <div className="text-[13px] py-2" style={{ color: 'var(--nm-text-faint)' }}>這段期間沒有{title}紀錄</div>}
-      {rows.map(([kind, amount]) => (
-        <div key={kind} className="flex items-center justify-between py-1.5 text-[13.5px]" style={{ borderBottom: '1px solid var(--nm-border-hair)', color: 'var(--nm-text-body)' }}>
-          <span>{LEDGER_KIND_LABEL[kind]}</span>
-          <span className="tabular-nums">${fmt(amount)}</span>
+      {rows.length === 0 && <div className="text-[13px] py-2" style={{ color: 'var(--nm-text-faint)' }}>{emptyLabel}</div>}
+      {rows.map((r) => (
+        <div key={r.kind} className="flex items-center justify-between py-1.5 text-[13.5px]" style={{ borderBottom: '1px solid var(--nm-border-hair)', color: 'var(--nm-text-body)' }}>
+          <span>{r.label}</span>
+          <span className="tabular-nums">${fmt(r.amount)}</span>
         </div>
       ))}
       <div className="flex items-center justify-between pt-2 text-[14px] font-semibold" style={{ color: 'var(--nm-text-primary)' }}>

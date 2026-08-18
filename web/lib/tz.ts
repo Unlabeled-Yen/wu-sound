@@ -29,3 +29,9 @@ export function taipeiCurrentMonthStr(): string {
 export function taipeiCurrentYear(): number {
   return taipeiParts(new Date()).y;
 }
+
+export function taipeiCurrentQuarterStr(): string {
+  const { y, m } = taipeiParts(new Date());
+  const q = Math.floor((m - 1) / 3) + 1;
+  return `${y}-Q${q}`;
+}

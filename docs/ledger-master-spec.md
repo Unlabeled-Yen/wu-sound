@@ -197,6 +197,11 @@ none ──(標記待開)──> to_issue ──(填發票號+日期)──> iss
   超收超付另計 `overpaidCount`,UI 必須顯示、不可吞掉。驗證:
   `lib/__tests__/receivables-summary.test.ts`
 - **R-AMT4**:只有 `status='open'` 的約定計入在手應收/應付合計
+- **R-AMT5**:任何「本月/本季/本年」的期間計算一律走 `lib/tz.ts`(台北時區),
+  不可用 `Date.UTC`/`getUTCFullYear` 等 UTC 方法推算——UTC 版本在台北時間
+  00:00–07:59 之間會算錯期間(例如 1/1 台北凌晨,UTC 還是去年 12/31,
+  「本年」會被算成去年)。2026-08-18 報表中心批次修正,`ledger-page-helpers.ts`
+  的 `currentQuarter`/`currentYear` 曾誤用 UTC,見第 6 節變更歷史
 
 ### 3.2 帳簿與類別
 
@@ -238,6 +243,23 @@ none ──(標記待開)──> to_issue ──(填發票號+日期)──> iss
   不是靠人工比對
 
 ---
+
+### 3.6 報表口徑(2026-08-18 報表中心新增)
+
+- **R-RPT1**:損益表的「營業收入/營業損益」只計 `INCOME_KINDS` 扣除
+  `loan`(借款/資本)——借款是籌資活動,不是營業收入,計入會虛增營收。
+  `investment`(投資)、`health`(健檢)屬於老闆個人/業外項,同樣不計入營業損益,
+  另立「營業外及個人項」小計。此三者連同其餘各 kind 合計必須等於
+  `summarizeEntries()` 算出的收入/支出總額(恆等式,不可有殘差)
+- **R-RPT2**:報表中心的淨額計算必須呼叫 `summarizeEntries()`(`lib/ledger-summary.ts`),
+  不可自行重新 reduce `ledger_entries`——避免出現第二套加總邏輯,與金流監測分頁
+  的淨額不一致(2026-08-18 之前的 `ReportsView.tsx` 犯過這個錯,舊版淨額未扣手續費、
+  且把借款算進收入,已修正,見第 6 節)
+- **R-RPT3**:所有報表視圖標題附近必須標明口徑——現金收付制、是否扣手續費、
+  是否含未收未付、是否含人力分攤成本(R-UI2 的報表層落地)
+- **R-RPT4**:`credit_card`(已退役 kind)若在報表期間內出現舊資料,獨立列一行
+  「已退役類別(歷史資料)」,不可靜默併入 `other_expense`——併入會讓使用者
+  誤以為退役後的資料完全消失,實際上舊分錄仍計入合計
 
 ## 4. 重建 vs 修補評估
 
@@ -291,6 +313,7 @@ none ──(標記待開)──> to_issue ──(填發票號+日期)──> iss
 
 | 日期 | 修正 | 原因 |
 |---|---|---|
+| 2026-08-18 | 報表中心口徑止血:淨額改呼叫 `summarizeEntries()`(原本自行重算、漏扣手續費)、營業收入排除借款/投資/健檢、`currentQuarter`/`currentYear` 改用 `lib/tz.ts` 台北時區(原本用 UTC) | `ReportsView.tsx` 舊版與金流監測分頁數字不一致(R-UI3 違反),借款被算進營收會虛增本期損益 |
 | 2026-08-14 | 淨額計算改為扣除手續費 | 手續費是真實現金流出,不扣會讓淨額虛高 |
 | 2026-08-14 | migration 014:新增 `state`/`to_check`/`journal`/`payment_method`/`site_distribution`,`credit_card` 拆分 | 見 [ledger-v3-spec-v1.md](./ledger-v3-spec-v1.md) |
 | 2026-08-14 | 修正 `voidEntry`(`web/app/boss/ledger/actions.ts`)漏同步 `state` 的 bug | 作廢的收款分錄若 `state` 未同步,`receivable_payment_state` 會誤把它算進已結清金額,應收未結金額偏低 |
