@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { fmt } from './ledger-page-helpers';
 
 // 就地抽屜(Q5):看數字不離開,要動手才離開。伺服器端 Link 狀態(?drill=),
@@ -26,7 +27,7 @@ export function ReportsDrillDrawer({
         <div style={{ font: '400 11px/1 inherit', color: 'var(--nm-text-muted)' }}>
           就地抽屜　·　{title}　·　{count} 筆　·　合計 ${fmt(total)}
         </div>
-        <a href={collapseHref} style={{ font: '400 12px/1 inherit', color: 'var(--nm-text-secondary)', textDecoration: 'none' }}>收起 ▴</a>
+        <Link href={collapseHref} style={{ font: '400 12px/1 inherit', color: 'var(--nm-text-secondary)', textDecoration: 'none' }}>收起 ▴</Link>
       </div>
 
       {count === 0 ? (
@@ -47,7 +48,7 @@ export function ReportsDrillDrawer({
       )}
 
       <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <a href={seeAllHref} className="nm-btn" style={{ minHeight: 34, borderRadius: 10, padding: '6px 14px', fontSize: 12.5 }}>到明細頁看全部 {count} 筆</a>
+        <Link href={seeAllHref} className="nm-btn" style={{ minHeight: 34, borderRadius: 10, padding: '6px 14px', fontSize: 12.5 }}>到明細頁看全部 {count} 筆</Link>
         <span style={{ font: '400 11px/1.4 inherit', color: 'var(--nm-text-faint)' }}>前三筆就地看完就走　·　帶著期間與類別的篩選條件過去</span>
       </div>
     </div>

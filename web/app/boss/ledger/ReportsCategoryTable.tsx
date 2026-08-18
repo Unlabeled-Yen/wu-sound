@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { IncomeStatement, KindAmount } from '@/lib/ledger-report-summary';
 import { fmt } from './ledger-page-helpers';
 
@@ -81,10 +82,10 @@ function SectionRows({ rows, sign, drillHref, prevByKind, hasPrior, revenueBase,
         return (
           <tr key={r.kind} style={{ borderBottom: '1px solid var(--nm-border-hair)' }}>
             <td style={{ padding: '9px 0', font: '400 13px/1.4 inherit', color: retired ? 'var(--nm-text-secondary)' : 'var(--nm-text-body)' }} data-drill>
-              <a href={drillHref(r.kind)} style={{ color: 'inherit', textDecoration: 'none' }}>
+              <Link href={drillHref(r.kind)} style={{ color: 'inherit', textDecoration: 'none' }}>
                 {r.label}
                 {retired && <span style={{ font: '400 11px/1 inherit', color: 'var(--nm-text-muted)', marginLeft: 6 }}>歷史資料,不可新增</span>}
-              </a>
+              </Link>
             </td>
             <NumTd value={value} />
             <PrevTd prevValue={prevValue} />

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { SiteReport, SiteReportRow } from '@/lib/ledger-report-site';
 import { fmt, NO_SITE } from './ledger-page-helpers';
 import { NumberCell } from './ReportsCategoryTable';
@@ -57,7 +58,7 @@ function SiteRow({ row, href, residual, mono }: { row: SiteReportRow; href?: str
       data-margin={row.margin}
     >
       <td style={{ padding: '9px 0', font: `400 13px/1.4 inherit`, color: residual ? 'var(--nm-warning-glass-text)' : 'var(--nm-text-body)', fontWeight: residual ? 500 : 400 }} data-drill={href ? true : undefined}>
-        {href ? <a href={href} style={{ color: 'inherit', textDecoration: 'none' }}>{row.label}</a> : row.label}
+        {href ? <Link href={href} style={{ color: 'inherit', textDecoration: 'none' }}>{row.label}</Link> : row.label}
       </td>
       <NumTd value={row.revenue} mono={mono} />
       <NumTd value={-row.directCost} mono={mono} />

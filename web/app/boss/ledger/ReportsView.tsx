@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { buildIncomeStatement, type ReportEntryRow } from '@/lib/ledger-report-summary';
 import { buildSiteReport } from '@/lib/ledger-report-site';
@@ -292,7 +293,7 @@ function ReportKnobs({ base, dim, period, periodValue, forceReason }: {
           const active = opt.key === period;
           const href = disabled ? undefined : buildHref(base, { dim, period: opt.key, pv: currentPeriodValue(opt.key), drill: undefined });
           return href
-            ? <a key={opt.key} href={href} data-opt data-active={active ? true : undefined} style={segStyle(active, false)}>{opt.label}</a>
+            ? <Link key={opt.key} href={href} data-opt data-active={active ? true : undefined} style={segStyle(active, false)}>{opt.label}</Link>
             : <span key={opt.key} data-opt data-disabled style={segStyle(active, true)}>{opt.label}</span>;
         })}
       </div>
@@ -311,11 +312,11 @@ function PeriodStepper({ base, dim, period, periodValue }: { base: SP; dim: Dime
   const cur = period === 'year' ? currentYear() : period === 'quarter' ? currentQuarter() : currentMonth();
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
-      <a href={buildHref(base, { dim, period, pv: prev, drill: undefined })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto', fontSize: 12.5 }}>← 上期</a>
+      <Link href={buildHref(base, { dim, period, pv: prev, drill: undefined })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto', fontSize: 12.5 }}>← 上期</Link>
       <span style={{ font: '500 12.5px/1 inherit', color: 'var(--nm-text-primary)', minWidth: '5rem', textAlign: 'center' }}>{periodValue}</span>
-      <a href={buildHref(base, { dim, period, pv: next, drill: undefined })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto', fontSize: 12.5 }}>下期 →</a>
+      <Link href={buildHref(base, { dim, period, pv: next, drill: undefined })} className="nm-btn" style={{ padding: '4px 10px', minHeight: 'auto', fontSize: 12.5 }}>下期 →</Link>
       {periodValue !== cur && (
-        <a href={buildHref(base, { dim, period, pv: cur, drill: undefined })} style={{ font: '400 11.5px/1 inherit', color: 'var(--nm-text-muted)', textDecoration: 'underline' }}>回本期</a>
+        <Link href={buildHref(base, { dim, period, pv: cur, drill: undefined })} style={{ font: '400 11.5px/1 inherit', color: 'var(--nm-text-muted)', textDecoration: 'underline' }}>回本期</Link>
       )}
     </div>
   );
@@ -333,9 +334,9 @@ function DimensionRow({ base, dim, activePeriod }: { base: SP; dim: Dimension; a
           const { period: forcedPeriod } = resolvePeriodForDimension(opt.key, activePeriod);
           const href = buildHref(base, { dim: opt.key, period: forcedPeriod, pv: currentPeriodValue(forcedPeriod), drill: undefined });
           return (
-            <a key={opt.key} href={href} data-opt data-active={active ? true : undefined}
+            <Link key={opt.key} href={href} data-opt data-active={active ? true : undefined}
               style={{ padding: '7px 13px', borderRadius: 8, font: '400 12.5px/1 inherit', background: active ? '#f0f0f2' : 'transparent', color: active ? '#17171a' : 'var(--nm-text-muted)', fontWeight: active ? 500 : 400, textDecoration: 'none', display: 'inline-block' }}
-            >{opt.label}</a>
+            >{opt.label}</Link>
           );
         })}
       </div>
