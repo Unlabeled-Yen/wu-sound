@@ -15,7 +15,8 @@ export const dynamic = 'force-dynamic';
 export default async function LoginPage() {
   const session = await getSession();
   if (session) {
-    redirect(session.role === 'boss' ? '/boss' : '/staff');
+    // 員工桌面版落地頁跟老闆一致,一律 /boss,見 app/page.tsx 同名註解。
+    redirect('/boss');
   }
 
   const sb = getSupabaseAdmin();

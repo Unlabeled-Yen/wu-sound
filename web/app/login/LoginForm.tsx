@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
-import type { UserRole } from '@/lib/types';
 import { BrandLockup } from '@/app/_shared/BrandLogo';
 import {
   ChannelStrip,
@@ -90,8 +89,8 @@ export default function LoginForm({ users }: Props) {
         setSubmitting(false);
         return;
       }
-      const body = (await res.json()) as { ok: boolean; role: UserRole };
-      router.replace(body.role === 'boss' ? '/boss' : '/staff');
+      // 員工桌面版落地頁跟老闆一致,一律 /boss,見 app/page.tsx 同名註解。
+      router.replace('/boss');
       router.refresh();
     } catch {
       setError(NETWORK_ERROR_MESSAGE);
