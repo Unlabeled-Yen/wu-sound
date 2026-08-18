@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { speechFor, useVoice } from './useVoice';
+import { useAssistantReturn } from '@/app/_shared/useAssistantShortcut';
 
 /**
  * Lab 2 極簡聊天 UI(spec §5)。
@@ -47,6 +48,9 @@ const STATE_LABEL: Record<string, string> = {
 };
 
 export function ChatClient() {
+  // ⌘K/Ctrl+K 跳回按快捷鍵之前那個 ERP 頁面(見 useAssistantShortcut.ts)。
+  useAssistantReturn();
+
   const [sessionId, setSessionId] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');

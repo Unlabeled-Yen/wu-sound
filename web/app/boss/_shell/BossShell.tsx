@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ToastProvider } from './Toast';
 import { BrandLockup, BrandMark } from '@/app/_shared/BrandLogo';
+import { useAssistantLauncher } from '@/app/_shared/useAssistantShortcut';
 import {
   findActiveItemLabel,
   findActiveMobileTab,
@@ -24,6 +25,10 @@ const PREFETCH_ROUTES = ['/boss', '/boss/expenses', '/boss/ledger', '/boss/quote
 function useBossShellData(role: UserRole) {
   const router = useRouter();
   const [pendingCount, setPendingCount] = useState(0);
+
+  // ⌘K/Ctrl+K 全站跳去 AI 助理頁,涵蓋所有共用這個 shell 的頁面
+  // (/boss/*、/tools/*,現在也包含員工桌面版)。
+  useAssistantLauncher();
 
   useEffect(() => {
     // Prefetch hot routes so nav feels instant
