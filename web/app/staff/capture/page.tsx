@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { randomClientId } from '@/lib/client-id';
 
 type SheetMode = null | 'fuel' | 'parking';
 
@@ -114,7 +115,7 @@ export default function CapturePage() {
         const dataUrl = await fileToDataUrl(file);
         const q = loadQueue();
         q.push({
-          id: crypto.randomUUID(),
+          id: randomClientId(),
           dataUrl,
           mediaType: file.type || 'image/jpeg',
           addedAt: Date.now(),

@@ -77,6 +77,18 @@ const MOBILE_TABS: MobileTab[] = [
   { key: 'more', href: '/boss/more', label: '更多', icon: MobileMoreIcon },
 ];
 
+// 員工版底部分頁——審核/財務屬於 finance 能力、「更多」頁本身也是 STAFF_DENIED
+// 的 'more' 能力(見 lib/acl.ts),點了會被彈回去,乾脆不畫出來,不要讓使用者
+// 點一個進不去的分頁(這個坑之前在桌面側欄已經修過,手機這裡當時漏掉了)。
+const STAFF_MOBILE_TABS: MobileTab[] = [
+  { key: 'overview', href: '/boss', label: '總覽', icon: MobileHomeIcon },
+  { key: 'projects', href: '/boss/sites', label: '專案', icon: MobileDocIcon },
+];
+
+function mobileTabsForRole(role: UserRole): MobileTab[] {
+  return role === 'boss' ? MOBILE_TABS : STAFF_MOBILE_TABS;
+}
+
 function currentMonthLabel(): string {
   const d = new Date();
   return `本月 ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -214,26 +226,29 @@ export function BossShell({ children, role = 'boss' }: { children: React.ReactNo
 
         {/* ===== Mobile bottom tab bar (＜lg only) ===== */}
         <nav
-          className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pt-2 grid grid-cols-5"
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pt-2 grid"
           style={{
             background: 'rgba(16,16,20,0.5)',
             WebkitBackdropFilter: 'blur(22px) saturate(1.2)',
             backdropFilter: 'blur(22px) saturate(1.2)',
             borderTop: '1px solid rgba(255,255,255,0.12)',
             paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+            // 老闆 5 格、員工 2 格(過濾掉進不去的分頁,見 STAFF_MOBILE_TABS)——
+            // 格數不固定,不能用 Tailwind 的 grid-cols-N 寫死。
+            gridTemplateColumns: `repeat(${mobileTabsForRole(role).length}, minmax(0, 1fr))`,
           }}
         >
-          <MobileTabBar activeTab={activeTab} pendingCount={pendingCount} />
+          <MobileTabBar role={role} activeTab={activeTab} pendingCount={pendingCount} />
         </nav>
       </div>
     </ToastProvider>
   );
 }
 
-function MobileTabBar({ activeTab, pendingCount }: { activeTab: string; pendingCount: number }) {
+function MobileTabBar({ role, activeTab, pendingCount }: { role: UserRole; activeTab: string; pendingCount: number }) {
   return (
     <>
-      {MOBILE_TABS.map((t) => {
+      {mobileTabsForRole(role).map((t) => {
         const active = t.key === activeTab;
         const badge = t.key === 'review' ? pendingCount : 0;
         return (

@@ -5,7 +5,7 @@ import type { UserRole } from './types';
  * 員工手機版暫緩開發中(見 docs/desktop-lock-and-staff-access-spec-v1.md)。
  * 做完後改成 true,員工即回到跟隨裝置的版面判斷,行為與老闆端相同。
  */
-export const STAFF_MOBILE_ENABLED = false;
+export const STAFF_MOBILE_ENABLED = true; // TEMP: 手機版整合驗證用,不要 commit
 
 // 跟 app/layout.tsx 的 root viewport 一致——老闆維持這份,版面照裝置走。
 const NORMAL_VIEWPORT: Viewport = {

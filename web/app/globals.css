@@ -71,7 +71,11 @@ body {
   font-feature-settings: "palt" 1;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  min-height: 100vh;
+  /* 100dvh 不是 100vh:手機 Safari 網址列收合/展開時可視高度會變,100vh
+     算的是網址列收合後的「大」高度,跟畫面當下實際看得到的高度對不上,
+     用 100dvh(動態視窗高度)才會跟著網址列即時調整,元件才不會多出一截
+     捲軸(2026-08-18 Yen 在真機上實測撞到,見 voice-lab-chat 頁)。 */
+  min-height: 100dvh;
 }
 
 ::selection { background: rgba(228, 228, 231, 0.16); }
@@ -430,8 +434,8 @@ body::after {
 /* logo 素材是白色透明底,只在深色底上使用(見 app/_shared/BrandLogo.tsx 同一份
    素材的既有慣例),app 本身也是 color-scheme:dark 寫死、沒有淺色模式,不處理反轉。 */
 .agent-logo {
-  width: 88px;
-  height: 88px;
+  /* 尺寸由 AgentLogo.tsx 的 size prop 用 inline style 控制(空狀態大、
+     對話中常駐小圖示縮小),這裡不寫死。 */
   object-fit: contain;
   cursor: pointer;
 }

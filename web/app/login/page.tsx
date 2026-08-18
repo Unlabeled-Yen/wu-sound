@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/session';
+import { STAFF_MOBILE_ENABLED } from '@/lib/view-mode';
 import type { UserRole } from '@/lib/types';
 import LoginForm from './LoginForm';
 
@@ -15,7 +16,9 @@ export const dynamic = 'force-dynamic';
 export default async function LoginPage() {
   const session = await getSession();
   if (session) {
-    // 員工桌面版落地頁跟老闆一致,一律 /boss,見 app/page.tsx 同名註解。
+    // 落地頁邏輯見 app/page.tsx 同名註解:手機版鎖著時員工也是 /boss,
+    // 解鎖後員工落地 /staff。
+    if (session.role !== 'boss' && STAFF_MOBILE_ENABLED) redirect('/staff');
     redirect('/boss');
   }
 

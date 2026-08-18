@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { speechFor, useVoice } from './useVoice';
+import { useVoice } from './useVoice';
 import { useAssistantReturn } from '@/app/_shared/useAssistantShortcut';
+import { randomClientId } from '@/lib/client-id';
+import { AgentLogo, type AgentState } from '@/app/_shared/AgentLogo';
 
 /**
  * Lab 2 極簡聊天 UI(spec §5)。
@@ -47,7 +49,7 @@ const STATE_LABEL: Record<string, string> = {
   responding: '已回覆',
 };
 
-export function ChatClient() {
+export function ChatClient({ autoVoice = false }: { autoVoice?: boolean }) {
   // ⌘K/Ctrl+K 跳回按快捷鍵之前那個 ERP 頁面(見 useAssistantShortcut.ts)。
   useAssistantReturn();
 
@@ -55,7 +57,11 @@ export function ChatClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [voiceMode, setVoiceMode] = useState(false);
+  // 手機 logo 入口帶 ?voice=1 進來,一開始就是免手模式——「語音優先」的互動順位
+  // (voice-lab/lab4-mobile-agent-entry-brief-v1.md §1.8),不用使用者自己再勾。
+  // 2026-08-18 定案:logo 點一下切換免手模式,按著不放是單句錄音——不是兩顆
+  // 按鈕,是同一顆 logo 靠手勢分流(見 AgentLogo.tsx)。
+  const [voiceMode, setVoiceMode] = useState(autoVoice);
   const nextId = useRef(1);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<ChatMessage['state']>(undefined);
@@ -73,8 +79,19 @@ export function ChatClient() {
 
   // session_id 在 client 端產生:server render 時產生會造成 hydration 不一致
   useEffect(() => {
-    setSessionId(crypto.randomUUID());
+    setSessionId(randomClientId());
   }, []);
+
+  // autoVoice 且瀏覽器支援錄音時,session 就緒後直接開始聽——不用使用者再按一次
+  // 麥克風。只在 sessionId 剛產生的那一刻做一次,不然使用者手動停止錄音後
+  // 這個 effect 不能又把它搶回去重開。
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (!autoVoice || autoStartedRef.current || !sessionId || !voice.supported) return;
+    autoStartedRef.current = true;
+    void voice.start(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoVoice, sessionId, voice.supported]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -132,11 +149,20 @@ export function ChatClient() {
         toolTrace: Array.isArray(data.tool_trace) ? (data.tool_trace as ToolTraceEntry[]) : undefined,
       });
 
+      // 2026-08-18 Yen 明確要求拿掉:回覆只用文字顯示,不自動朗讀。
+      //
+      // 免手模式什麼時候自動關掉:後端沒有明講「這輪對話結束了」的旗標,
+      // 用已經在回的 state 反推——clarifying(追問中)/confirming(等你確認)
+      // 代表 AI 還需要使用者再講一句,繼續聽;其餘(responding 等最終答案、
+      // 或任何非以上兩種)代表這輪告一段落,自動關掉免手模式,不再搶著聽。
+      // 這不是 AI 主動下指令關閉,是借用它已經在講的話反推,效果接近但
+      // 機制不同,要記得這個差異。
       if (voiceModeRef.current) {
-        // 等唸完再開始聽,不然會錄到自己的聲音;唸完後不管什麼狀態都繼續聽下一句,
-        // 這才是「來回對話」而不是只有等確認那一步才會動——這是這次要解決的體驗問題
-        await voice.speak(speechFor(String(data.reply ?? ''), state, pending));
-        if (voiceModeRef.current) void voice.start(true);
+        if (state === 'clarifying' || state === 'confirming') {
+          void voice.start(true);
+        } else {
+          setVoiceMode(false);
+        }
       }
     } catch (e) {
       push({ role: 'error', text: `連線失敗: ${e instanceof Error ? e.message : String(e)}` });
@@ -153,15 +179,56 @@ export function ChatClient() {
     void send('message', text);
   }
 
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="nm-raised rounded-[var(--nm-radius)] p-4 min-h-[340px] flex flex-col gap-3">
-        {messages.length === 0 && (
-          <p className="text-[13px]" style={{ color: 'var(--nm-text-faint)' }}>
-            例如:「幫我在磐頂那個案子記一筆,木作進場前先放樣」
-          </p>
-        )}
+  // 點一下:切換免手模式。開起來就直接開始聽(等你講);關掉就停止聽,
+  // 不留尾巴錄音。長按走另一條路(見下面 onHoldStart/onHoldEnd),
+  // 兩者互斥——長按開始時一定不在免手模式的自動聆聽狀態(見 AgentLogo
+  // 的手勢判斷,快點快放才會走到這裡)。
+  function handleTap() {
+    if (voiceMode) {
+      setVoiceMode(false);
+      if (voice.recording) voice.stop();
+      return;
+    }
+    setVoiceMode(true);
+    void voice.start(true);
+  }
 
+  // 長按開始:單句手動錄音,不管免手模式現在開或關,長按期間都當作
+  // 一次性錄音——鬆開就送出,不會像免手模式那樣講完自動再聽下一句。
+  function handleHoldStart() {
+    if (voiceMode) setVoiceMode(false);
+    if (!voice.recording) void voice.start(false);
+  }
+
+  function handleHoldEnd() {
+    if (voice.recording) voice.stop();
+  }
+
+  // logo 顯示的狀態,跟粗胚定案的五態對齊——executing 這輪先不細分
+  // (沒有專門的「工具呼叫中」旗標),busy 一律當 thinking。
+  const logoState: AgentState = voice.recording ? 'listening' : busy ? 'thinking' : 'idle';
+  const logoLabel = voiceMode && logoState === 'idle' ? '免手模式聽你說…' : undefined;
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 max-w-[720px] w-full mx-auto lg:px-[22px]">
+      <div className="flex-1 overflow-y-auto min-h-0 px-[18px] lg:px-0">
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3 pb-16">
+            <AgentLogo
+              state={logoState}
+              label={logoLabel}
+              onTap={handleTap}
+              onHoldStart={handleHoldStart}
+              onHoldEnd={handleHoldEnd}
+            />
+            {!logoLabel && (
+              <p className="text-[13px] text-center max-w-[240px]" style={{ color: 'var(--nm-text-faint)' }}>
+                輕點下方輸入,或輕點 logo 開免手、按著 logo 錄一句
+              </p>
+            )}
+          </div>
+        ) : (
+        <div className="flex flex-col gap-3 pt-4 pb-4">
         {messages.map((m) => (
           <div key={m.id} className={m.role === 'user' ? 'self-end max-w-[85%]' : 'self-start max-w-[92%]'}>
             <div
@@ -251,8 +318,14 @@ export function ChatClient() {
           </p>
         )}
         <div ref={bottomRef} />
+        </div>
+        )}
       </div>
 
+      <div
+        className="shrink-0 px-[18px] lg:px-0 pt-2 flex flex-col gap-2"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)' }}
+      >
       {voice.error && (
         <p className="text-[12px]" style={{ color: '#ff8f8f' }}>
           🎤 {voice.error}
@@ -260,7 +333,7 @@ export function ChatClient() {
       )}
       {voice.recording && (
         <p className="text-[13px]" style={{ color: 'var(--nm-accent)' }}>
-          🔴 {voiceMode ? '聽你說…講完停頓一下會自動送出' : '錄音中…講完按一下停止'}
+          🔴 {voiceMode ? '免手模式聽你說…講完停頓一下會自動送出' : '錄音中…放開就送出'}
         </p>
       )}
       {voice.transcribing && (
@@ -268,36 +341,17 @@ export function ChatClient() {
           辨識中…
         </p>
       )}
-      {voice.speaking && (
-        <p className="text-[13px]" style={{ color: 'var(--nm-text-muted)' }}>
-          🔊 播放中…(按麥克風可以打斷直接講下一句)
-        </p>
-      )}
-
-      <form onSubmit={submit} className="flex gap-2">
-        <button
-          type="button"
-          className="nm-btn text-[16px] px-3"
-          aria-label={voice.recording ? '停止錄音' : '開始說話'}
-          title={
-            voice.supported
-              ? voiceMode
-                ? '按一下開始說話,講完停頓會自動送出'
-                : '按一下開始講,講完再按一下停止'
-              : '這個瀏覽器不支援錄音'
-          }
-          disabled={busy || !sessionId || !voice.supported || voice.transcribing}
-          onClick={() => {
-            if (voice.recording) {
-              voice.stop();
-              return;
-            }
-            voice.cancelSpeech(); // 唸話中按下去,先打斷朗讀再開始聽,才有機會真的插話
-            void voice.start(voiceMode);
-          }}
-        >
-          {voice.recording ? '⏹' : '🎤'}
-        </button>
+      <form onSubmit={submit} className="flex items-center gap-2">
+        {messages.length > 0 && (
+          <AgentLogo
+            state={logoState}
+            label=""
+            size={40}
+            onTap={handleTap}
+            onHoldStart={handleHoldStart}
+            onHoldEnd={handleHoldEnd}
+          />
+        )}
         <input
           className="nm-input flex-1 text-[14px]"
           placeholder={awaitingConfirm ? '要修改內容就直接打字(原提案會作廢)' : '講一件要記的事…'}
@@ -309,25 +363,7 @@ export function ChatClient() {
           送出
         </button>
       </form>
-
-      <label className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--nm-text-faint)' }}>
-        <input
-          type="checkbox"
-          className="nm-focus"
-          checked={voiceMode}
-          disabled={!voice.supported}
-          onChange={(e) => {
-            setVoiceMode(e.target.checked);
-            if (!e.target.checked) {
-              voice.cancelSpeech();
-              if (voice.recording) voice.stop();
-            }
-          }}
-        />
-        免手模式:講完停頓自動送出、agent 唸完回覆自動繼續聽,像對話一樣來回;
-        等你確認時說「確認」或「取消」
-        {!voice.supported && '(這個瀏覽器不支援錄音)'}
-      </label>
+      </div>
     </div>
   );
 }
