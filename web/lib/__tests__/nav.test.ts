@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ACOUSTIC_TABS,
   NAV_SECTIONS,
   QUOTE_SYSTEM_TABS,
   SETTINGS_SECTION,
@@ -126,14 +125,13 @@ describe('手機頁面標題', () => {
 describe('頁內分頁列', () => {
   it('分頁的路徑都存在於導覽結構中', () => {
     const known = new Set(ALL_SECTIONS.flatMap((s) => s.items.map((i) => i.href)));
-    for (const t of [...QUOTE_SYSTEM_TABS, ...ACOUSTIC_TABS]) {
+    for (const t of QUOTE_SYSTEM_TABS) {
       expect(known.has(t.href), `${t.href} 不在導覽結構裡`).toBe(true);
     }
   });
 
   it('分頁第一項就是側欄那一列指向的頁面', () => {
     expect(QUOTE_SYSTEM_TABS[0].href).toBe(visibleItems(NAV_SECTIONS.find((s) => s.key === 'quotes')!)[0].href);
-    expect(ACOUSTIC_TABS[0].href).toBe(visibleItems(NAV_SECTIONS.find((s) => s.key === 'acoustic')!)[0].href);
   });
 
   it('isTabActive 認子路徑,但不會誤中別的分頁', () => {

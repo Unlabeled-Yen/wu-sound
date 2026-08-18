@@ -205,12 +205,6 @@ export const QUOTE_SYSTEM_TABS: PageTab[] = [
   { href: '/boss/catalog', label: '價目表' },
 ];
 
-// 併頁後只剩一個路由,分頁列其實不需要了(PageTabs 單一 pill 沒有切換意義)——
-// 保留這個匯出是因為 app/tools/layout.tsx 還在用它渲染 PageTabs,等 layout
-// 那邊決定要不要整個拿掉分頁列再一起清。
-export const ACOUSTIC_TABS: PageTab[] = [
-  { href: '/tools/acoustic', label: '聲學計算' },
-];
 
 export function isTabActive(pathname: string, tab: PageTab): boolean {
   return pathname === tab.href || pathname.startsWith(tab.href + '/');
