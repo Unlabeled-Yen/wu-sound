@@ -93,16 +93,26 @@ export function AgentLogo({
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerLeave}
+        onContextMenu={(e) => e.preventDefault()}
         className="bg-transparent border-0 p-0 nm-focus select-none"
-        style={{ borderRadius: '50%', touchAction: 'manipulation' }}
+        style={{
+          borderRadius: '50%',
+          touchAction: 'manipulation',
+          // iOS Safari 長按圖片會跳出系統的「儲存/拷貝/查詢」選單,搶走我們自己的
+          // 長按錄音手勢——這兩個 -webkit 屬性關掉那個系統選單,onContextMenu
+          // 擋的是滑鼠右鍵那條路徑,兩者要同時擋才會在真機上都生效。
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+        }}
       >
         <img
           src="/brand/mark.png"
           alt=""
           aria-hidden="true"
           data-state={state}
+          draggable={false}
           className="agent-logo"
-          style={{ width: size, height: size }}
+          style={{ width: size, height: size, WebkitTouchCallout: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' }}
         />
       </button>
       {label !== '' && (

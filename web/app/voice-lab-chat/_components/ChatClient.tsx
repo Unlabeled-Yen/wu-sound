@@ -211,7 +211,7 @@ export function ChatClient({ autoVoice = false }: { autoVoice?: boolean }) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 max-w-[720px] w-full mx-auto lg:px-[22px]">
-      <div className="flex-1 overflow-y-auto min-h-0 px-[18px] lg:px-0">
+      <div className="flex-1 overflow-y-auto min-h-0 px-[18px] lg:px-0" style={{ overscrollBehavior: 'contain' }}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 pb-16">
             <AgentLogo

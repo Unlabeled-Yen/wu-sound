@@ -84,11 +84,17 @@ async function getProjectSummary(sb: SupabaseClient, body: Json): Promise<NextRe
   // 注意:count-only 查詢不可用 { head: true } —— PostgREST 對不存在的表在
   // HEAD 請求下會回 204 + error:null + count:null(已實測確認),等於把「表不存在」
   // 偽裝成「0 筆」,是活生生的靜默失效。改用一般 select 讓錯誤能正常浮現。
+  //
+  // status != 'done' 才是「未完成」,不是 status = 'open'——migration
+  // 020_tasks_kanban.sql 把 tasks.status 從兩態(open/done)擴成看板四態
+  // (decide/todo/blocked/done),'open' 這個值已經不存在於資料庫裡,這裡沒跟著
+  // 改就會變成「查詢永遠 0 筆」的靜默失效(AI 一律回答「沒有待辦事項」,
+  // 不管實際有沒有)。2026-08-18 修。
   const { data: openTaskRows, count: openTaskCount, error: taskErr } = await sb
     .from('tasks')
     .select('id', { count: 'exact' })
     .eq('site_id', projectId)
-    .eq('status', 'open');
+    .neq('status', 'done');
   if (taskErr) return dbErrorResponse(taskErr);
   if (openTaskCount === null && openTaskRows === null) {
     return voiceError('SERVICE_UNAVAILABLE', 'voice 資料表狀態異常,無法確認任務數', 503);
@@ -131,7 +137,10 @@ async function listTasks(sb: SupabaseClient, body: Json): Promise<NextResponse> 
     .eq('site_id', projectId)
     .order('due_date', { ascending: true, nullsFirst: false })
     .limit(10);
-  if (statusFilter !== 'all') q = q.eq('status', statusFilter);
+  // 'open'(對 LLM 的外部語意=「未完成」)對應看板四態裡的 decide/todo/blocked,
+  // 不是真的有一個 status='open' 的值——同一個坑見上面 getProjectSummary 的註解。
+  if (statusFilter === 'done') q = q.eq('status', 'done');
+  else if (statusFilter !== 'all') q = q.neq('status', 'done');
 
   const { data, count, error } = await q;
   if (error) return dbErrorResponse(error);

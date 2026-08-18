@@ -43,7 +43,12 @@ export default async function VoiceLabChatPage({
   }
 
   return (
-    <div className="relative z-[1] flex-1 flex flex-col h-[100dvh] lg:h-auto lg:min-h-screen">
+    // overflow-hidden 是關鍵:沒有它的話,真機上鍵盤彈出/網址列收合那個瞬間,
+    // 只要內容高度短暫超出一點點,溢出的部分會被 body(globals.css 只有
+    // min-height:100dvh,沒有 overflow:hidden)接手變成整頁捲動——訊息串跟
+    // 打字列會一起被推走,要滑到底才找得到打字列。加這個讓溢出永遠留在
+    // 這支容器內部處理,不會漏到 body(2026-08-18 真機回報後修)。
+    <div className="relative z-[1] flex-1 flex flex-col h-[100dvh] overflow-hidden lg:h-auto lg:min-h-screen lg:overflow-visible">
       <div className="lg:hidden">
         <MobileTopBar role={session.role} draftCount={draftCount} />
       </div>
