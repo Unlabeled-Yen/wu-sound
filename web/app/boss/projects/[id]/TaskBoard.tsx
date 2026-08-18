@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TASK_STATUS_LABEL, TASK_STATUS_ORDER, type Task, type TaskStatus } from '@/lib/types';
+import { TASK_STATUS_LABEL, TASK_STATUS_ORDER, type Task, type TaskStatus, type TaskTag } from '@/lib/types';
 import { validateTaskMove } from '@/lib/task-validation';
 import TaskCard from './TaskCard';
 
@@ -63,6 +63,18 @@ export default function TaskBoard({ initialTasks, archivedDoneCount }: Props) {
     }
   }
 
+  async function editTask(taskId: string, title: string, tags: TaskTag[]) {
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title, tags }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || '更新失敗');
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, title, tags } : t)));
+    router.refresh();
+  }
+
   function requestMove(taskId: string, toStatus: TaskStatus) {
     if (toStatus === 'blocked') {
       setReason('');
@@ -112,7 +124,7 @@ export default function TaskBoard({ initialTasks, archivedDoneCount }: Props) {
               </div>
               <div className="flex flex-col overflow-y-auto min-h-0" style={{ gap: 10 }}>
                 {colTasks.map((t) => (
-                  <TaskCard key={t.id} task={t} onRequestMove={requestMove} onDragStart={setDraggingId} />
+                  <TaskCard key={t.id} task={t} onRequestMove={requestMove} onDragStart={setDraggingId} onEditTask={editTask} />
                 ))}
                 {colTasks.length === 0 && (
                   <div className="text-xs rounded-xl nm-inset p-2 text-center" style={{ color: 'var(--nm-text-faint)' }}>

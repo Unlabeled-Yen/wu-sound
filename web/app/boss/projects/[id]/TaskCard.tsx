@@ -2,22 +2,28 @@
 
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { TASK_STATUS_LABEL, TASK_TAG_LABEL, type Task, type TaskStatus, type TaskTag } from '@/lib/types';
+import { TASK_STATUS_LABEL, TASK_TAGS, TASK_TAG_LABEL, type Task, type TaskStatus, type TaskTag } from '@/lib/types';
 
 interface Props {
   task: Task & { users: { name: string } | null };
   onRequestMove: (taskId: string, toStatus: TaskStatus) => void;
   onDragStart: (taskId: string) => void;
+  onEditTask: (taskId: string, title: string, tags: TaskTag[]) => Promise<void>;
 }
 
 function daysStuck(blockedSince: string): number {
   return Math.floor((Date.now() - new Date(blockedSince).getTime()) / (24 * 60 * 60 * 1000));
 }
 
-export default function TaskCard({ task, onRequestMove, onDragStart }: Props) {
+export default function TaskCard({ task, onRequestMove, onDragStart, onEditTask }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState(task.title);
+  const [editTags, setEditTags] = useState<TaskTag[]>(task.tags);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const cover = task.photos.length > 0 ? task.photos[0] : null;
 
   function toggleMenu() {
@@ -27,6 +33,33 @@ export default function TaskCard({ task, onRequestMove, onDragStart }: Props) {
     }
     setMenuOpen((v) => !v);
   }
+
+  function openEdit() {
+    setEditTitle(task.title);
+    setEditTags(task.tags);
+    setEditError(null);
+    setEditOpen(true);
+  }
+
+  function toggleEditTag(tag: TaskTag) {
+    setEditTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
+
+  async function submitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTitle.trim()) { setEditError('內容不得為空'); return; }
+    setEditSubmitting(true);
+    setEditError(null);
+    try {
+      await onEditTask(task.id, editTitle.trim(), editTags);
+      setEditOpen(false);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : '更新失敗');
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
+
   const days = task.status === 'blocked' && task.blocked_since ? daysStuck(task.blocked_since) : null;
   const isDone = task.status === 'done';
 
@@ -114,6 +147,15 @@ export default function TaskCard({ task, onRequestMove, onDragStart }: Props) {
                 style={{ top: menuPos.top, right: menuPos.right, width: 140, background: 'rgba(24,24,28,.92)', border: '1px solid rgba(255,255,255,.17)', boxShadow: '0 24px 70px -28px rgba(0,0,0,.85)' }}
                 onMouseLeave={() => setMenuOpen(false)}
               >
+                <button
+                  type="button"
+                  className="block w-full text-left px-2 py-1.5 rounded-lg nm-lift"
+                  style={{ fontSize: 12.5, color: '#e4e4e7' }}
+                  onClick={() => { setMenuOpen(false); openEdit(); }}
+                >
+                  編輯內容
+                </button>
+                <div style={{ height: 1, background: 'rgba(255,255,255,.1)', margin: '4px 0' }} />
                 {(Object.keys(TASK_STATUS_LABEL) as TaskStatus[])
                   .filter((s) => s !== task.status)
                   .map((s) => (
@@ -133,6 +175,56 @@ export default function TaskCard({ task, onRequestMove, onDragStart }: Props) {
           </div>
         </div>
       </div>
+
+      {editOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditOpen(false)}>
+          <div
+            className="w-full max-w-md rounded-2xl nm-raised-lg p-6 space-y-4"
+            style={{ background: 'rgba(24,24,28,0.9)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--nm-text-primary)' }}>編輯內容</h2>
+              <button onClick={() => setEditOpen(false)} className="nm-focus" style={{ color: 'var(--nm-text-muted)' }}>✕</button>
+            </div>
+
+            <form onSubmit={submitEdit} className="space-y-3">
+              <textarea
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                rows={2}
+                autoFocus
+                className="nm-input w-full text-[15px]"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {TASK_TAGS.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleEditTag(tag)}
+                    className="nm-pill"
+                    style={editTags.includes(tag) ? { color: 'var(--nm-text-primary)', background: 'rgba(255,255,255,0.14)', borderColor: 'rgba(255,255,255,0.2)' } : undefined}
+                  >
+                    {TASK_TAG_LABEL[tag]}
+                  </button>
+                ))}
+              </div>
+
+              {editError && (
+                <div className="rounded-xl nm-inset p-2 text-[13px]" style={{ color: 'var(--nm-danger)' }}>{editError}</div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-1">
+                <button type="button" onClick={() => setEditOpen(false)} className="nm-btn text-[13px]">取消</button>
+                <button type="submit" disabled={editSubmitting} className="nm-btn-solid text-[13.5px]">
+                  {editSubmitting ? '儲存中…' : '儲存'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

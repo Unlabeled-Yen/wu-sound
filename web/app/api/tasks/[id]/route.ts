@@ -51,6 +51,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
+  if (body.title !== undefined) {
+    const title = String(body.title).trim();
+    if (!title) return NextResponse.json({ error: '內容不得為空' }, { status: 400 });
+    if (title.length > 200) return NextResponse.json({ error: '內容超過 200 字' }, { status: 400 });
+    patch.title = title;
+  }
+
   if (body.site_id !== undefined) {
     // 待歸案卡歸案:site_id 從 null 填成實際案子。
     patch.site_id = body.site_id ? String(body.site_id) : null;
