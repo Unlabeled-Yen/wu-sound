@@ -47,6 +47,27 @@ export function RealtimeVoiceClient() {
   const dcRef = useRef<RTCDataChannel | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
+  // stop() 是下面用 useCallback 定義的,但 handleFunctionCall / 閒置計時器都在它
+  // 前面就要用到。走 ref 才不會受定義順序影響,也不會抓到過期的閉包。
+  const stopRef = useRef<(() => void) | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * 閒置自動掛斷。end_call 靠模型判斷「使用者說完了」,這一層防的是模型判斷不到的
+   * 情況:使用者講完直接把手機放進口袋、或現場被叫走人就走了——通話會一直開著,
+   * 麥克風亮著、也一直在計費。完全沒有人聲超過這個時間就自己斷線。
+   * 時間放寬到 90 秒,因為現場常常是「講一句、去搬東西、回來再講一句」,
+   * 太短會在人還在用的時候把他掛掉,那比多開一會兒更惱人。
+   */
+  const IDLE_HANGUP_MS = 90_000;
+
+  function resetIdleTimer() {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      setLastCaption('太久沒說話,已自動結束通話');
+      stopRef.current?.();
+    }, IDLE_HANGUP_MS);
+  }
 
   function sendEvent(ev: Record<string, unknown>) {
     if (dcRef.current?.readyState === 'open') dcRef.current.send(JSON.stringify(ev));
@@ -93,6 +114,17 @@ export function RealtimeVoiceClient() {
     if (name === 'search_projects' || name === 'list_projects' || name === 'get_project_summary' || name === 'list_tasks') {
       const result = await callTool(name, args);
       sendFunctionOutput(callId, result.body);
+      return;
+    }
+
+    // 掛斷:2026-08-24 Yen 回報「說掰掰之後通話還開著,麥克風一直亮、也一直計費」。
+    // 讓模型自己判斷該不該掛是安全的——掛錯了重按一次 logo 就好,跟寫入資料的
+    // 性質完全不同(那個判斷才必須是系統的,不能交給模型)。
+    // 先回工具結果讓它把道別講完,再等一下才真的斷線,不然話會被切一半。
+    if (name === 'end_call') {
+      sendFunctionOutput(callId, { ended: true });
+      setLastCaption('通話結束');
+      setTimeout(() => stopRef.current?.(), 2500);
       return;
     }
 
@@ -147,11 +179,19 @@ export function RealtimeVoiceClient() {
 
     // 光暈狀態機映射(見檔頭手勢設計):logo 狀態由 realtime 事件推,
     // 不由本地計時器猜——事件收到什麼就是什麼,才不會跟實際模型行為對不上。
-    if (event.type === 'input_audio_buffer.speech_started') setModelState('listening');
+    //
+    // 這幾個事件同時也是「這通還活著」的證據,用來重置閒置計時器:
+    // 使用者開口、AI 講完一輪,都算有互動。單純聽 AI 講話那段不重置也沒關係
+    // ——AI 講完會發 response.done,那時才開始計時,不會在他還在聽的時候掛掉。
+    if (event.type === 'input_audio_buffer.speech_started') {
+      setModelState('listening');
+      resetIdleTimer();
+    }
     if (event.type === 'response.created') setModelState('thinking');
     if (event.type === 'response.output_audio.delta') setModelState('responding');
     if (event.type === 'response.done') {
       setModelState('listening');
+      resetIdleTimer();
       const output = ((event.response as Record<string, unknown> | undefined)?.output ?? []) as Array<Record<string, unknown>>;
       const calls = output.filter((item) => item.type === 'function_call');
       for (const item of calls) {
@@ -203,7 +243,10 @@ export function RealtimeVoiceClient() {
       const dc = pc.createDataChannel('oai-events');
       dcRef.current = dc;
       dc.addEventListener('message', onServerEvent);
-      dc.addEventListener('open', () => setConnState('connected'));
+      dc.addEventListener('open', () => {
+        setConnState('connected');
+        resetIdleTimer(); // 接通就開始算閒置——連上之後一直沒人講話也要能自己斷
+      });
       dc.addEventListener('close', () => setConnState('idle'));
 
       const offer = await pc.createOffer();
@@ -235,6 +278,10 @@ export function RealtimeVoiceClient() {
   }, []);
 
   const stop = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
     dcRef.current?.close();
     dcRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -244,6 +291,9 @@ export function RealtimeVoiceClient() {
     setWriting(false);
     setConnState((s) => (s === 'error' ? 'error' : 'idle'));
   }, []);
+
+  // end_call 與閒置計時器都在 stop 定義之前就要用到它,透過 ref 取用
+  stopRef.current = stop;
 
   // 卸載時務必掛斷,不然使用者切走頁面 realtime 連線還會繼續燒 API 費用
   useEffect(() => {

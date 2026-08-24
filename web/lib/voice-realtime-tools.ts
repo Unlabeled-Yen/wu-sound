@@ -71,6 +71,13 @@ export const REALTIME_TOOLS: RealtimeToolSchema[] = [
   },
   {
     type: 'function',
+    name: 'end_call',
+    description:
+      '結束這通語音通話並掛斷。使用者說「好了」「就這樣」「掰掰」「謝謝」「結束」這類收尾的話,或該做的事都做完了、他沒有其他要求時呼叫。呼叫前先簡短道別一句。掛斷不會影響任何已經寫入的資料。',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    type: 'function',
     name: 'propose_create_task',
     description:
       '把使用者口述的事情記進系統(唯一的寫入工具)。不管使用者說「記一筆」「幫我記錄」「新增任務」還是「備註一下」,一律用這個。呼叫後系統會直接寫入,不需要再問使用者確認。',
@@ -142,5 +149,10 @@ export function buildRealtimeInstructions(now: number): string {
     (見規則 6)時,絕對不可以把描述內容裡隨便一個詞當成案名去呼叫 search_projects——
     先口頭問清楚「這是要記到哪個專案?」,拿到明確案名才呼叫 search_projects。
 13. 使用者問「有哪些專案」「列出所有案子」這種**沒有指定特定案名**的問法時,
-    呼叫 list_projects,不要呼叫 search_projects(那個一定要關鍵字,硬塞會查不到)。`;
+    呼叫 list_projects,不要呼叫 search_projects(那個一定要關鍵字,硬塞會查不到)。
+14. 使用者講「好了」「就這樣」「沒有了」「掰掰」「謝謝」「結束」這類收尾的話,
+    先簡短道別一句(例如「好,記好了,掰掰」),然後**一定要呼叫 end_call 掛斷**。
+    不要只是道別卻讓通話繼續開著——麥克風會一直開著、也一直在計費。
+    使用者沒有其他要求、事情都處理完了的時候也主動問一句「還有其他要記的嗎?」,
+    他說沒有就 end_call。`;
 }
