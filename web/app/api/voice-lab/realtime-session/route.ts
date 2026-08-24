@@ -9,7 +9,12 @@ export const runtime = 'nodejs';
 // 端點/欄位跟著 OpenAI Realtime API 走,同一套「環境變數可覆蓋」的慣例見
 // lib/voice-stt.ts(換供應商/換模型不用改程式)。
 const DEFAULT_BASE = 'https://api.openai.com/v1';
-const DEFAULT_MODEL = 'gpt-realtime-2.1';
+// 2026-08-24 直接跟 /v1/models 對這把 key 查了實際可用的 realtime model,
+// 這帳號只開通了 `gpt-realtime-2.1-mini` 一個(原先我以為 `gpt-realtime-2.1`
+// 是憑印象亂寫,其實 2.1 系列確實存在,只是 mini 變體才對這帳號放行)。
+// 之後帳號升級到完整版可改回 `gpt-realtime-2.1` 或 `gpt-realtime`,
+// 或設 VOICE_REALTIME_MODEL 環境變數覆蓋,不用改程式。
+const DEFAULT_MODEL = 'gpt-realtime-2.1-mini';
 const DEFAULT_VOICE = 'marin';
 // 使用者語音轉出的文字要拿來做關鍵字比對(確認/取消),所以一定要開啟輸入端轉錄——
 // 不開的話 conversation.item.input_audio_transcription.completed 事件根本不會來,
@@ -43,6 +48,19 @@ export async function POST() {
           audio: {
             input: {
               transcription: { model: process.env.VOICE_REALTIME_TRANSCRIBE_MODEL ?? DEFAULT_TRANSCRIBE_MODEL },
+              // 打斷/接手判斷放寬(2026-08-24 Yen 真機兩輪調參後定在這裡):
+              // - threshold 0.5(預設)→0.75→0.82,需要更明顯的人聲才會判定
+              //   為打斷,雜音/近距離呼吸不會誤觸
+              // - silence_duration 500(預設)→900→1300ms,AI 講到句中停頓
+              //   不會馬上被使用者的一個「嗯」接走
+              // 再想更放寬:threshold 拉到 0.88,silence_duration 拉到 1600
+              // (超過這個範圍會開始感覺 AI 聽不到你插話,反效果)
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.82,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 1300,
+              },
             },
             output: { voice },
           },

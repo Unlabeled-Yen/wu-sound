@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { MobileTopBar } from '@/app/_shared/MobileTopBar';
 import { ChatClient } from './_components/ChatClient';
+import { RealtimeVoiceClient } from './_components/RealtimeVoiceClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +19,11 @@ export const dynamic = 'force-dynamic';
  * 維持原本的標題 + 返回連結。兩套頭都渲染,靠 lg: 斷點互斥顯示,不是
  * 用 JS 判斷裝置。
  *
- * ?voice=1(手機首頁帶這個參數)= 一進來就開免手模式並開始聽,
- * 對應手機端「語音優先」的互動順位;桌面 ⌘K 進來預設是打字模式。
+ * ?voice=1(手機首頁帶這個參數)= 走 OpenAI Realtime 全雙工語音對答
+ *   (RealtimeVoiceClient,logo tap 開始/結束通話),對應手機端「跟 AI
+ *   對答」的互動順位(2026-08-24 Yen 定案)。
+ * ?voice=0(桌面 ⌘K 或手機切成打字模式)= 走傳統文字聊天(ChatClient)。
+ * 兩條路都掛同一個 propose→確認→寫入的硬化流程,只是引擎跟 UI 不同。
  */
 export default async function VoiceLabChatPage({
   searchParams,
@@ -55,7 +59,7 @@ export default async function VoiceLabChatPage({
 
       <div className="hidden lg:flex items-baseline justify-between gap-3 max-w-[720px] w-full mx-auto px-[22px] pt-6">
         <h1 className="text-[17px] font-medium" style={{ color: 'var(--nm-text-primary)' }}>
-          語音實驗室 · {autoVoice ? '免手語音模式' : '打字模式'}
+          語音實驗室 · {autoVoice ? '語音對答' : '打字模式'}
         </h1>
         <Link
           href={session.role === 'boss' ? '/boss' : '/staff'}
@@ -66,7 +70,25 @@ export default async function VoiceLabChatPage({
         </Link>
       </div>
 
-      <ChatClient autoVoice={autoVoice} />
+      {/* 手機語音入口(?voice=1)= Realtime 全雙工;其餘走 ChatClient 打字。
+          兩種模式互不共用引擎,但兩邊都有一個回頭切換的入口:語音模式底下
+          給一個「改打字」按鈕,打字模式的 logo tap 會開語音——見對應元件。 */}
+      {autoVoice ? (
+        <>
+          <RealtimeVoiceClient />
+          <div className="flex justify-center pb-6">
+            <Link
+              href="/voice-lab-chat"
+              className="text-[12px] px-3 py-1.5 rounded-lg nm-focus"
+              style={{ color: 'var(--nm-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              改用打字
+            </Link>
+          </div>
+        </>
+      ) : (
+        <ChatClient autoVoice={false} />
+      )}
     </div>
   );
 }

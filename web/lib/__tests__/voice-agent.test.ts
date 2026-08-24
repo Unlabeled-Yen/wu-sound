@@ -496,6 +496,18 @@ describe('語音口令確認(Lab 3 雙軌的 B 軌)', () => {
     expect(matchVoiceCommand('没错')).toBe('confirm');
   });
 
+  it('全語音對答的完整句子(帶語氣詞、多個肯定詞連講)也能斷句比對到——2026-08-24 真機回報全預設嚴格比對卡住確認流程後修', () => {
+    expect(matchVoiceCommand('嗯,對,確認一下')).toBe('confirm');
+    expect(matchVoiceCommand('好啊,可以')).toBe('confirm');
+    expect(matchVoiceCommand('那確認')).toBe('confirm');
+    expect(matchVoiceCommand('好啊')).toBe('confirm');
+  });
+
+  it('斷句後每個子句仍是精確比對,不是包含比對——矛盾句一律 unclear,不猜哪句才是真的', () => {
+    expect(matchVoiceCommand('對,不對')).toBe('unclear');
+    expect(matchVoiceCommand('嗯,不對,我是說錯了')).toBe('cancel'); // 「不對」精確命中取消名單,其他子句沒命中任何名單,不影響結果
+  });
+
   it('聽不清楚時不動 pending,狀態留在 confirming 讓使用者再講一次', async () => {
     const llm = fakeLlm([
       [{ type: 'tool_use', id: 't1', name: 'propose_log_note', input: { project_id: SITE_ID, content: '放樣' } }],

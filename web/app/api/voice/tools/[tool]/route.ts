@@ -64,6 +64,28 @@ async function searchProjects(sb: SupabaseClient, body: Json): Promise<NextRespo
   return ok({ candidates });
 }
 
+/**
+ * 列出全部進行中專案(不用關鍵字)——2026-08-24 真機回報:使用者問「列出所有
+ * 專案」,AI 只有 search_projects(要關鍵字)可用,只能誠實回「不支援」,
+ * 是能力缺口不是 bug,補這支工具讓它有得查。
+ *
+ * 只回 active=true,跟 search_projects 同一個範圍——休眠中的案子不列進來,
+ * 語音講一長串休眠案名對使用者沒有意義,只會增加聽的負擔。
+ * limit 50 是防呆上限,不是預期值(目前全公司案量遠低於這個數字)。
+ */
+async function listProjects(sb: SupabaseClient): Promise<NextResponse> {
+  const { data, error } = await sb
+    .from('sites')
+    .select('id, name')
+    .eq('active', true)
+    .order('name', { ascending: true })
+    .limit(50);
+  if (error) return dbErrorResponse(error);
+
+  const projects = (data ?? []).map((r: { id: string; name: string }) => ({ id: r.id, name: r.name }));
+  return ok({ projects, total: projects.length });
+}
+
 async function findActiveSite(sb: SupabaseClient, siteId: string) {
   // 格式不對的 id(非 uuid)一律當「找不到」,不要讓它打進 DB 變成 22P02 500——
   // 詳見 lib/voice.ts isWellFormedUuid 的註解
@@ -351,7 +373,7 @@ async function commitWrite(
 
 // ---------- dispatch ----------
 
-const READ_TOOLS = new Set(['search_projects', 'get_project_summary', 'list_tasks']);
+const READ_TOOLS = new Set(['search_projects', 'get_project_summary', 'list_tasks', 'list_projects']);
 const WRITE_TOOLS = new Set(['create_task', 'log_note']);
 
 export async function POST(req: Request, ctx: { params: Promise<{ tool: string }> }) {
@@ -365,6 +387,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ tool: string }
   if (body === null) return voiceError('BAD_REQUEST', '請求格式不是有效的 JSON', 400);
 
   if (tool === 'search_projects') return searchProjects(sb, body);
+  if (tool === 'list_projects') return listProjects(sb);
   if (tool === 'get_project_summary') return getProjectSummary(sb, body);
   if (tool === 'list_tasks') return listTasks(sb, body);
   if (tool === 'propose_write') return proposeWrite(sb, actorId, body);

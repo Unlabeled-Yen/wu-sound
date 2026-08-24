@@ -100,6 +100,12 @@ export const AGENT_TOOLS: ToolSchema[] = [
     },
   },
   {
+    name: 'list_projects',
+    description:
+      '列出全部進行中的專案(名稱+id),不需要關鍵字。使用者問「有哪些專案」「列出所有案子」這種沒有指定特定案名的問法時用這個,不要用 search_projects 硬塞一個猜測的關鍵字進去。',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
     name: 'get_project_summary',
     description: '取得單一專案的概況:名稱、未完成任務數、最近幾筆工作記錄。',
     input_schema: {

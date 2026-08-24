@@ -39,6 +39,13 @@ export const REALTIME_TOOLS: RealtimeToolSchema[] = [
   },
   {
     type: 'function',
+    name: 'list_projects',
+    description:
+      '列出全部進行中的專案(名稱+id),不需要關鍵字。使用者問「有哪些專案」「列出所有案子」這種沒有指定特定案名的問法時用這個,不要用 search_projects 硬塞一個猜測的關鍵字進去。',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    type: 'function',
     name: 'get_project_summary',
     description: '取得單一專案的概況:名稱、未完成任務數、最近幾筆工作記錄。',
     parameters: {
@@ -99,7 +106,7 @@ export const REALTIME_PROPOSE_ACTION: Record<string, 'create_task' | 'log_note'>
   propose_log_note: 'log_note',
 };
 
-export const READ_TOOL_NAMES = new Set(['search_projects', 'get_project_summary', 'list_tasks']);
+export const READ_TOOL_NAMES = new Set(['search_projects', 'list_projects', 'get_project_summary', 'list_tasks']);
 
 /**
  * 跟 buildSystemPrompt(voice-agent.ts,Lab 2 文字版)同一套硬規則,拿掉「你不能
@@ -137,5 +144,7 @@ export function buildRealtimeInstructions(now: number): string {
     跟工作有關但你沒有工具能做的(改金額、刪資料、建新專案)明講「這個操作目前不支援」。
 12. 使用者這句話裡**沒有提到任何專案/案場名稱**,而且對話裡**也還沒有已經對齊過的專案**
     (見規則 6)時,絕對不可以把描述內容裡隨便一個詞當成案名去呼叫 search_projects——
-    先口頭問清楚「這是要記到哪個專案?」,拿到明確案名才呼叫 search_projects。`;
+    先口頭問清楚「這是要記到哪個專案?」,拿到明確案名才呼叫 search_projects。
+13. 使用者問「有哪些專案」「列出所有案子」這種**沒有指定特定案名**的問法時,
+    呼叫 list_projects,不要呼叫 search_projects(那個一定要關鍵字,硬塞會查不到)。`;
 }
