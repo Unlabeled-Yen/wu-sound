@@ -1,14 +1,19 @@
+import Link from 'next/link';
 import { getSession } from '@/lib/session';
-import { ChatClient } from '@/app/voice-lab-chat/_components/ChatClient';
+import { RealtimeVoiceClient } from '@/app/voice-lab-chat/_components/RealtimeVoiceClient';
 
 // 總覽 v2(13a)桌機版重新規劃暫緩(2026-08-15 Yen 決定)——桌機先放「即將推出」
 // 占位畫面。OverviewDesktop.tsx / lib/overview-data.ts 兩支既有實作保留在
 // 專案裡但不掛上這個頁面,之後真的要重新規劃時可能還用得上,不要刪掉。
 //
-// 2026-08-18 Yen 定案:老闆手機版首頁換成跟員工同一套 AI 聊天介面(取代原本
+// 2026-08-18 Yen 定案:老闆手機版首頁換成跟員工同一套 AI 介面(取代原本
 // 的財務儀表板 BossMobileDashboard)。原本儀表板的數字收進抽屜「總覽(金流
 // 摘要)」項目(見 /boss/overview),不是整個拿掉——只是不再是一進來就看到
 // 的畫面。桌機版不受影響,還是占位卡。
+//
+// 2026-08-24 Yen 定案:跟員工一致,老闆手機首頁也走 Realtime 語音對答
+// (RealtimeVoiceClient),不是原本的 ChatClient 打字介面。要打字的話點
+// 畫面下方「改用打字」切到 /voice-lab-chat。
 
 export const dynamic = 'force-dynamic';
 
@@ -42,9 +47,18 @@ export default async function BossDashboard() {
 
   return (
     <>
-      {/* Mobile-only:AI 聊天首頁(跟員工同一支元件,見 BossShell.tsx 的 isBossChatHome) */}
+      {/* Mobile-only:AI 語音對答首頁(跟員工同一支元件,見 BossShell.tsx 的 isBossChatHome) */}
       <div className="lg:hidden flex-1 min-h-0 flex flex-col">
-        <ChatClient autoVoice={false} />
+        <RealtimeVoiceClient />
+        <div className="flex justify-center pb-6">
+          <Link
+            href="/voice-lab-chat"
+            className="text-[12px] px-3 py-1.5 rounded-lg nm-focus"
+            style={{ color: 'var(--nm-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            改用打字
+          </Link>
+        </div>
       </div>
 
       {/* Desktop view — 總覽重新規劃暫緩,先放占位畫面 */}

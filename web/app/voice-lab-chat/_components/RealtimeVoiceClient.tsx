@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentLogo, type AgentState } from '@/app/_shared/AgentLogo';
-import { matchVoiceCommand } from '@/lib/voice-command-match';
 
 /**
  * 手機語音助理:AgentLogo 排版 + OpenAI Realtime 引擎(2026-08-24 Yen 定案)。
@@ -15,7 +14,8 @@ import { matchVoiceCommand } from '@/lib/voice-command-match';
  *
  * 硬化規則(跟 ChatClient / voice-lab-realtime 是同一份):
  * - 模型工具清單只有 propose_*,沒有 create_task / log_note / confirm
- * - 「確認/取消」是 matchVoiceCommand 白名單比對,不是讓模型自己判斷
+ * - 語音模式**不等口頭確認**,propose 拿到 token 後系統自己接著 commit
+ *   (2026-08-24 Yen 定案:講完就寫,不要再問一次)
  * - propose 的 confirmation_token / canonical_echo 原封不動送回 commit
  * 見 lib/voice-realtime-tools.ts、docs voice-lab spec §4。
  *
@@ -27,13 +27,6 @@ import { matchVoiceCommand } from '@/lib/voice-command-match';
  */
 
 const REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
-
-interface PendingWrite {
-  action: 'create_task' | 'log_note';
-  token: string;
-  payload: Record<string, unknown>;
-  summary: string;
-}
 
 type ConnState = 'idle' | 'connecting' | 'connected' | 'error';
 type ModelState = 'listening' | 'thinking' | 'responding';
@@ -47,13 +40,12 @@ export function RealtimeVoiceClient() {
   const [connState, setConnState] = useState<ConnState>('idle');
   const [modelState, setModelState] = useState<ModelState>('listening');
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<PendingWrite | null>(null);
   const [lastCaption, setLastCaption] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const pendingRef = useRef<PendingWrite | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
 
   function sendEvent(ev: Record<string, unknown>) {
@@ -111,46 +103,38 @@ export function RealtimeVoiceClient() {
           ? { project_id: args.project_id, title: args.title, description: args.description, due_date: args.due_date }
           : { project_id: args.project_id, content: args.content, tags: args.tags };
 
-      const result = await callTool('propose_write', { action, payload });
-      if (!result.ok) {
-        sendFunctionOutput(callId, result.body);
+      // 2026-08-24 Yen 定案:語音模式不等使用者口頭確認,講完直接寫入。
+      // 兩階段 token 的機制**保留不動**(propose 拿 token → commit 帶 token),
+      // 只是「誰按下確認」從使用者變成系統自己接著按——payload hash 驗證、
+      // 稽核紀錄、canonical echo 這些防護都還在,拿掉的只有那句口頭確認。
+      //
+      // 這樣做順便根治了「AI 說謊」那個事故:寫入結果直接當成工具的回傳值
+      // 餵回模型,它是拿到真實結果才開口,不像之前那樣自己猜一句「記好了」。
+      setWriting(true);
+      const proposed = await callTool('propose_write', { action, payload });
+      if (!proposed.ok) {
+        setWriting(false);
+        sendFunctionOutput(callId, proposed.body);
         return;
       }
-      const token = String(result.body.confirmation_token ?? '');
-      const p: PendingWrite = { action, token, payload, summary: summarize(action, payload) };
-      pendingRef.current = p;
-      setPending(p);
-      sendFunctionOutput(callId, { proposed: true, echo: result.body.canonical_echo });
+      const token = String(proposed.body.confirmation_token ?? '');
+      const written = await callTool(action, { confirmation_token: token, ...payload });
+      setWriting(false);
+      const summary = summarize(action, payload);
+      if (written.ok) {
+        setLastCaption(`已寫入:${summary}`);
+        sendFunctionOutput(callId, { written: true, summary });
+      } else {
+        const msg = String(written.body.message_zh ?? '未知錯誤');
+        setLastCaption(`寫入失敗:${msg}`);
+        sendFunctionOutput(callId, { written: false, error_zh: msg });
+      }
       return;
     }
 
     // 工具清單新增了但這裡忘了接的話,靜默 return 會讓 model 一直等不到結果、
     // 對話卡死且沒有任何線索。留一句 warn 讓它至少在 console 現形。
     console.warn('[realtime] 收到沒有對應處理的工具呼叫:', name);
-  }
-
-  async function tryConfirmOrCancel(transcript: string) {
-    const p = pendingRef.current;
-    if (!p) return;
-    const cmd = matchVoiceCommand(transcript);
-    if (cmd === 'confirm') {
-      const result = await callTool(p.action, { confirmation_token: p.token, ...p.payload });
-      pendingRef.current = null;
-      setPending(null);
-      if (result.ok) {
-        tellModel('系統剛剛已經確認並寫入完成,請用一句話跟使用者說已經記好了,不用重複內容細節。');
-      } else {
-        const msg = String(result.body.message_zh ?? '未知錯誤');
-        tellModel(`剛才的寫入失敗了(${msg}),跟使用者說一下,問要不要重試。`);
-      }
-      return;
-    }
-    if (cmd === 'cancel') {
-      pendingRef.current = null;
-      setPending(null);
-      tellModel('使用者取消了剛才的提案,跟使用者說一聲沒問題,不用重複提案內容,也不用再問一次。');
-    }
-    // unclear:什麼都不做,維持 pending,等使用者再講清楚一點
   }
 
   function onServerEvent(e: MessageEvent) {
@@ -176,9 +160,7 @@ export function RealtimeVoiceClient() {
     }
 
     if (event.type === 'conversation.item.input_audio_transcription.completed') {
-      const transcript = String(event.transcript ?? '');
-      setLastCaption(`你:${transcript}`);
-      void tryConfirmOrCancel(transcript);
+      setLastCaption(`你:${String(event.transcript ?? '')}`);
     }
 
     if (event.type === 'response.output_audio_transcript.done') {
@@ -259,8 +241,7 @@ export function RealtimeVoiceClient() {
     streamRef.current = null;
     pcRef.current?.close();
     pcRef.current = null;
-    pendingRef.current = null;
-    setPending(null);
+    setWriting(false);
     setConnState((s) => (s === 'error' ? 'error' : 'idle'));
   }, []);
 
@@ -270,17 +251,17 @@ export function RealtimeVoiceClient() {
   }, [stop]);
 
   // logo 狀態機:沒連線=idle;連線中=接 realtime 事件驅動的 modelState;
-  // 有 pending 提案(等你講「確認」)= executing——這是需要使用者做決定的時刻,
-  // 用綠色光暈明確跟一般對話區隔。
+  // writing=真的在寫資料庫(綠色光暈),跟一般對話明確區隔——不等確認之後,
+  // 這是使用者唯一能看出「剛剛那句話真的動到資料了」的視覺訊號。
   const logoState: AgentState =
-    connState !== 'connected' ? 'idle' : pending ? 'executing' : modelState;
+    connState !== 'connected' ? 'idle' : writing ? 'executing' : modelState;
 
   const label =
     connState === 'connecting'
       ? '連線中…'
       : connState === 'connected'
-        ? pending
-          ? '講「確認」寫入,或「取消」撤銷'
+        ? writing
+          ? '寫入中…'
           : modelState === 'thinking'
             ? '整理中…'
             : modelState === 'responding'

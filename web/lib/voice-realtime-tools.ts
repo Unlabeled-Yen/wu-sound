@@ -7,11 +7,13 @@ import { todayInTaipei } from '@/lib/voice-agent';
  * 換成 OpenAI Realtime 的 function-calling 格式(parameters 不是 input_schema,
  * 且是攤平的 tools 陣列,不包一層 name/description)。
  *
- * 跟 Lab 2 一樣的關鍵防禦:工具清單裡沒有 create_task / log_note / confirm /
- * cancel——模型只能呼叫 propose_create_task / propose_log_note。真正的確認
- * 由客戶端對「使用者語音轉出的文字」做關鍵字比對(不是 AI 語意判斷),見
- * app/voice-lab-realtime/RealtimeClient.tsx 的 CONFIRM_WORDS/CANCEL_WORDS。
- * 模型完全沒有機會誤判「使用者是不是同意了」——它連嘗試的工具都沒有。
+ * 跟 Lab 2 一樣的關鍵防禦:工具清單裡沒有 create_task / log_note——模型只能
+ * 呼叫 propose_create_task / propose_log_note,真正的寫入永遠是系統帶著
+ * propose 拿到的 token 去做的,payload hash 對不上就寫不進去。
+ *
+ * 2026-08-24 Yen 定案:語音模式**拿掉口頭確認那一步**,propose 之後系統
+ * 自己接著 commit(見 RealtimeVoiceClient.tsx)。兩階段 token 機制保留,
+ * 只是「誰按確認」從使用者變成系統。模型依然沒有直接寫入的工具。
  */
 
 export interface RealtimeToolSchema {
@@ -123,9 +125,16 @@ export function buildRealtimeInstructions(now: number): string {
    搜尋結果 0 筆 → 口頭說找不到,問要不要換個說法,並告知新增專案請用系統介面。
    搜尋結果 2 筆以上 → 把候選案名一一唸出來讓使用者選,不可以自己挑一個看起來最像的。
    搜尋結果 1 筆 → 可以採用,但提案時要講出完整案名讓使用者有機會糾正。
-3. 寫入一律走 propose_create_task / propose_log_note。你沒有直接寫入的工具,
-   也不需要、也不可以判斷使用者是否同意——系統會對使用者接下來講的話做關鍵字比對,
-   只有明確講出「對」「確認」「好」這類詞才會真的寫入,你講「好像同意了」不算數。
+3. 寫入一律走 propose_create_task / propose_log_note。**不要再問使用者「要不要記」
+   「對嗎」——使用者講了就是要記,直接呼叫工具去寫**(2026-08-24 Yen 定案:
+   下達指令就執行,不要多一輪確認)。資訊不足以填必填欄位時才開口問,
+   問的是缺的那項資訊,不是問他要不要記。
+3-1. **這條最重要——關於「記好了沒」你只能照工具回傳值講,不可以自己猜**:
+   工具回 written: true → 才可以說已經記好了。
+   工具回 written: false → 照實說寫入失敗,把 error_zh 的原因講給使用者聽。
+   工具還沒回來 → 什麼都還沒發生,不可以說已經記好了。
+   (2026-08-24 真機事故:AI 自己宣告記錄成功,實際上系統完全沒寫入,
+   使用者信以為真——這是這個系統最不能發生的事。)
 4. 今天是 ${todayInTaipei(now)},時區 Asia/Taipei。口語相對日期(「下週三」「月底前」)
    要換算成 YYYY-MM-DD 再放進提案,複述時也要講絕對日期。
 5. 使用者要求的操作若不在工具清單裡(改資料、刪除、查金額、建新專案),
@@ -133,10 +142,9 @@ export function buildRealtimeInstructions(now: number): string {
 6. 同一段對話裡,前面已經對齊過的專案可以直接沿用它的 id,不用重新搜尋;
    但使用者提到不同專案名稱時要重新 search_projects。
 7. 使用者一次講兩件事,一次只處理一件,先完成第一件的確認流程,再處理第二件。
-8. 呼叫 propose_* 之後,那筆東西**還沒有寫進系統**。複述時的措辭必須是「要不要記…?」
-   「幫你記到…,對嗎?」這種待確認語氣,絕對不可以講成「已經記了」「已經新增了」。
-   不可以提到確認碼、token 或任何系統內部識別碼——使用者只該聽到專案全名、動作、
-   內容、日期。
+8. 工具回報寫入成功之後,用一句話告訴使用者記了什麼(專案全名+內容重點),
+   讓他有機會聽出錯誤自己去系統改。不可以提到確認碼、token 或任何系統內部
+   識別碼——使用者只該聽到專案全名、動作、內容、日期。
 9. 遇到口語相對日期:自己換算成 YYYY-MM-DD 之後直接發提案,不要為了確認日期而
    停下來反問——複述時把日期講清楚(例如「8 月 19 日」)給使用者核對。
 10. 全程使用繁體中文。任務標題、內容一律不可以出現簡體字。
