@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
-import { REALTIME_TOOLS, buildRealtimeInstructions } from '@/lib/voice-realtime-tools';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import {
+  MAX_INLINE_PROJECTS,
+  buildRealtimeInstructions,
+  buildRealtimeTools,
+  type KnownProject,
+} from '@/lib/voice-realtime-tools';
 
 export const runtime = 'nodejs';
 
@@ -30,6 +36,36 @@ export async function POST() {
   if (!apiKey) {
     return NextResponse.json({ error: '語音即時通話尚未設定(缺 OPENAI_API_KEY 或 VOICE_REALTIME_API_KEY)' }, { status: 503 });
   }
+  // 專案清單直接注入提示詞,不讓 AI 再花一次往返去查(2026-08-24 Yen 定案)。
+  // 換來三件事:少一次往返(較快)、不再有模糊比對失敗(「磐頂教會」對不上
+  // 「磐頂長老教會」那種)、工具從 6 個減到 4 個(工具越少模型選錯的空間越小,
+  // 這個專案 2026-08-14 實測過工具變多會掉準確度)。
+  //
+  // 只在案量小的時候成立:超過 MAX_INLINE_PROJECTS 就退回用 search_projects 查。
+  // 退回時要 loud 記一筆——這種「悄悄換了做法」的劣化最難察覺。
+  let projects: KnownProject[] = [];
+  try {
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb
+      .from('sites')
+      .select('id, name')
+      .eq('active', true)
+      .order('name', { ascending: true });
+    if (error) {
+      console.error('[realtime-session] 專案清單讀取失敗,改用查詢模式:', error.message);
+    } else {
+      projects = (data ?? []) as KnownProject[];
+      if (projects.length > MAX_INLINE_PROJECTS) {
+        console.warn(
+          `[realtime-session] 進行中專案 ${projects.length} 個,超過內嵌上限 ${MAX_INLINE_PROJECTS},` +
+            '已退回查詢模式。要繼續用內嵌就調高上限,但注意提示詞變長會拉低準確度。',
+        );
+      }
+    }
+  } catch (e) {
+    console.error('[realtime-session] 專案清單讀取異常,改用查詢模式:', e);
+  }
+
   const base = (process.env.VOICE_REALTIME_BASE_URL ?? DEFAULT_BASE).replace(/\/+$/, '');
   const model = process.env.VOICE_REALTIME_MODEL ?? DEFAULT_MODEL;
   const voice = process.env.VOICE_REALTIME_VOICE ?? DEFAULT_VOICE;
@@ -70,8 +106,8 @@ export async function POST() {
             },
             output: { voice },
           },
-          instructions: buildRealtimeInstructions(Date.now()),
-          tools: REALTIME_TOOLS,
+          instructions: buildRealtimeInstructions(Date.now(), projects),
+          tools: buildRealtimeTools(projects),
           tool_choice: 'auto',
         },
       }),
