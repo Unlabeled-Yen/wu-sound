@@ -16,9 +16,10 @@ const DEFAULT_BASE = 'https://api.openai.com/v1';
 // 或設 VOICE_REALTIME_MODEL 環境變數覆蓋,不用改程式。
 const DEFAULT_MODEL = 'gpt-realtime-2.1-mini';
 const DEFAULT_VOICE = 'marin';
-// 使用者語音轉出的文字要拿來做關鍵字比對(確認/取消),所以一定要開啟輸入端轉錄——
-// 不開的話 conversation.item.input_audio_transcription.completed 事件根本不會來,
-// 「不解讀自由文字語意、只比對關鍵字」這道防呆閥就沒有輸入可比對。
+// 開啟輸入端轉錄:UI 要把「你剛剛講了什麼」顯示在畫面上給使用者核對
+// (RealtimeVoiceClient 的 lastCaption)。不開的話
+// conversation.item.input_audio_transcription.completed 事件不會來,畫面就沒東西可顯示。
+// (原本還兼任確認/取消的關鍵字比對來源,2026-08-24 拿掉口頭確認後只剩顯示用途。)
 const DEFAULT_TRANSCRIBE_MODEL = 'gpt-4o-transcribe';
 
 export async function POST() {
@@ -48,18 +49,23 @@ export async function POST() {
           audio: {
             input: {
               transcription: { model: process.env.VOICE_REALTIME_TRANSCRIBE_MODEL ?? DEFAULT_TRANSCRIBE_MODEL },
-              // 打斷/接手判斷放寬(2026-08-24 Yen 真機兩輪調參後定在這裡):
-              // - threshold 0.5(預設)→0.75→0.82,需要更明顯的人聲才會判定
-              //   為打斷,雜音/近距離呼吸不會誤觸
-              // - silence_duration 500(預設)→900→1300ms,AI 講到句中停頓
-              //   不會馬上被使用者的一個「嗯」接走
-              // 再想更放寬:threshold 拉到 0.88,silence_duration 拉到 1600
-              // (超過這個範圍會開始感覺 AI 聽不到你插話,反效果)
+              // 斷句改用語意判斷(2026-08-24 定案)。
+              //
+              // 原本是 server_vad:純粹量「靜音持續多久」來判斷你講完沒。那個做法
+              // 有個解不開的矛盾——調長才不會在你停頓想措辭時把你切掉,但調長就
+              // 一定慢;調短反應快,但你一停頓就被搶話。前兩輪調參
+              // (threshold 0.5→0.75→0.82、silence 500→900→1300ms)其實只是在
+              // 這條矛盾線上來回移動,治不了根。
+              //
+              // semantic_vad 是拿語意分類器判斷「這句話講完了沒」,不是量靜音,
+              // 所以能同時做到「不切你」跟「講完馬上接」——跳出上面那個矛盾。
+              // 副作用是背景噪音也比較不會被誤判成人聲(工地現場的重點)。
+              //
+              // eagerness 是唯一的旋鈕:auto(=medium)→ 覺得慢改 high,
+              // 覺得會搶話改 low。不要再回去手調 threshold/靜音毫秒數。
               turn_detection: {
-                type: 'server_vad',
-                threshold: 0.82,
-                prefix_padding_ms: 300,
-                silence_duration_ms: 1300,
+                type: 'semantic_vad',
+                eagerness: process.env.VOICE_REALTIME_EAGERNESS ?? 'auto',
               },
             },
             output: { voice },
