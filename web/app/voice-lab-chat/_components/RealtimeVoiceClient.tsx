@@ -56,10 +56,12 @@ export function RealtimeVoiceClient() {
    * 閒置自動掛斷。end_call 靠模型判斷「使用者說完了」,這一層防的是模型判斷不到的
    * 情況:使用者講完直接把手機放進口袋、或現場被叫走人就走了——通話會一直開著,
    * 麥克風亮著、也一直在計費。完全沒有人聲超過這個時間就自己斷線。
-   * 時間放寬到 90 秒,因為現場常常是「講一句、去搬東西、回來再講一句」,
-   * 太短會在人還在用的時候把他掛掉,那比多開一會兒更惱人。
+   *
+   * 15 秒(2026-08-24 Yen 定案,原本設 90 秒)——這比一般人「講到一半停頓想
+   * 措辭」的間隔長很多(那個由 semantic_vad 判斷,不會被這裡誤傷),抓的是
+   * 「這通已經沒人在用了」的訊號,不是句子中間的停頓。
    */
-  const IDLE_HANGUP_MS = 90_000;
+  const IDLE_HANGUP_MS = 15_000;
 
   function resetIdleTimer() {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
