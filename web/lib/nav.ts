@@ -224,6 +224,7 @@ const MOBILE_TITLES: Record<string, MobileTitle> = {
   '/boss/tenders/agencies': { title: '機關經營名單', subtitle: '標案' },
   '/boss/tenders': { title: '資料進度板', subtitle: '標案' },
   '/boss/users': { title: '使用者管理' },
+  '/boss/voice-traces': { title: '語音對話軌跡', subtitle: '錯誤分析用' },
   // /tools/spl-calculator、/tools/array-designer 已併入 /tools/acoustic
   // (16-acoustic-merged.md),舊路徑只剩 redirect,不再需要手機標題。
   '/tools/acoustic': { title: '聲學計算' },

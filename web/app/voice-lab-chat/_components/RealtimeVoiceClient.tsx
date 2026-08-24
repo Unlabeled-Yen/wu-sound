@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentLogo, type AgentState } from '@/app/_shared/AgentLogo';
+import { randomClientId } from '@/lib/client-id';
 
 /**
  * 手機語音助理:AgentLogo 排版 + OpenAI Realtime 引擎(2026-08-24 Yen 定案)。
@@ -51,6 +52,10 @@ export function RealtimeVoiceClient() {
   // 前面就要用到。走 ref 才不會受定義順序影響,也不會抓到過期的閉包。
   const stopRef = useRef<(() => void) | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 一通通話一個 id,同一通的軌跡靠它串起來看;seq 保證還原得出順序
+  // (時間戳可能落在同一毫秒,不夠可靠)
+  const traceSessionRef = useRef<string | null>(null);
+  const traceSeqRef = useRef(0);
 
   /**
    * 閒置自動掛斷。end_call 靠模型判斷「使用者說完了」,這一層防的是模型判斷不到的
@@ -93,6 +98,25 @@ export function RealtimeVoiceClient() {
     sendEvent({ type: 'response.create' });
   }
 
+  /**
+   * 記一筆對話軌跡。這是做錯誤分析的原料——在這之前判斷 AI 好不好只能靠
+   * 使用者口頭回報單次體感,誤判過好幾次(見 /api/voice-lab/trace 的檔頭)。
+   *
+   * 刻意 fire-and-forget:不 await、失敗只在 console 留一句。診斷用的東西
+   * 絕對不能拖慢或打斷通話本身——這條原則比「軌跡一定要記到」重要。
+   */
+  function trace(kind: 'user_speech' | 'ai_speech' | 'tool_call' | 'error', payload: Record<string, unknown>) {
+    const sid = traceSessionRef.current;
+    if (!sid) return;
+    traceSeqRef.current += 1;
+    void fetch('/api/voice-lab/trace', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid, seq: traceSeqRef.current, kind, payload }),
+    }).catch((e) => console.warn('[voice-trace] 送出失敗(不影響通話):', e));
+  }
+
   async function callTool(tool: string, body: Record<string, unknown>) {
     const res = await fetch(`/api/voice/tools/${tool}`, {
       method: 'POST',
@@ -115,6 +139,7 @@ export function RealtimeVoiceClient() {
 
     if (name === 'search_projects' || name === 'list_projects' || name === 'get_project_summary' || name === 'list_tasks') {
       const result = await callTool(name, args);
+      trace('tool_call', { name, args, ok: result.ok, result: result.body });
       sendFunctionOutput(callId, result.body);
       return;
     }
@@ -124,6 +149,7 @@ export function RealtimeVoiceClient() {
     // 性質完全不同(那個判斷才必須是系統的,不能交給模型)。
     // 先回工具結果讓它把道別講完,再等一下才真的斷線,不然話會被切一半。
     if (name === 'end_call') {
+      trace('tool_call', { name, args, ok: true, note: 'AI 主動掛斷' });
       sendFunctionOutput(callId, { ended: true });
       setLastCaption('通話結束');
       setTimeout(() => stopRef.current?.(), 2500);
@@ -148,6 +174,7 @@ export function RealtimeVoiceClient() {
       const proposed = await callTool('propose_write', { action, payload });
       if (!proposed.ok) {
         setWriting(false);
+        trace('tool_call', { name, args, payload, stage: 'propose', ok: false, result: proposed.body });
         sendFunctionOutput(callId, proposed.body);
         return;
       }
@@ -156,10 +183,12 @@ export function RealtimeVoiceClient() {
       setWriting(false);
       const summary = summarize(action, payload);
       if (written.ok) {
+        trace('tool_call', { name, args, payload, ok: true, wrote: summary, result: written.body });
         setLastCaption(`已寫入:${summary}`);
         sendFunctionOutput(callId, { written: true, summary });
       } else {
         const msg = String(written.body.message_zh ?? '未知錯誤');
+        trace('tool_call', { name, args, payload, ok: false, error_zh: msg, result: written.body });
         setLastCaption(`寫入失敗:${msg}`);
         sendFunctionOutput(callId, { written: false, error_zh: msg });
       }
@@ -202,16 +231,22 @@ export function RealtimeVoiceClient() {
     }
 
     if (event.type === 'conversation.item.input_audio_transcription.completed') {
-      setLastCaption(`你:${String(event.transcript ?? '')}`);
+      const text = String(event.transcript ?? '');
+      setLastCaption(`你:${text}`);
+      trace('user_speech', { text });
     }
 
     if (event.type === 'response.output_audio_transcript.done') {
-      setLastCaption(`AI:${String(event.transcript ?? '')}`);
+      const text = String(event.transcript ?? '');
+      setLastCaption(`AI:${text}`);
+      trace('ai_speech', { text });
     }
 
     if (event.type === 'error') {
       const err = event.error as Record<string, unknown> | undefined;
-      setError(String(err?.message ?? '發生錯誤'));
+      const msg = String(err?.message ?? '發生錯誤');
+      setError(msg);
+      trace('error', { message: msg, raw: err });
     }
   }
 
@@ -220,6 +255,9 @@ export function RealtimeVoiceClient() {
     setConnState('connecting');
     setModelState('listening');
     setLastCaption(null);
+    // 一通一個軌跡 session,重接就是新的一通
+    traceSessionRef.current = randomClientId();
+    traceSeqRef.current = 0;
     try {
       const sessionRes = await fetch('/api/voice-lab/realtime-session', { method: 'POST' });
       const sessionJson = await sessionRes.json();

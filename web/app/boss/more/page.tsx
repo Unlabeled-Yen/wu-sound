@@ -47,7 +47,10 @@ const GROUPS: Group[] = [
   },
   {
     title: '設定',
-    items: [{ href: '/boss/users', label: '使用者管理' }],
+    items: [
+      { href: '/boss/users', label: '使用者管理' },
+      { href: '/boss/voice-traces', label: '語音對話軌跡' },
+    ],
   },
 ];
 

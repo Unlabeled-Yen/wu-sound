@@ -53,6 +53,10 @@ const PAGE_CAPABILITIES: PathEntry[] = [
   { prefix: '/boss/bundles', cap: 'quotes' },
   { prefix: '/boss/catalog', cap: 'quotes' },
   { prefix: '/boss/equipment', cap: 'equipment' },
+  // 語音軌跡含**所有人**的真實對話內容,是敏感資料,只能老闆看。
+  // 這裡刻意不用 ops——ops 不在 STAFF_DENIED 裡,員工照樣進得來;
+  // 'more'(其他管理與設定)才是真的擋得住員工的那一組。
+  { prefix: '/boss/voice-traces', cap: 'more' },
   { prefix: '/boss/clockins', cap: 'ops' },
   { prefix: '/boss/projects', cap: 'sites' },
   { prefix: '/boss/sites', cap: 'sites' },
