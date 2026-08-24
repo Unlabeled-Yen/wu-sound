@@ -85,12 +85,14 @@ describe('訊息結構轉換', () => {
 });
 
 describe('工具定義轉換', () => {
-  it('9 個工具都轉成 function 格式,input_schema 原樣當 parameters', () => {
+  it('8 個工具都轉成 function 格式,input_schema 原樣當 parameters', () => {
     // 2026-08-14 回退:民生救難三個工具(get_now/get_weather/emergency_info)
     // 移除後準確度回到 Yen 親自肯定過的水準,見 voice-agent-tools.ts 的 READ_TOOLS 註解
-    // 2026-08-24 新增 list_projects(列出全部專案,不需要關鍵字)
+    // 2026-08-24 新增 list_projects(列出全部專案,不需要關鍵字);
+    // 同日移除 propose_log_note——前端已無工作記錄介面(只剩四欄任務看板),
+    // AI 寫進 worklogs 使用者根本看不到,一律記成任務(Yen 定案)。
     const tools = toOpenAiTools(AGENT_TOOLS);
-    expect(tools).toHaveLength(9);
+    expect(tools).toHaveLength(8);
     expect(tools.map((t) => t.function.name)).toEqual([
       'search_projects',
       'list_projects',
@@ -100,7 +102,6 @@ describe('工具定義轉換', () => {
       'respond',
       'decline',
       'propose_create_task',
-      'propose_log_note',
     ]);
     expect(tools[0].function.parameters).toBe(AGENT_TOOLS[0].input_schema);
     // 換供應商不會讓寫入工具偷偷跑出來

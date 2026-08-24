@@ -210,9 +210,14 @@ describe('提案流程', () => {
     const tools = fakeTools({});
     await runAgentTurn(session(), '你好', deps(llm.client, tools.client));
     const names = (llm.seen[0].tools ?? []).map((t) => t.name);
-    expect(names).toContain('propose_log_note');
+    expect(names).toContain('propose_create_task');
     expect(names).not.toContain('log_note');
     expect(names).not.toContain('create_task');
+    // 2026-08-24:propose_log_note 也一併從模型看得到的清單移除(前端沒有
+    // 工作記錄介面,寫進去使用者看不到)。runtime 仍支援 log_note 這個 action,
+    // 只是模型沒有工具可以發動它——下面那一大批用 propose_log_note 當
+    // fixture 的測試因此仍然有效,測的是 runtime 對 propose_* 的通用處理。
+    expect(names).not.toContain('propose_log_note');
   });
 
   it('空字串/空陣列的選填欄位不會混進 payload(避免 hash 對不上)', async () => {

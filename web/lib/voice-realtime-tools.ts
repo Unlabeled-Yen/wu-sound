@@ -73,7 +73,7 @@ export const REALTIME_TOOLS: RealtimeToolSchema[] = [
     type: 'function',
     name: 'propose_create_task',
     description:
-      '提出「新增任務」的提案(還沒有真的寫入)。呼叫後你要把提案內容口頭複述給使用者聽,等使用者明確用語音講「對/確認/好」——系統會自己判斷使用者是否確認,你不需要、也不可以自己認定使用者已經同意。',
+      '把使用者口述的事情記進系統(唯一的寫入工具)。不管使用者說「記一筆」「幫我記錄」「新增任務」還是「備註一下」,一律用這個。呼叫後系統會直接寫入,不需要再問使用者確認。',
     parameters: {
       type: 'object',
       properties: {
@@ -83,21 +83,6 @@ export const REALTIME_TOOLS: RealtimeToolSchema[] = [
         due_date: { type: 'string', description: 'YYYY-MM-DD,口語相對日期要先換算' },
       },
       required: ['project_id', 'title'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'propose_log_note',
-    description:
-      '提出「記一筆工作記錄」的提案(還沒有真的寫入)。呼叫後你要把提案內容口頭複述給使用者聽,等使用者明確用語音講「對/確認/好」。',
-    parameters: {
-      type: 'object',
-      properties: {
-        project_id: { type: 'string', description: '必須是 search_projects 回傳的 id' },
-        content: { type: 'string' },
-        tags: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['project_id', 'content'],
     },
   },
 ];
@@ -125,10 +110,13 @@ export function buildRealtimeInstructions(now: number): string {
    搜尋結果 0 筆 → 口頭說找不到,問要不要換個說法,並告知新增專案請用系統介面。
    搜尋結果 2 筆以上 → 把候選案名一一唸出來讓使用者選,不可以自己挑一個看起來最像的。
    搜尋結果 1 筆 → 可以採用,但提案時要講出完整案名讓使用者有機會糾正。
-3. 寫入一律走 propose_create_task / propose_log_note。**不要再問使用者「要不要記」
-   「對嗎」——使用者講了就是要記,直接呼叫工具去寫**(2026-08-24 Yen 定案:
-   下達指令就執行,不要多一輪確認)。資訊不足以填必填欄位時才開口問,
-   問的是缺的那項資訊,不是問他要不要記。
+3. 寫入只有 propose_create_task 一個工具,**一律記成任務**(2026-08-24 Yen 定案)。
+   不管使用者講「記一筆」「幫我記錄」「新增任務」「備註一下」還是「今天到了哪裡」,
+   全部用它,沒有第二種選擇。**不要再問使用者「要不要記」「對嗎」——講了就是要記,
+   直接呼叫工具去寫**。資訊不足以填必填欄位時才開口問,問的是缺的那項資訊,
+   不是問他要不要記。
+   (背景:先前有工作記錄/任務兩種寫法,AI 判斷成工作記錄、使用者卻去任務看板找,
+   以為沒寫進去——拿掉選擇就不會再錯配。)
 3-1. **這條最重要——關於「記好了沒」你只能照工具回傳值講,不可以自己猜**:
    工具回 written: true → 才可以說已經記好了。
    工具回 written: false → 照實說寫入失敗,把 error_zh 的原因講給使用者聽。

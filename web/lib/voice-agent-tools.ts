@@ -189,20 +189,6 @@ export const AGENT_TOOLS: ToolSchema[] = [
       required: ['project_id', 'title'],
     },
   },
-  {
-    name: 'propose_log_note',
-    description:
-      '提出「記一筆工作記錄」的提案(還沒有真的寫入)。呼叫後系統會向使用者顯示確認按鈕,使用者按下確認才會真的寫入。',
-    input_schema: {
-      type: 'object',
-      properties: {
-        project_id: { type: 'string', description: '必須是 search_projects 回傳的 id' },
-        content: { type: 'string' },
-        tags: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['project_id', 'content'],
-    },
-  },
 ];
 
 /** LLM 工具名 → Lab 1 propose_write 的 action */
