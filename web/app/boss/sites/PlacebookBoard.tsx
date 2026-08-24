@@ -147,7 +147,7 @@ function PlaceSubRow({ project, categories }: { project: PlaceRow['projects'][nu
   );
 }
 
-function PlaceListRow({ place, today, defaultExpanded, categories }: { place: PlaceRow; today: string; defaultExpanded: boolean; categories: SiteCategoryOption[] }) {
+function PlaceListRow({ place, defaultExpanded, categories }: { place: PlaceRow; defaultExpanded: boolean; categories: SiteCategoryOption[] }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const sentence = statusSentence(place);
 
@@ -164,7 +164,7 @@ function PlaceListRow({ place, today, defaultExpanded, categories }: { place: Pl
         <EdgeBar todayHere={place.todayHere} weekHere={place.weekHere} />
         <div
           className="flex-1 grid items-center"
-          style={{ gridTemplateColumns: '1fr 108px 96px 108px 116px', columnGap: 18, padding: '14px 16px 14px 0' }}
+          style={{ gridTemplateColumns: '1fr 108px 96px 108px', columnGap: 18, padding: '14px 16px 14px 0' }}
         >
           <div className="min-w-0">
             <div className="text-[14px] font-medium truncate" style={{ color: 'var(--nm-text-primary)' }}>{place.label}</div>
@@ -178,9 +178,6 @@ function PlaceListRow({ place, today, defaultExpanded, categories }: { place: Pl
           </span>
           <span className="text-[13px] tabular-nums text-right" style={{ color: 'var(--nm-text-secondary)', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace' }}>
             {place.knowledgeCount}
-          </span>
-          <span className="text-[12px] tabular-nums text-right" style={{ color: place.lastVisit === today ? 'var(--nm-success-glass-text)' : 'var(--nm-text-secondary)', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace' }}>
-            {place.lastVisit ? (place.lastVisit === today ? '今天' : place.lastVisit.slice(5)) : '沒去過'}
           </span>
         </div>
       </button>
@@ -262,24 +259,23 @@ export function PlacebookBoard({ data }: { data: PlacebookData }) {
       <div className="rounded-2xl nm-raised overflow-hidden" data-place-table>
         <div
           className="grid px-4"
-          style={{ gridTemplateColumns: '10px 1fr 108px 96px 108px 116px', columnGap: 18, padding: '11px 16px', borderBottom: '1px solid rgba(255,255,255,.07)' }}
+          style={{ gridTemplateColumns: '10px 1fr 108px 96px 108px', columnGap: 18, padding: '11px 16px', borderBottom: '1px solid rgba(255,255,255,.07)' }}
         >
           <span />
           <span className="text-[10px] uppercase" style={{ letterSpacing: '.16em', color: 'var(--nm-text-muted)' }}>地點・客戶</span>
           <span className="text-[10px] uppercase text-right" style={{ letterSpacing: '.16em', color: 'var(--nm-text-muted)' }}>進行中</span>
           <span className="text-[10px] uppercase text-right" style={{ letterSpacing: '.16em', color: 'var(--nm-text-muted)' }}>在場設備</span>
           <span className="text-[10px] uppercase text-right" style={{ letterSpacing: '.16em', color: 'var(--nm-text-muted)' }}>場地知識</span>
-          <span className="text-[10px] uppercase text-right" style={{ letterSpacing: '.16em', color: 'var(--nm-text-muted)' }}>最後去</span>
         </div>
 
         {active.map((p) => (
-          <PlaceListRow key={p.key} place={p} today={today} defaultExpanded={p.todayHere} categories={data.categories} />
+          <PlaceListRow key={p.key} place={p} defaultExpanded={p.todayHere} categories={data.categories} />
         ))}
 
         {dormant.length > 0 && (
           <div style={{ borderTop: '1px solid rgba(255,255,255,.05)' }}>
             {dormantOpen ? (
-              dormant.map((p) => <PlaceListRow key={p.key} place={p} today={today} defaultExpanded={false} categories={data.categories} />)
+              dormant.map((p) => <PlaceListRow key={p.key} place={p} defaultExpanded={false} categories={data.categories} />)
             ) : (
               <button
                 type="button"

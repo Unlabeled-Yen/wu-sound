@@ -95,7 +95,6 @@ describe('手機底部分頁', () => {
     ['/boss/quotes', 'more'],
     ['/boss/bundles', 'more'],
     ['/boss/catalog', 'more'],
-    ['/boss/worklogs', 'more'],
     ['/boss/clockins', 'more'],
     ['/boss/equipment', 'more'],
     ['/boss/tenders', 'more'],

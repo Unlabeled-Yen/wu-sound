@@ -122,18 +122,20 @@ async function getProjectSummary(sb: SupabaseClient, body: Json): Promise<NextRe
     return voiceError('SERVICE_UNAVAILABLE', 'voice 資料表狀態異常,無法確認任務數', 503);
   }
 
-  const { data: recent, error: wlErr } = await sb
-    .from('worklogs')
-    .select('logged_on, note')
+  // 近況來源 2026-08-24 從 worklogs 改成 tasks:前端工作記錄整套移除
+  // (只剩四欄任務看板),AI 講「最近動態」時該講的是任務,不是使用者
+  // 已經看不到的工作記錄。
+  const { data: recent, error: recentErr } = await sb
+    .from('tasks')
+    .select('updated_at, title, status')
     .eq('site_id', projectId)
-    .order('logged_on', { ascending: false })
-    .order('created_at', { ascending: false })
+    .order('updated_at', { ascending: false })
     .limit(3);
-  if (wlErr) return dbErrorResponse(wlErr);
+  if (recentErr) return dbErrorResponse(recentErr);
 
-  const recentUpdates = ((recent ?? []) as { logged_on: string; note: string }[]).map((w) => ({
-    ts: w.logged_on,
-    summary: w.note.length > 60 ? `${w.note.slice(0, 60)}…` : w.note,
+  const recentUpdates = ((recent ?? []) as { updated_at: string; title: string; status: string }[]).map((t) => ({
+    ts: String(t.updated_at).slice(0, 10),
+    summary: `${t.title.length > 60 ? `${t.title.slice(0, 60)}…` : t.title}(${t.status})`,
   }));
 
   return ok({
@@ -183,17 +185,15 @@ function validateWritePayload(action: string, payload: Json): string | null {
     }
     return null;
   }
-  if (action === 'log_note') {
-    if (typeof payload.content !== 'string' || !payload.content.trim()) return '缺少 content';
-    return null;
-  }
   return `不支援的 action: ${action}`;
 }
 
 async function proposeWrite(sb: SupabaseClient, actorId: string, body: Json): Promise<NextResponse> {
+  // 2026-08-24:log_note 整條移除(前端工作記錄介面已拿掉,只剩四欄任務看板),
+  // 寫入只剩 create_task 一種。
   const action = body.action;
-  if (action !== 'create_task' && action !== 'log_note') {
-    return voiceError('BAD_REQUEST', 'action 須為 create_task 或 log_note', 400);
+  if (action !== 'create_task') {
+    return voiceError('BAD_REQUEST', 'action 須為 create_task', 400);
   }
   const payload = (body.payload && typeof body.payload === 'object' ? body.payload : {}) as Json;
 
@@ -244,7 +244,7 @@ async function proposeWrite(sb: SupabaseClient, actorId: string, body: Json): Pr
   });
 }
 
-// ---------- 寫入:commit(create_task / log_note) ----------
+// ---------- 寫入:commit(只有 create_task) ----------
 
 interface ProposalRow {
   token: string;
@@ -279,7 +279,7 @@ async function loadProposal(sb: SupabaseClient, token: unknown): Promise<
 async function commitWrite(
   sb: SupabaseClient,
   actorId: string,
-  action: 'create_task' | 'log_note',
+  action: 'create_task',
   body: Json,
 ): Promise<NextResponse> {
   const loaded = await loadProposal(sb, body.confirmation_token);
@@ -316,38 +316,20 @@ async function commitWrite(
   if (siteErr) return dbErrorResponse(siteErr);
   if (!site || !site.active) return voiceError('PROJECT_NOT_FOUND', '找不到這個專案', 404);
 
-  let result: Json;
-  if (action === 'create_task') {
-    const { data, error } = await sb
-      .from('tasks')
-      .insert({
-        site_id: payload.project_id,
-        title: payload.title,
-        description: payload.description ?? null,
-        due_date: payload.due_date ?? null,
-        created_by: actorId,
-        source: proposal.source,
-      })
-      .select('id')
-      .single();
-    if (error) return dbErrorResponse(error);
-    result = { task_id: data.id as string };
-  } else {
-    const tags = Array.isArray(payload.tags) ? (payload.tags as string[]) : [];
-    const tagSuffix = tags.length > 0 ? ` ${tags.map((t) => `#${t}`).join(' ')}` : '';
-    const { data, error } = await sb
-      .from('worklogs')
-      .insert({
-        user_id: actorId,
-        site_id: payload.project_id,
-        note: `${payload.content}${tagSuffix}`,
-        photos: [],
-      })
-      .select('id')
-      .single();
-    if (error) return dbErrorResponse(error);
-    result = { note_id: data.id as string };
-  }
+  const { data: inserted, error: insertErr } = await sb
+    .from('tasks')
+    .insert({
+      site_id: payload.project_id,
+      title: payload.title,
+      description: payload.description ?? null,
+      due_date: payload.due_date ?? null,
+      created_by: actorId,
+      source: proposal.source,
+    })
+    .select('id')
+    .single();
+  if (insertErr) return dbErrorResponse(insertErr);
+  const result: Json = { task_id: inserted.id as string };
 
   await sb
     .from('write_proposals')
@@ -357,8 +339,8 @@ async function commitWrite(
   await sb.from('audit_log').insert({
     actor_id: actorId,
     action: `voice.${action}`,
-    target_table: action === 'create_task' ? 'tasks' : 'worklogs',
-    target_id: action === 'create_task' ? (result.task_id as string) : (result.note_id as string),
+    target_table: 'tasks',
+    target_id: result.task_id as string,
     diff: {
       params: payload,
       source: proposal.source,
@@ -374,7 +356,7 @@ async function commitWrite(
 // ---------- dispatch ----------
 
 const READ_TOOLS = new Set(['search_projects', 'get_project_summary', 'list_tasks', 'list_projects']);
-const WRITE_TOOLS = new Set(['create_task', 'log_note']);
+const WRITE_TOOLS = new Set(['create_task']);
 
 export async function POST(req: Request, ctx: { params: Promise<{ tool: string }> }) {
   const { tool } = await ctx.params;
@@ -391,7 +373,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ tool: string }
   if (tool === 'get_project_summary') return getProjectSummary(sb, body);
   if (tool === 'list_tasks') return listTasks(sb, body);
   if (tool === 'propose_write') return proposeWrite(sb, actorId, body);
-  if (tool === 'create_task' || tool === 'log_note') return commitWrite(sb, actorId, tool, body);
+  if (tool === 'create_task') return commitWrite(sb, actorId, tool, body);
 
   if (READ_TOOLS.has(tool) || WRITE_TOOLS.has(tool)) {
     // 不會走到這裡(above 已窮舉),保留給未來新增工具時的防呆

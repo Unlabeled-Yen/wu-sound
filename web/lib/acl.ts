@@ -53,7 +53,6 @@ const PAGE_CAPABILITIES: PathEntry[] = [
   { prefix: '/boss/bundles', cap: 'quotes' },
   { prefix: '/boss/catalog', cap: 'quotes' },
   { prefix: '/boss/equipment', cap: 'equipment' },
-  { prefix: '/boss/worklogs', cap: 'ops' },
   { prefix: '/boss/clockins', cap: 'ops' },
   { prefix: '/boss/projects', cap: 'sites' },
   { prefix: '/boss/sites', cap: 'sites' },
@@ -88,7 +87,6 @@ const API_CAPABILITIES: PathEntry[] = [
   { prefix: '/api/tasks', cap: 'sites' },
   { prefix: '/api/voice-lab', cap: 'open' },
   { prefix: '/api/voice', cap: 'open' },
-  { prefix: '/api/worklogs', cap: 'ops' },
 ];
 
 function matchLongestPrefix(pathname: string, table: PathEntry[]): Capability | null {

@@ -33,7 +33,8 @@ export interface PlaceRow {
   activeCount: number;
   onSiteEquipmentQty: number | null; // null 顯示 "—"(不適用/未量測?這裡固定有資料來源,0 就是 0)
   knowledgeCount: number;
-  lastVisit: string | null; // 'YYYY-MM-DD',null = 從沒去過
+  /** 任務最後異動日 'YYYY-MM-DD',null = 這案子還沒有任何任務。只用於休眠判定與排序,不顯示 */
+  lastActivity: string | null;
   todayHere: boolean;
   weekHere: boolean;
   blockedTaskCount: number | null; // null = tasks 未接上,不顯示那句話
@@ -88,25 +89,24 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
     return d.toISOString().slice(0, 10);
   })();
 
-  const [sitesRes, categoriesRes, equipmentRes, knowledgeRes, worklogsRes, allocRes] = await Promise.all([
+  const [sitesRes, categoriesRes, equipmentRes, knowledgeRes, allocRes] = await Promise.all([
     sb.from('sites').select('id, name, active, category_id, customer_name').order('name'),
     sb.from('site_categories').select('id, name, active').eq('active', true).order('name'),
     sb.from('equipment').select('current_site_id').eq('status', 'on_site'),
     sb.from('site_knowledge').select('site_id'),
-    sb.from('worklogs').select('site_id, logged_on').order('logged_on', { ascending: false }),
     sb.from('day_site_allocations').select('site_id, worked_on, users!day_site_allocations_user_id_fkey(name)').gte('worked_on', weekFrom).lte('worked_on', weekTo),
   ]);
 
-  const firstError = sitesRes.error || categoriesRes.error || equipmentRes.error || knowledgeRes.error || worklogsRes.error || allocRes.error;
+  const firstError = sitesRes.error || categoriesRes.error || equipmentRes.error || knowledgeRes.error || allocRes.error;
   if (firstError) {
     return { places: [], activePlaceCount: 0, activeProjectCount: 0, totalKnowledgeCount: 0, weekSlots: [], categories: [], error: firstError.message };
   }
 
   // tasks 表獨立查、獨立防禦——失敗不擋其他欄位。
-  let tasksRows: Array<{ site_id: string | null; status: string }> = [];
+  let tasksRows: Array<{ site_id: string | null; status: string; updated_at: string | null }> = [];
   let tasksOk = true;
   try {
-    const tasksRes = await sb.from('tasks').select('site_id, status').in('status', ['decide', 'todo', 'blocked']);
+    const tasksRes = await sb.from('tasks').select('site_id, status, updated_at');
     if (tasksRes.error) tasksOk = false;
     else tasksRows = (tasksRes.data ?? []) as typeof tasksRows;
   } catch {
@@ -128,10 +128,16 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
     knowledgeCountBySite.set(r.site_id, (knowledgeCountBySite.get(r.site_id) ?? 0) + 1);
   }
 
-  const lastVisitBySite = new Map<string, string>();
-  for (const r of (worklogsRes.data ?? []) as Array<{ site_id: string | null; logged_on: string }>) {
-    if (!r.site_id) continue;
-    if (!lastVisitBySite.has(r.site_id)) lastVisitBySite.set(r.site_id, r.logged_on); // 已依 logged_on desc 排序,第一筆就是最新
+  // 「這個案子最近有沒有動靜」的訊號:2026-08-24 前是 worklogs 的最後拜訪日,
+  // 工作記錄整套移除後改用任務的最後異動日(tasks.updated_at,有 DB 觸發器自動更新)。
+  // 這個值不再顯示在畫面上(「最後去」欄位已拿掉),只用來決定休眠與排序——
+  // 沒有它的話所有案場都會被判成休眠、默默收摺起來,那是靜默的行為改變。
+  const lastActivityBySite = new Map<string, string>();
+  for (const r of tasksRows) {
+    if (!r.site_id || !r.updated_at) continue;
+    const day = String(r.updated_at).slice(0, 10); // timestamptz → YYYY-MM-DD,跟原本的日期粒度一致
+    const cur = lastActivityBySite.get(r.site_id);
+    if (!cur || day > cur) lastActivityBySite.set(r.site_id, day);
   }
 
   const todayBySite = new Set<string>();
@@ -147,6 +153,10 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
   const pendingBySite = new Map<string, number>();
   for (const t of tasksRows) {
     if (!t.site_id) continue;
+    // 2026-08-24:查詢改成撈全部任務(活躍度判定需要已完成的異動時間),
+    // 所以這裡要自己排除 done——原本靠查詢端 .in([...]) 過濾,改了沒跟著改
+    // 的話已完成任務會被算進待辦數,畫面上完全看不出錯。
+    if (t.status === 'done') continue;
     pendingBySite.set(t.site_id, (pendingBySite.get(t.site_id) ?? 0) + 1);
     if (t.status === 'blocked') blockedBySite.set(t.site_id, (blockedBySite.get(t.site_id) ?? 0) + 1);
   }
@@ -162,8 +172,8 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
     const siteIds = g.sites.map((s) => s.id);
     const onSiteEquipmentQty = siteIds.reduce((sum, id) => sum + (onSiteQtyBySite.get(id) ?? 0), 0);
     const knowledgeCount = siteIds.reduce((sum, id) => sum + (knowledgeCountBySite.get(id) ?? 0), 0);
-    const lastVisit = siteIds.reduce<string | null>((latest, id) => {
-      const v = lastVisitBySite.get(id);
+    const lastActivity = siteIds.reduce<string | null>((latest, id) => {
+      const v = lastActivityBySite.get(id);
       if (!v) return latest;
       if (!latest || v > latest) return v;
       return latest;
@@ -173,7 +183,7 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
     const activeCount = g.sites.filter((s) => s.active).length;
     const blockedTaskCount = tasksOk ? siteIds.reduce((sum, id) => sum + (blockedBySite.get(id) ?? 0), 0) : null;
     const anyActive = g.sites.some((s) => s.active);
-    const recentlyActive = !!lastVisit && lastVisit >= ninetyDaysAgo;
+    const recentlyActive = !!lastActivity && lastActivity >= ninetyDaysAgo;
     const dormant = !anyActive || (!recentlyActive && onSiteEquipmentQty === 0 && !weekHere);
 
     return {
@@ -193,7 +203,7 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
       activeCount,
       onSiteEquipmentQty,
       knowledgeCount,
-      lastVisit,
+      lastActivity,
       todayHere,
       weekHere,
       blockedTaskCount,
@@ -201,12 +211,12 @@ export async function loadPlacebookData(sb: SupabaseClient): Promise<PlacebookDa
     };
   });
 
-  // 排序:今天有人在 > 本週要去 > 其餘,同層依最後去(新到舊),沒去過排最後。
+  // 排序:今天有人在 > 本週要去 > 其餘,同層依任務最後異動(新到舊),沒動靜排最後。
   places.sort((a, b) => {
     if (a.dormant !== b.dormant) return a.dormant ? 1 : -1;
     if (a.todayHere !== b.todayHere) return a.todayHere ? -1 : 1;
     if (a.weekHere !== b.weekHere) return a.weekHere ? -1 : 1;
-    if (a.lastVisit !== b.lastVisit) return (b.lastVisit ?? '').localeCompare(a.lastVisit ?? '');
+    if (a.lastActivity !== b.lastActivity) return (b.lastActivity ?? '').localeCompare(a.lastActivity ?? '');
     return a.label.localeCompare(b.label, 'zh-Hant');
   });
 

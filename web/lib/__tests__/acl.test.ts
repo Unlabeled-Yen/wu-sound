@@ -80,7 +80,6 @@ describe('放行給員工的區塊——員工存取一律 true', () => {
     '/boss/catalog',
     '/boss/equipment',
     '/boss/equipment/new',
-    '/boss/worklogs',
     '/boss/clockins',
     '/tools/spl-calculator',
     '/tools/array-designer',

@@ -83,9 +83,9 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'ops',
     label: '現場',
-    // 工作記錄已從兩端導覽移除(2026-08-18 Yen 裁決:被專案管理看板的
-    // 動態軌取代)。路由 /boss/worklogs、/staff/worklog 照專案慣例保留,
-    // 只是不再有入口。
+    // 工作記錄 2026-08-18 先從導覽移除(被專案管理看板取代),2026-08-24
+    // 整套刪除(頁面/API/AI 寫入路徑都拿掉,Yen 定案:一切都是任務看板)。
+    // worklogs 資料表本身保留,裡面還有歷史資料,只是不再有任何寫入與介面。
     items: [
       { href: '/boss/clockins', label: '打卡' },
     ],
