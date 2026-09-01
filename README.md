@@ -10,7 +10,7 @@
 | 員工手機(PWA) | 老闆桌機(聲學規劃) |
 |---|---|
 | ![登入](docs/screenshots/mobile-login.png) | ![SPL 預算計算器](docs/screenshots/desktop-spl-calc.png) |
-| ![員工首頁 — 拍收據](docs/screenshots/mobile-staff-home.png) | ![陣列設計器](docs/screenshots/desktop-array.png) |
+| ![員工端 — 拍收據](docs/screenshots/mobile-staff-home.png) | ![陣列設計器](docs/screenshots/desktop-array.png) |
 
 > 上圖以示範帳號截圖,無真實客戶/案場資料。
 
@@ -39,10 +39,25 @@
 ## 內容目標(每一塊要做到什麼)
 
 ### 員工端(手機 PWA)
-三件套:打卡、零用金報備、工作記錄。**目標比 LINE 少步驟**,PIN 登入不裝 App。首頁預設「拍收據」(見上圖),拍完即存,AI 稍後自動辨識金額。
+三件套:打卡、零用金報備、專案備忘。**目標比 LINE 少步驟**,PIN 登入不裝 App。手機首頁已改成語音 agent(見下),打卡與拍收據收進左上角抽屜;拍完即存,AI 稍後自動辨識金額。
 
 ### 老闆端(桌機 + 手機)
-把報價、記帳、聲學規劃、標案監測收攏成單一操作面板,AI 藏在動作裡:語音 → 需求單、拍照 → 收據、口述 → SPL 配置。**任何 AI 產出都是草稿,老闆按下確認才生效**。
+把報價、記帳、聲學規劃、標案監測收攏成單一操作面板,AI 藏在動作裡:語音 → 需求單、拍照 → 收據、口述 → SPL 配置。**任何 AI 產出都是草稿,老闆按下確認才生效**。手機版首頁跟員工一樣是語音 agent——同一個 AI,入口不同而已。
+
+### 語音 agent(手機首頁)
+老闆與員工的手機首頁就是同一個語音 agent:打開就講話,不進任何選單。這是「AI 隱形嵌入」憲章最直接的落地——沒有人需要知道自己正在用 AI。
+
+- **全雙工對答**:走 OpenAI Realtime API + WebRTC。瀏覽器拿到的是伺服器現鑄的 ephemeral token,真正的 API key 不下放到前端。
+- **斷句交給模型**:用 `semantic_vad`,不再手調靜音毫秒數(threshold 0.5→0.82、silence 500→1300ms 全試過,都不如語意判斷)。
+- **會自己掛斷**:agent 手上有 `end_call` 工具,講完再見就收線;閒置 15 秒也自動斷線,不會放著一直計費。
+- **打字備援**:同一套工具鏈也接文字模式,Anthropic Claude 為主、Kimi 為備,桌機 ⌘K 全站呼叫。語音不通時照樣能用。
+- **模型手上沒有寫入工具**:它只有 `propose_write`。伺服器回一枚 60 秒過期、綁 payload SHA-256 的 token,第二段才真的落庫,提議與寫入各記一筆 audit log。模型多塞或少塞一個欄位,雜湊就對不上。
+- **只寫任務,不寫日誌**:AI 一律記成看板任務。曾發生「AI 判成工作記錄、人在任務看板上找不到、以為沒存成功」,索性把工作記錄整套移除。
+
+> **一個有意識的讓步**:打字路徑仍要人按確認,語音路徑(2026-08-24 定案)拿掉口頭確認、講完直接寫入。兩段式 token、雜湊比對、audit log 全部保留,只是「誰按確認」從人換成系統——這是憲章第 1 條為了「比 Excel 少步驟」讓出的一步。
+
+### 語音軌跡(error analysis)
+每通對話的逐字稿、AI 回覆、每一次工具呼叫(含失敗原因)都寫進 `voice_traces`,老闆端 `/boss/voice-traces` 可按通次翻查。**只存文字,不存音檔**。這頁刻意做得陽春——它的用途是錯誤分析,不是給人看的報表。
 
 ### 聲學規劃工具
 把老闆的口頭需求 →(NL 解析)→ 結構化參數 → SPL/陣列計算 → 可回饋修改的閉環。**電學計算走 deterministic,不交給 LLM**。
@@ -82,6 +97,14 @@
 - 四步規格書已定案(nav / NL→params / spec-data / closed-loop)
 - Array Designer UI 完整度目前 1/5,底層數學已全驗證(規劃中補完 5 分頁)
 
+### ✅ 語音 agent(已上線)
+- 員工/老闆手機首頁改成 AI 對答介面,取代原本的底部分頁列
+- OpenAI Realtime 全雙工對答 + `end_call` 工具 + 閒置 15 秒自動掛斷
+- 文字路徑雙 provider(Claude 主 / Kimi 備),桌機 ⌘K 全站呼叫
+- 兩段式寫入契約(propose → 60 秒 token → commit)+ audit log
+- 語音軌跡落庫,老闆端可翻查(只存文字)
+- 🟡 工具層 ACL 尚未接上——目前沒有任何工具碰得到財務/標案資料,所以還沒有越權面,但這是已知的缺口
+
 ### ✅ 標案監測(tender-radar 老闆端)
 - 讀取 tender-radar API 的唯讀新分類
 - 標案卡片顯示每案訊號(等標期壓縮 / 第幾次招標)
@@ -98,6 +121,7 @@
 ## 目錄
 
 - `web/` — Next.js app(老闆端 + 員工端 PWA)
+- `voice-lab/` — 語音 agent 的分階段實驗規格(Lab 1~4:工具契約 → 文字 agent → 語音辨識/全雙工 → 手機入口)
 - `supabase/` — schema migrations + edge functions
 - `docs/` — 公開規格、ADR、UI conventions、聲學規劃與 Array Designer 設計文件、產品截圖
 - `intake/` — 從雇主端收來的原始資料(Excel 實例、內外帳文件、歷史報價單…)。**不進 git 遠端、不外流**
@@ -118,6 +142,7 @@
 
 - Next.js (App Router) + TypeScript
 - Supabase (Postgres + Auth + Storage + Edge Functions)
-- Anthropic Claude API + Moonshot Kimi API(收據辨識雙軌)
+- Anthropic Claude API + Moonshot Kimi API(收據辨識雙軌、文字 agent 主備)
+- OpenAI Realtime API(WebRTC 全雙工語音)+ gpt-4o-transcribe(語音辨識)
 - Vitest
 - 部署:Vercel / Cloudflare 免費層
