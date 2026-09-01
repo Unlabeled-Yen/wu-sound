@@ -51,7 +51,7 @@ SPL 預算計算器與陣列設計器併成同一頁:上半用喇叭最大音壓
 
 ## 約束
 
-- 預算:老闆只願付 API 費 → hosting 走免費層(Supabase + Vercel/Cloudflare 之類),AI 用 Claude API
+- 預算:老闆只願付 API 費 → hosting 走免費層(Supabase + Vercel/Cloudflare 之類),AI 走多供應商(Anthropic Claude 主 / Kimi 備 / OpenAI Realtime 跑語音)
 - 無時程壓力
 - 員工端不裝 App,用手機瀏覽器(PWA)
 
@@ -92,7 +92,7 @@ SPL 預算計算器與陣列設計器併成同一頁:上半用喇叭最大音壓
 ## 進度
 
 ### ✅ Phase 1:員工手機三件套(已上線)
-- PIN 登入、打卡、零用金報備、工作記錄
+- PIN 登入、打卡、零用金報備、專案備忘(原本的「工作記錄」已整套移除,見下方語音 agent 段落)
 - PWA(manifest + iOS standalone,可加到主畫面當 App 用)
 - 老闆手機 UI + 導覽效能改善(拿掉 layout 阻塞的 count query + 熱門路由 prefetch)
 
