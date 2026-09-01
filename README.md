@@ -7,12 +7,13 @@
 
 ## 快速一瞥
 
-| 員工手機(PWA) | 老闆桌機(聲學規劃) |
+| 手機(PWA) | 老闆桌機(聲學規劃) |
 |---|---|
-| ![登入](docs/screenshots/mobile-login.png) | ![SPL 預算計算器](docs/screenshots/desktop-spl-calc.png) |
-| ![員工端 — 拍收據](docs/screenshots/mobile-staff-home.png) | ![陣列設計器](docs/screenshots/desktop-array.png) |
+| ![語音 agent — 手機首頁,通話中](docs/screenshots/mobile-voice-agent.png) | ![SPL 預算計算器](docs/screenshots/desktop-spl-calc.png) |
+| ![登入](docs/screenshots/mobile-login.png) | ![陣列設計器](docs/screenshots/desktop-array.png) |
 
-> 上圖以示範帳號截圖,無真實客戶/案場資料。
+> 桌機與登入頁以示範帳號截圖,無真實客戶/案場資料。
+> 語音 agent 那張是真機實測,AI 回覆段落提到真實案場名稱,已遮蔽。
 
 ## 公司輪廓
 
@@ -40,6 +41,8 @@
 
 ### 員工端(手機 PWA)
 三件套:打卡、零用金報備、專案備忘。**目標比 LINE 少步驟**,PIN 登入不裝 App。手機首頁已改成語音 agent(見下),打卡與拍收據收進左上角抽屜;拍完即存,AI 稍後自動辨識金額。
+
+<img src="docs/screenshots/mobile-staff-home.png" alt="員工端 — 拍收據" width="280">
 
 ### 老闆端(桌機 + 手機)
 把報價、記帳、聲學規劃、標案監測收攏成單一操作面板,AI 藏在動作裡:語音 → 需求單、拍照 → 收據、口述 → SPL 配置。**任何 AI 產出都是草稿,老闆按下確認才生效**。手機版首頁跟員工一樣是語音 agent——同一個 AI,入口不同而已。
