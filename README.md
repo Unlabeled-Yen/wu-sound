@@ -11,9 +11,9 @@
 ### 手機(PWA)—— 老闆與員工共用的入口
 
 <p align="left">
-  <img src="docs/screenshots/mobile-voice-agent.png" alt="語音 agent — 手機首頁,通話中" width="260">
-  <img src="docs/screenshots/mobile-staff-home.png" alt="員工端 — 拍收據" width="260">
-  <img src="docs/screenshots/mobile-login.png" alt="登入" width="260">
+  <img src="docs/screenshots/mobile-voice-agent.png" alt="語音 agent — 手機首頁,通話中" height="520">
+  <img src="docs/screenshots/mobile-staff-home.png" alt="員工端 — 拍收據" height="520">
+  <img src="docs/screenshots/mobile-login.png" alt="登入" height="520">
 </p>
 
 左:手機首頁就是語音 agent,打開直接講話。中:拍收據,拍完即存。右:PIN 登入,不裝 App。
