@@ -7,12 +7,33 @@
 
 ## 快速一瞥
 
-| 手機(PWA) | 老闆桌機(聲學規劃) |
-|---|---|
-| ![語音 agent — 手機首頁,通話中](docs/screenshots/mobile-voice-agent.png) | ![SPL 預算計算器](docs/screenshots/desktop-spl-calc.png) |
-| ![登入](docs/screenshots/mobile-login.png) | ![陣列設計器](docs/screenshots/desktop-array.png) |
+### 手機(PWA)—— 老闆與員工共用的入口
 
-> 桌機與登入頁以示範帳號截圖,無真實客戶/案場資料。
+<p align="left">
+  <img src="docs/screenshots/mobile-voice-agent.png" alt="語音 agent — 手機首頁,通話中" width="260">
+  <img src="docs/screenshots/mobile-staff-home.png" alt="員工端 — 拍收據" width="260">
+  <img src="docs/screenshots/mobile-login.png" alt="登入" width="260">
+</p>
+
+左:手機首頁就是語音 agent,打開直接講話。中:拍收據,拍完即存。右:PIN 登入,不裝 App。
+
+### 老闆桌機 —— 聲學規劃
+
+SPL 預算計算器 —— 用喇叭最大音壓反推可涵蓋的最遠距離。
+
+![SPL 預算計算器](docs/screenshots/desktop-spl-calc.png)
+
+陣列設計器 —— 給定場地寬度與覆蓋角,推薦喇叭數量與間距。
+
+![陣列設計器](docs/screenshots/desktop-array.png)
+
+### 老闆桌機 —— 財務
+
+帳務管理的「金流監測」:實收實付淨額(真的在帳戶裡的錢)與帳面淨額分開陳述,未來四週現金依約定收付日排入週次並標出安全水位,右欄是當月已收付明細與尚未收到的款項。
+
+![帳務管理 — 金流監測](docs/screenshots/desktop-ledger.png)
+
+> 桌機與登入頁以示範帳號截圖,無真實客戶/案場資料;財務畫面的案場、往來對象、金額全是本機產生的示範資料。
 > 語音 agent 那張是真機實測,AI 回覆段落提到真實案場名稱,已遮蔽。
 
 ## 公司輪廓
@@ -41,8 +62,6 @@
 
 ### 員工端(手機 PWA)
 三件套:打卡、零用金報備、專案備忘。**目標比 LINE 少步驟**,PIN 登入不裝 App。手機首頁已改成語音 agent(見下),打卡與拍收據收進左上角抽屜;拍完即存,AI 稍後自動辨識金額。
-
-<img src="docs/screenshots/mobile-staff-home.png" alt="員工端 — 拍收據" width="280">
 
 ### 老闆端(桌機 + 手機)
 把報價、記帳、聲學規劃、標案監測收攏成單一操作面板,AI 藏在動作裡:語音 → 需求單、拍照 → 收據、口述 → SPL 配置。**任何 AI 產出都是草稿,老闆按下確認才生效**。手機版首頁跟員工一樣是語音 agent——同一個 AI,入口不同而已。
