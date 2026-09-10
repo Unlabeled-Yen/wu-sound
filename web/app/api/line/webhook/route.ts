@@ -10,6 +10,7 @@ import {
 } from '@/lib/line';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 interface LineEvent {
   type: string;

@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session';
 import { createDraftExpenseFromPhoto } from '@/lib/expense-capture';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   const session = await getSession();

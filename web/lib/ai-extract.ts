@@ -4,7 +4,7 @@ import type { ExpenseAiDraft, ExpenseCategory } from './types';
 
 const ANTHROPIC_PRIMARY = 'claude-sonnet-4-5';
 const ANTHROPIC_FALLBACK = 'claude-sonnet-5';
-const KIMI_DEFAULT_MODEL = 'kimi-k2.6';
+const KIMI_DEFAULT_MODEL = 'kimi-k2.7-code-highspeed';
 const KIMI_DEFAULT_BASE = 'https://api.moonshot.ai/v1';
 
 const PROMPT = `你是收據辨識助手,任務是從照片中盡量抓出消費資訊。這張照片可能是正式發票、收銀機小票,也可能是手寫的、非正式格式的單據或代墊憑證(例如隨手寫的紙條、便條紙、廠商手寫單)——不要因為格式不標準就直接放棄辨識。
@@ -111,8 +111,8 @@ async function extractViaKimi(b64: string, mediaType: string): Promise<ExpenseAi
     },
     body: JSON.stringify({
       model,
-      // kimi-k2.6 是推理模型,思考過程會先吃掉大量 completion tokens,
-      // 且只接受 temperature=1,實測需要 4096 才穩定吐出最終 JSON(768/2048 都會被截斷成空字串)。
+      // kimi-k2.7-code-highspeed 也是推理模型,只接受 temperature=1;
+      // 實測比 kimi-k2.6 快很多(~8s vs ~47s),但保留 4096 當安全邊界,避免思考過程吃光 token 把最終 JSON 截斷成空字串。
       max_tokens: 4096,
       temperature: 1,
       messages: [

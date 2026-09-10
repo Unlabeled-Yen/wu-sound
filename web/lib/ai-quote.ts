@@ -2,7 +2,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 
 const ANTHROPIC_MODEL = 'claude-sonnet-4-5';
-const KIMI_DEFAULT_MODEL = 'kimi-k2.6';
+const KIMI_DEFAULT_MODEL = 'kimi-k2.7-code-highspeed';
 const KIMI_DEFAULT_BASE = 'https://api.moonshot.ai/v1';
 
 export interface CatalogHint {
