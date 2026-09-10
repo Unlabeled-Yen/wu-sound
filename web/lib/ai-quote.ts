@@ -2,7 +2,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 
 const ANTHROPIC_MODEL = 'claude-sonnet-4-5';
-const KIMI_DEFAULT_MODEL = 'moonshot-v1-32k';
+const KIMI_DEFAULT_MODEL = 'kimi-k2.6';
 const KIMI_DEFAULT_BASE = 'https://api.moonshot.ai/v1';
 
 export interface CatalogHint {
@@ -111,7 +111,9 @@ async function viaKimi(prompt: string): Promise<SuggestResult> {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2048,
+      // kimi-k2.6 是推理模型,思考過程會先吃掉大量 completion tokens,
+      // 實測 2048 常常還沒吐出最終 JSON 就被截斷成空字串,4096 才穩定。
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
