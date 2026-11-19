@@ -64,8 +64,12 @@ const PAGE_CAPABILITIES: PathEntry[] = [
   { prefix: '/tools', cap: 'acoustic' },
   { prefix: '/staff', cap: 'self' },
   { prefix: '/login', cap: 'open' },
-  { prefix: '/voice-lab-chat', cap: 'open' },
-  { prefix: '/voice-lab-realtime', cap: 'open' },
+  // 這兩條原本標 open,但兩個頁面其實都已經用 getSession() 擋未登入、沒登入
+  // 就 redirect('/login')——標 open 等於這張表對自己說謊。改成 sites 對
+  // 員工/老闆的可及性都是 true,行為零變化;真正的細粒度守衛(哪個工具能不能
+  // 呼叫)在 lib/voice-tool-acl.ts,不是這張表的事。
+  { prefix: '/voice-lab-chat', cap: 'sites' },
+  { prefix: '/voice-lab-realtime', cap: 'sites' },
   { prefix: '/', cap: 'open' },
 ];
 
@@ -89,8 +93,10 @@ const API_CAPABILITIES: PathEntry[] = [
   { prefix: '/api/site-knowledge', cap: 'sites' },
   { prefix: '/api/sites', cap: 'sites' },
   { prefix: '/api/tasks', cap: 'sites' },
-  { prefix: '/api/voice-lab', cap: 'open' },
-  { prefix: '/api/voice', cap: 'open' },
+  // 同上——realtime-session / trace 都已自行擋未登入(401),標 open 不實。
+  // 改成 sites,細粒度守衛(哪個工具能不能呼叫)在 lib/voice-tool-acl.ts。
+  { prefix: '/api/voice-lab', cap: 'sites' },
+  { prefix: '/api/voice', cap: 'sites' },
 ];
 
 function matchLongestPrefix(pathname: string, table: PathEntry[]): Capability | null {

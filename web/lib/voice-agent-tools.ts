@@ -88,6 +88,24 @@ export const DECLINE_TEXT: Record<string, string> = {
   chitchat: '我是現場記錄助理,只處理專案查詢、工作記錄和任務。有什麼要記的嗎?',
 };
 
+/**
+ * TODO(voice-tool-acl-spec-v1 §5):這份清單目前沒有依角色過濾,是這次補權限
+ * 守衛時刻意留下的缺口,不是漏看。
+ *
+ * 查證結果:呼叫端 app/api/voice-lab/chat/route.ts 其實拿得到 role
+ * (`const user = await getSession()`,`user.role` 現成可用)——並不是「沒有
+ * session/role 可用」。真正的障礙是這裡:AGENT_TOOLS 是一個模組層級的靜態
+ * 陣列,直接被 voice-agent.ts 的 runAgentTurn() 當常數引用(`tools: AGENT_TOOLS`),
+ * 沒有任何管道把 role 傳進來——要做對得把 runAgentTurn 簽章/AgentDeps 加一個
+ * role 欄位,一路穿到這裡,而 lib/__tests__/voice-agent.test.ts 有 20+ 處呼叫
+ * 共用同一個 deps() 測試 helper,全部要跟著改。
+ *
+ * 現況下這是零行為變化(現有工具全部是 sites,員工老闆都通過),為了這個
+ * 沒有實際效果的變動去動一個已經有大量測試釘住行為的檔案,風險不成比例——
+ * 跟 Realtime 版(voice-realtime-tools.ts,本來就是函式、role 直接是參數)
+ * 條件不同,不是同樣複製貼上就能做完。等下一批工具真的需要區分權限時,
+ * 再一併把 runAgentTurn 的簽章改掉。
+ */
 export const AGENT_TOOLS: ToolSchema[] = [
   {
     name: 'search_projects',

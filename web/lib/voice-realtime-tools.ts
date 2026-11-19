@@ -1,5 +1,8 @@
 import 'server-only';
 import { todayInTaipei } from '@/lib/voice-agent';
+import { can, type Capability } from '@/lib/acl';
+import { PROPOSE_ACTION_CAPABILITIES, TOOL_CAPABILITIES } from '@/lib/voice-tool-acl';
+import type { UserRole } from '@/lib/types';
 
 /**
  * voice-lab Realtime 語音版的工具面。跟 lib/voice-agent-tools.ts(Lab 2 文字版)
@@ -107,13 +110,38 @@ export function canInlineProjects(projects: KnownProject[]): boolean {
 }
 
 /**
+ * 工具名 → 所需能力,查不到回 null。跟 dispatcher(voice-tool-acl.ts)用同一張表,
+ * 不能自己另外判斷一次,否則哪天兩邊改分岔就等於工具清單跟實際能不能呼叫脫鉤。
+ *
+ * propose_create_task 依它最終會提案的 action 對應能力(跟真正 commit 的
+ * create_task 同一格)。end_call 沒有對應到任何 Lab 1 工具,不查這張表——
+ * 見 buildRealtimeTools() 裡的特例。回 null 在這裡代表「這個工具名不在已知
+ * 清單裡」,呼叫端預設過濾掉,不是「不需要能力放行」。
+ */
+function capabilityForRealtimeTool(toolName: string): Capability | null {
+  if (toolName in TOOL_CAPABILITIES) return TOOL_CAPABILITIES[toolName];
+  const action = REALTIME_PROPOSE_ACTION[toolName];
+  if (action) return PROPOSE_ACTION_CAPABILITIES[action] ?? null;
+  return null;
+}
+
+/**
  * 這一通要給模型的工具清單。
  * 內嵌模式:不給 search_projects(清單已經在提示詞裡,查了也是多一次往返)。
  * 退回模式:加上 search_projects,否則模型完全沒有辦法找到任何專案——
  * 這正是 2026-08-24 我第一版漏掉的洞:刪了工具卻沒補退回路徑。
+ *
+ * 再依角色過濾一次:模型不該拿到它無權呼叫的工具——拿到了才被 403 擋,是把
+ * 可預防的失敗推遲到執行期,而且模型會在通話中對使用者講出一句莫名其妙的
+ * 失敗說明。end_call 永遠保留,其餘工具都要 can(role, cap) 為真才留著。
  */
-export function buildRealtimeTools(projects: KnownProject[]): RealtimeToolSchema[] {
-  return canInlineProjects(projects) ? REALTIME_TOOLS : [SEARCH_PROJECTS_TOOL, ...REALTIME_TOOLS];
+export function buildRealtimeTools(projects: KnownProject[], role: UserRole): RealtimeToolSchema[] {
+  const base = canInlineProjects(projects) ? REALTIME_TOOLS : [SEARCH_PROJECTS_TOOL, ...REALTIME_TOOLS];
+  return base.filter((t) => {
+    if (t.name === 'end_call') return true;
+    const cap = capabilityForRealtimeTool(t.name);
+    return cap !== null && can(role, cap);
+  });
 }
 
 /**

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/session';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { UserRole } from '@/lib/types';
 
 /**
  * voice-lab Lab 1 轉接層共用工具。
@@ -20,6 +21,7 @@ export type VoiceErrorCode =
   | 'PROJECT_NOT_FOUND'
   | 'BAD_REQUEST'
   | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
   | 'SERVICE_UNAVAILABLE';
 
 export function voiceError(code: VoiceErrorCode, messageZh: string, status: number): NextResponse {
@@ -77,10 +79,22 @@ interface VoiceAuthOk {
   ok: true;
   sb: SupabaseClient;
   actorId: string;
+  /** 呼叫者的角色——工具層權限守衛(lib/voice-tool-acl.ts)靠這個查表,跟人走 UI 用同一份 acl.ts */
+  role: UserRole;
 }
 interface VoiceAuthFail {
   ok: false;
   response: NextResponse;
+}
+
+/**
+ * role 欄位讀出來不是 'boss'/'staff'(null、或資料庫髒資料)一律 loud 503——
+ * 工具層權限守衛(voice-tool-acl.ts)拿 role 去查 can(role, cap),role 猜錯
+ * 一格就等於猜錯整張權限表,不能預設成 staff(那是「猜錯方向就直接洞開」),
+ * 也不能預設成 boss(那是直接放行一切)。查不到就是查不到,不猜。
+ */
+function isKnownRole(role: unknown): role is UserRole {
+  return role === 'boss' || role === 'staff';
 }
 
 /**
@@ -90,8 +104,9 @@ interface VoiceAuthFail {
  *    不是寫死的 VOICE_ACTOR_USER_ID。這條路優先檢查:帶了合法 session 的請求
  *    本來就代表一個真人已經登入,不需要再繞道 Bearer key。
  * 2. Bearer VOICE_API_KEY(server-to-server,例如 Lab 2 文字 agent 的舊路徑)——
- *    actor 固定是 VOICE_ACTOR_USER_ID。缺配置 loud 回 503,不靜默放行
- *    (voice-lab spec §8 風險條款)。
+ *    actor 固定是 VOICE_ACTOR_USER_ID,role 就是那個使用者的真實 role
+ *    (目前設成老闆),不特別放行、也不特別限制。缺配置 loud 回 503,
+ *    不靜默放行(voice-lab spec §8 風險條款)。
  */
 export async function authenticateVoiceRequest(req: Request): Promise<VoiceAuthOk | VoiceAuthFail> {
   const session = await getSession();
@@ -99,7 +114,7 @@ export async function authenticateVoiceRequest(req: Request): Promise<VoiceAuthO
     const sb = getSupabaseAdmin();
     const { data: actor, error } = await sb
       .from('users')
-      .select('id, active')
+      .select('id, active, role')
       .eq('id', session.id)
       .maybeSingle();
     if (error) {
@@ -108,7 +123,10 @@ export async function authenticateVoiceRequest(req: Request): Promise<VoiceAuthO
     if (!actor || !actor.active) {
       return { ok: false, response: voiceError('UNAUTHORIZED', '使用者不存在或已停用', 401) };
     }
-    return { ok: true, sb, actorId: actor.id as string };
+    if (!isKnownRole(actor.role)) {
+      return { ok: false, response: voiceError('SERVICE_UNAVAILABLE', 'actor 角色資料異常', 503) };
+    }
+    return { ok: true, sb, actorId: actor.id as string, role: actor.role };
   }
 
   const expectedKey = process.env.VOICE_API_KEY;
@@ -130,7 +148,7 @@ export async function authenticateVoiceRequest(req: Request): Promise<VoiceAuthO
   const sb = getSupabaseAdmin();
   const { data: actor, error } = await sb
     .from('users')
-    .select('id, active')
+    .select('id, active, role')
     .eq('id', actorUserId)
     .maybeSingle();
   if (error) {
@@ -139,8 +157,11 @@ export async function authenticateVoiceRequest(req: Request): Promise<VoiceAuthO
   if (!actor || !actor.active) {
     return { ok: false, response: voiceError('SERVICE_UNAVAILABLE', 'voice 服務的 actor 使用者不存在或已停用', 503) };
   }
+  if (!isKnownRole(actor.role)) {
+    return { ok: false, response: voiceError('SERVICE_UNAVAILABLE', 'actor 角色資料異常', 503) };
+  }
 
-  return { ok: true, sb, actorId: actor.id as string };
+  return { ok: true, sb, actorId: actor.id as string, role: actor.role };
 }
 
 /** 統一把「表不存在」轉成 loud 503,其餘 DB 錯誤轉成 500 */

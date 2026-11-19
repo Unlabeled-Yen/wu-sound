@@ -35,7 +35,7 @@ describe('內嵌模式(案量小)', () => {
   });
 
   it('不給 search_projects——清單已經在提示詞裡,再查是多一次往返', () => {
-    const names = buildRealtimeTools(few).map((t) => t.name);
+    const names = buildRealtimeTools(few, 'boss').map((t) => t.name);
     expect(names).not.toContain('search_projects');
     expect(names).toContain('propose_create_task');
   });
@@ -56,8 +56,8 @@ describe('退回模式(案量超過上限,或清單讀取失敗)', () => {
 
   it('退回時一定要補上 search_projects,否則 AI 完全找不到專案', () => {
     // 這是第一版真的漏掉的洞,不是假設性的邊角案例
-    expect(buildRealtimeTools(many).map((t) => t.name)).toContain('search_projects');
-    expect(buildRealtimeTools([]).map((t) => t.name)).toContain('search_projects');
+    expect(buildRealtimeTools(many, 'boss').map((t) => t.name)).toContain('search_projects');
+    expect(buildRealtimeTools([], 'boss').map((t) => t.name)).toContain('search_projects');
   });
 
   it('規則要換成「去查」,不能殘留對不到東西的「上面那份清單」指涉', () => {
@@ -72,7 +72,7 @@ describe('退回模式(案量超過上限,或清單讀取失敗)', () => {
 describe('不分模式都要成立的鐵律', () => {
   it('模型永遠拿不到直接寫入的工具,只有 propose_*', () => {
     for (const projects of [few, many, [] as KnownProject[]]) {
-      const names = buildRealtimeTools(projects).map((t) => t.name);
+      const names = buildRealtimeTools(projects, 'boss').map((t) => t.name);
       expect(names).not.toContain('create_task');
       expect(names).not.toContain('log_note');
       expect(names).toContain('propose_create_task');
@@ -81,7 +81,23 @@ describe('不分模式都要成立的鐵律', () => {
 
   it('工作記錄那條路已經整套移除,不可以復活', () => {
     for (const projects of [few, many]) {
-      expect(buildRealtimeTools(projects).map((t) => t.name)).not.toContain('propose_log_note');
+      expect(buildRealtimeTools(projects, 'boss').map((t) => t.name)).not.toContain('propose_log_note');
+    }
+  });
+});
+
+describe('依角色過濾(voice-tool-acl-spec-v1 §5)', () => {
+  it('現有工具全部是 sites,員工/老闆拿到的工具清單目前應等長', () => {
+    for (const projects of [few, many, [] as KnownProject[]]) {
+      const staffNames = buildRealtimeTools(projects, 'staff').map((t) => t.name);
+      const bossNames = buildRealtimeTools(projects, 'boss').map((t) => t.name);
+      expect(staffNames).toEqual(bossNames);
+    }
+  });
+
+  it('end_call 沒有能力對應,兩種角色都在——不能因為過濾邏輯的副作用把它濾掉', () => {
+    for (const role of ['staff', 'boss'] as const) {
+      expect(buildRealtimeTools(few, role).map((t) => t.name)).toContain('end_call');
     }
   });
 });

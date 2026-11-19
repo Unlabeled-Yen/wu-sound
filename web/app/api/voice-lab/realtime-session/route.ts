@@ -107,7 +107,7 @@ export async function POST() {
             output: { voice },
           },
           instructions: buildRealtimeInstructions(Date.now(), projects),
-          tools: buildRealtimeTools(projects),
+          tools: buildRealtimeTools(projects, session.role),
           tool_choice: 'auto',
         },
       }),

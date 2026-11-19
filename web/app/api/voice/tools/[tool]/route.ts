@@ -10,6 +10,8 @@ import {
   voiceError,
   withVersion,
 } from '@/lib/voice';
+import { can } from '@/lib/acl';
+import { capabilityForTool } from '@/lib/voice-tool-acl';
 
 export const runtime = 'nodejs';
 
@@ -363,10 +365,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ tool: string }
 
   const auth = await authenticateVoiceRequest(req);
   if (!auth.ok) return auth.response;
-  const { sb, actorId } = auth;
+  const { sb, actorId, role } = auth;
 
   const body = await parseBody(req);
   if (body === null) return voiceError('BAD_REQUEST', '請求格式不是有效的 JSON', 400);
+
+  // 能力檢查一定要在這裡、在所有 if (tool === ...) 分派之前做一次,不能留給
+  // 各個工具函式各做各的——那就退回成「每支路由自己記得寫」的老問題了。
+  // 工具沒登記在 TOOL_CAPABILITIES(voice-tool-acl.ts)→ 擋下來,不是放行:
+  // 未來新增工具卻忘了登記,結果是這個工具完全不能用,而不是對所有人開放。
+  const cap = capabilityForTool(tool, body);
+  if (cap === null) return voiceError('BAD_REQUEST', `工具 ${tool} 尚未登記權限`, 400);
+  if (!can(role, cap)) return voiceError('FORBIDDEN', '你沒有權限使用這個功能', 403);
 
   if (tool === 'search_projects') return searchProjects(sb, body);
   if (tool === 'list_projects') return listProjects(sb);
@@ -379,5 +389,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ tool: string }
     // 不會走到這裡(above 已窮舉),保留給未來新增工具時的防呆
     return voiceError('BAD_REQUEST', `工具 ${tool} 尚未實作`, 400);
   }
+  // 這裡其實也不會走到:任何不在 TOOL_CAPABILITIES 裡的工具名,上面的能力檢查
+  // 早就先擋下來回 400 了(訊息是「尚未登記權限」)。保留這行純粹是防呆的最後一道——
+  // 萬一哪天能力檢查那段被改壞,至少還有這一層兜底,不會真的憑空回一個 500。
   return voiceError('BAD_REQUEST', `未知的工具: ${tool}`, 404);
 }
